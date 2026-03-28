@@ -1,0 +1,12 @@
+{
+  "name": "taxi-concierge",
+  "private": true,
+  "scripts": {
+    "dev": "bun run src/index.ts",
+    "format": "treefmt",
+    "lint": "prettier --check ."
+  },
+  "devDependencies": {
+    "prettier": "^3.0.0"
+  }
+}

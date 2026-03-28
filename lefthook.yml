@@ -1,0 +1,7 @@
+pre-commit:
+  parallel: true
+  commands:
+    format:
+      run: treefmt
+    lint:
+      run: bunx prettier --check .
