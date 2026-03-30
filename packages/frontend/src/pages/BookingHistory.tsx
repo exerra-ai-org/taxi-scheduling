@@ -10,12 +10,17 @@ import {
 } from "../lib/format";
 import ReviewForm from "./ReviewForm";
 import { SkeletonCard } from "../components/Skeleton";
+import ConfirmDialog from "../components/ConfirmDialog";
+import { useConfirm } from "../hooks/useConfirm";
+import { useToast } from "../context/ToastContext";
 
 export default function BookingHistory() {
   const navigate = useNavigate();
   const [bookings, setBookings] = useState<Booking[]>([]);
   const [loading, setLoading] = useState(true);
   const [reviewBookingId, setReviewBookingId] = useState<number | null>(null);
+  const { confirm, dialogProps } = useConfirm();
+  const toast = useToast();
 
   async function fetchBookings() {
     try {
@@ -33,12 +38,19 @@ export default function BookingHistory() {
   }, []);
 
   async function handleCancel(id: number) {
-    if (!confirm("Cancel this booking?")) return;
+    const ok = await confirm({
+      title: "Cancel Booking",
+      message: "Are you sure you want to cancel this booking?",
+      confirmLabel: "Cancel Booking",
+      variant: "danger",
+    });
+    if (!ok) return;
     try {
       await cancelBooking(id);
+      toast.success("Booking cancelled");
       fetchBookings();
     } catch {
-      alert("Failed to cancel booking");
+      toast.error("Failed to cancel booking");
     }
   }
 
@@ -141,6 +153,7 @@ export default function BookingHistory() {
         bookingId={reviewBookingId}
         onClose={() => setReviewBookingId(null)}
       />
+      {dialogProps && <ConfirmDialog {...dialogProps} />}
     </div>
   );
 }

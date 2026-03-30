@@ -1,8 +1,11 @@
 import { useState } from "react";
 import type { Booking, BookingStatus } from "shared/types";
 import StatusBadge from "../../components/StatusBadge";
+import ConfirmDialog from "../../components/ConfirmDialog";
 import { formatDate, formatPrice } from "../../lib/format";
 import { api } from "../../api/client";
+import { useConfirm } from "../../hooks/useConfirm";
+import { useToast } from "../../context/ToastContext";
 
 interface Props {
   booking: Booking;
@@ -19,18 +22,26 @@ const NEXT_STATUS: Partial<
 
 export default function RideCard({ booking, onStatusUpdate }: Props) {
   const [loading, setLoading] = useState(false);
+  const { confirm, dialogProps } = useConfirm();
+  const toast = useToast();
   const next = NEXT_STATUS[booking.status];
 
   async function handleAction() {
-    if (!next || !confirm(`Set ride to "${next.label}"?`)) return;
+    if (!next) return;
+    const ok = await confirm({
+      title: "Update Status",
+      message: `Set this ride to "${next.label}"?`,
+    });
+    if (!ok) return;
     setLoading(true);
     try {
       await api.patch(`/api/bookings/${booking.id}/status`, {
         status: next.status,
       });
+      toast.success(`Ride set to ${next.label}`);
       onStatusUpdate();
     } catch {
-      alert("Failed to update status");
+      toast.error("Failed to update status");
     } finally {
       setLoading(false);
     }
@@ -66,6 +77,7 @@ export default function RideCard({ booking, onStatusUpdate }: Props) {
           {loading ? "Updating..." : next.label}
         </button>
       )}
+      {dialogProps && <ConfirmDialog {...dialogProps} />}
     </div>
   );
 }
