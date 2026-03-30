@@ -7,6 +7,7 @@ import { bookingRoutes } from "./routes/bookings";
 import { driverRoutes } from "./routes/drivers";
 import { couponRoutes } from "./routes/coupons";
 import { reviewRoutes } from "./routes/reviews";
+import { zoneRoutes } from "./routes/zones";
 
 const app = new Hono();
 
@@ -29,6 +30,7 @@ app.route("/api/bookings", bookingRoutes);
 app.route("/api/drivers", driverRoutes);
 app.route("/api/coupons", couponRoutes);
 app.route("/api/reviews", reviewRoutes);
+app.route("/api/zones", zoneRoutes);
 
 export default {
   port: 3000,
