@@ -15,9 +15,11 @@ import RideTimeline from "./pages/admin/RideTimeline";
 import DriverManagement from "./pages/admin/DriverManagement";
 import CouponManagement from "./pages/admin/CouponManagement";
 
-// Driver — placeholder until Phase 1e
-function MyRides() {
-  return <h1 className="text-xl font-semibold">Driver: My Rides</h1>;
+import MyRides from "./pages/driver/MyRides";
+
+// Register service worker
+if ("serviceWorker" in navigator) {
+  navigator.serviceWorker.register("/sw.js").catch(() => {});
 }
 
 ReactDOM.createRoot(document.getElementById("root")!).render(

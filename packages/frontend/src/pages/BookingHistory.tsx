@@ -8,11 +8,13 @@ import {
   statusLabel,
   statusColor,
 } from "../lib/format";
+import ReviewForm from "./ReviewForm";
 
 export default function BookingHistory() {
   const navigate = useNavigate();
   const [bookings, setBookings] = useState<Booking[]>([]);
   const [loading, setLoading] = useState(true);
+  const [reviewBookingId, setReviewBookingId] = useState<number | null>(null);
 
   async function fetchBookings() {
     try {
@@ -118,9 +120,22 @@ export default function BookingHistory() {
                 Cancel
               </button>
             )}
+            {b.status === "completed" && (
+              <button
+                onClick={() => setReviewBookingId(b.id)}
+                className="text-xs text-green-600 hover:text-green-800"
+              >
+                Leave Review
+              </button>
+            )}
           </div>
         </div>
       ))}
+
+      <ReviewForm
+        bookingId={reviewBookingId}
+        onClose={() => setReviewBookingId(null)}
+      />
     </div>
   );
 }
