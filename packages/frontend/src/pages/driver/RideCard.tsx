@@ -99,7 +99,7 @@ export default function RideCard({ booking, onStatusUpdate }: Props) {
         <button
           onClick={handleAction}
           disabled={loading}
-          className={`mt-3 w-full text-white py-2 rounded-lg text-sm font-semibold transition-colors disabled:opacity-50 ${next.color}`}
+          className={`mt-3 w-full text-white py-2 rounded-lg text-sm font-semibold transition-colors disabled:opacity-50 btn-press ${next.color}`}
         >
           {loading ? "Updating..." : next.label}
         </button>

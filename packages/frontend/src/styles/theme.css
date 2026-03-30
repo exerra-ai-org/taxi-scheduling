@@ -117,3 +117,35 @@
 .animate-pulse-ring {
   animation: pulse-ring 1.5s ease-out infinite;
 }
+
+@keyframes stagger-in {
+  from {
+    opacity: 0;
+    transform: translateY(0.5rem);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.animate-stagger-in {
+  animation: stagger-in 0.3s ease-out both;
+}
+
+.hover-lift {
+  transition:
+    box-shadow 0.15s ease,
+    transform 0.15s ease;
+}
+
+.hover-lift:hover {
+  box-shadow:
+    0 4px 6px -1px rgb(0 0 0 / 0.07),
+    0 2px 4px -2px rgb(0 0 0 / 0.05);
+  transform: translateY(-1px);
+}
+
+.btn-press:active {
+  transform: scale(0.97);
+}

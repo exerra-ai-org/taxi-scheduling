@@ -29,11 +29,14 @@ export default function Login() {
   }
 
   return (
-    <div className="mx-auto max-w-sm mt-16">
-      <h1 className="text-2xl font-bold text-center mb-6">Login</h1>
+    <div className="mx-auto max-w-sm mt-16 animate-fade-in">
+      <div className="text-center mb-8">
+        <h1 className="text-2xl font-bold text-gray-900">Welcome back</h1>
+        <p className="text-sm text-gray-500 mt-1">Sign in to your account</p>
+      </div>
       <form onSubmit={handleSubmit} className="space-y-4">
         {error && (
-          <div className="bg-red-50 text-red-700 px-4 py-2 rounded text-sm">
+          <div className="bg-red-50 text-red-700 px-4 py-2 rounded-lg text-sm border border-red-100">
             {error}
           </div>
         )}
@@ -46,7 +49,8 @@ export default function Login() {
             value={email}
             onChange={(e) => setEmail(e.target.value)}
             required
-            className="w-full border rounded px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+            autoFocus
+            className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-shadow"
             placeholder="you@example.com"
           />
         </div>
@@ -62,16 +66,42 @@ export default function Login() {
             type="password"
             value={password}
             onChange={(e) => setPassword(e.target.value)}
-            className="w-full border rounded px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+            className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-shadow"
             placeholder="Leave empty for customer login"
           />
         </div>
         <button
           type="submit"
           disabled={loading}
-          className="w-full bg-blue-600 text-white py-2 rounded font-medium hover:bg-blue-700 disabled:opacity-50"
+          className="w-full bg-blue-600 text-white py-2.5 rounded-lg font-semibold hover:bg-blue-700 disabled:opacity-50 transition-colors btn-press"
         >
-          {loading ? "Logging in..." : "Login"}
+          {loading ? (
+            <span className="flex items-center justify-center gap-2">
+              <svg
+                className="animate-spin w-4 h-4"
+                viewBox="0 0 24 24"
+                fill="none"
+              >
+                <circle
+                  cx="12"
+                  cy="12"
+                  r="10"
+                  stroke="currentColor"
+                  strokeWidth="3"
+                  opacity="0.25"
+                />
+                <path
+                  d="M12 2a10 10 0 0 1 10 10"
+                  stroke="currentColor"
+                  strokeWidth="3"
+                  strokeLinecap="round"
+                />
+              </svg>
+              Signing in...
+            </span>
+          ) : (
+            "Sign In"
+          )}
         </button>
       </form>
     </div>

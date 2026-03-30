@@ -106,10 +106,11 @@ export default function BookingHistory() {
   return (
     <div className="space-y-4">
       <h1 className="text-xl font-semibold">My Bookings</h1>
-      {bookings.map((b) => (
+      {bookings.map((b, i) => (
         <div
           key={b.id}
-          className={`bg-white border border-l-4 rounded-lg p-4 ${STATUS_LEFT_BORDER[b.status] ?? "border-l-gray-200"}`}
+          className={`bg-white border border-l-4 rounded-lg p-4 hover-lift animate-stagger-in ${STATUS_LEFT_BORDER[b.status] ?? "border-l-gray-200"}`}
+          style={{ animationDelay: `${i * 60}ms` }}
         >
           <div className="flex items-start justify-between">
             <div className="space-y-1 flex-1 min-w-0 pr-3">

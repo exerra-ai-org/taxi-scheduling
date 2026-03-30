@@ -42,8 +42,34 @@ export default function Confirmation({ data, onBack, onReset }: Props) {
 
   if (success) {
     return (
-      <div className="text-center space-y-4">
-        <div className="text-4xl">✓</div>
+      <div className="text-center space-y-4 animate-fade-in">
+        {/* Animated SVG checkmark */}
+        <div className="flex justify-center">
+          <svg
+            viewBox="0 0 52 52"
+            className="w-20 h-20 text-green-500"
+            fill="none"
+          >
+            <circle
+              cx="26"
+              cy="26"
+              r="25"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2"
+            />
+            <path
+              d="M14 27l8 8 16-16"
+              stroke="currentColor"
+              strokeWidth="2.5"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              strokeDasharray="40"
+              strokeDashoffset="40"
+              style={{ animation: "check-stroke 0.4s 0.2s ease forwards" }}
+            />
+          </svg>
+        </div>
         <h2 className="text-xl font-semibold text-green-700">
           Booking Confirmed!
         </h2>
@@ -54,13 +80,13 @@ export default function Confirmation({ data, onBack, onReset }: Props) {
         <div className="flex gap-3 justify-center">
           <button
             onClick={() => navigate("/bookings")}
-            className="bg-blue-600 text-white px-4 py-2 rounded text-sm font-medium hover:bg-blue-700"
+            className="bg-blue-600 text-white px-4 py-2 rounded-lg text-sm font-semibold hover:bg-blue-700 transition-colors"
           >
             View My Bookings
           </button>
           <button
             onClick={onReset}
-            className="border border-gray-300 text-gray-700 px-4 py-2 rounded text-sm hover:bg-gray-50"
+            className="border border-gray-200 text-gray-700 px-4 py-2 rounded-lg text-sm hover:bg-gray-50 transition-colors"
           >
             Book Another
           </button>
@@ -75,20 +101,24 @@ export default function Confirmation({ data, onBack, onReset }: Props) {
     <div className="space-y-4">
       <h2 className="text-xl font-semibold">Confirm Booking</h2>
 
-      <div className="bg-white border rounded-lg p-4 space-y-3">
+      <div className="bg-white border rounded-xl p-4 space-y-3">
         <div className="flex justify-between text-sm">
           <span className="text-gray-500">Pickup</span>
-          <span className="font-medium">{data.pickupAddress}</span>
+          <span className="font-medium text-right max-w-[60%]">
+            {data.pickupAddress}
+          </span>
         </div>
         <div className="flex justify-between text-sm">
           <span className="text-gray-500">Drop-off</span>
-          <span className="font-medium">{data.dropoffAddress}</span>
+          <span className="font-medium text-right max-w-[60%]">
+            {data.dropoffAddress}
+          </span>
         </div>
         <div className="flex justify-between text-sm">
           <span className="text-gray-500">Date & Time</span>
           <span className="font-medium">{formatDate(scheduledDate)}</span>
         </div>
-        <hr />
+        <hr className="border-gray-100" />
         <div className="flex justify-between text-sm">
           <span className="text-gray-500">Price</span>
           <span>{formatPrice(data.pricePence)}</span>
@@ -99,7 +129,7 @@ export default function Confirmation({ data, onBack, onReset }: Props) {
               <span>Discount ({data.couponCode})</span>
               <span>-{formatPrice(data.discountPence)}</span>
             </div>
-            <hr />
+            <hr className="border-gray-100" />
           </>
         )}
         <div className="flex justify-between font-semibold">
@@ -118,7 +148,7 @@ export default function Confirmation({ data, onBack, onReset }: Props) {
       </div>
 
       {error && (
-        <div className="bg-red-50 text-red-700 px-4 py-2 rounded text-sm">
+        <div className="bg-red-50 text-red-700 px-4 py-2 rounded-lg text-sm border border-red-100">
           {error}
         </div>
       )}
@@ -126,16 +156,42 @@ export default function Confirmation({ data, onBack, onReset }: Props) {
       <div className="flex gap-3">
         <button
           onClick={onBack}
-          className="flex-1 border border-gray-300 text-gray-700 py-2 rounded hover:bg-gray-50"
+          className="flex-1 border border-gray-200 text-gray-700 py-2 rounded-lg hover:bg-gray-50 transition-colors"
         >
           Back
         </button>
         <button
           onClick={handleConfirm}
           disabled={loading}
-          className="flex-1 bg-blue-600 text-white py-2 rounded font-medium hover:bg-blue-700 disabled:opacity-50"
+          className="flex-1 bg-blue-600 text-white py-2 rounded-lg font-semibold hover:bg-blue-700 disabled:opacity-50 transition-colors btn-press"
         >
-          {loading ? "Booking..." : "Confirm Booking"}
+          {loading ? (
+            <span className="flex items-center justify-center gap-2">
+              <svg
+                className="animate-spin w-4 h-4"
+                viewBox="0 0 24 24"
+                fill="none"
+              >
+                <circle
+                  cx="12"
+                  cy="12"
+                  r="10"
+                  stroke="currentColor"
+                  strokeWidth="3"
+                  opacity="0.25"
+                />
+                <path
+                  d="M12 2a10 10 0 0 1 10 10"
+                  stroke="currentColor"
+                  strokeWidth="3"
+                  strokeLinecap="round"
+                />
+              </svg>
+              Booking...
+            </span>
+          ) : (
+            "Confirm Booking"
+          )}
         </button>
       </div>
     </div>
