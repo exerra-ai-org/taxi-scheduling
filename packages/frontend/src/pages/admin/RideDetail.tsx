@@ -8,6 +8,7 @@ import {
   updateBookingStatus,
   triggerFallback,
 } from "../../api/admin";
+import { SkeletonText } from "../../components/Skeleton";
 import { formatPrice, formatDate } from "../../lib/format";
 
 interface Assignment {
@@ -79,7 +80,9 @@ export default function RideDetail({ bookingId, onClose, onUpdated }: Props) {
   return (
     <Modal isOpen={!!bookingId} onClose={onClose} title="Ride Detail">
       {loading || !booking ? (
-        <div className="text-center py-8 text-gray-500">Loading...</div>
+        <div className="space-y-4 py-2">
+          <SkeletonText lines={4} />
+        </div>
       ) : (
         <div className="space-y-4">
           {/* Booking info */}

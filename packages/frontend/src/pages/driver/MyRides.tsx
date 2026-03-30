@@ -2,6 +2,7 @@ import { useEffect, useState, useCallback } from "react";
 import type { Booking } from "shared/types";
 import { listBookings } from "../../api/bookings";
 import RideCard from "./RideCard";
+import { SkeletonCard } from "../../components/Skeleton";
 
 export default function MyRides() {
   const [bookings, setBookings] = useState<Booking[]>([]);
@@ -26,7 +27,11 @@ export default function MyRides() {
 
   if (loading) {
     return (
-      <div className="text-center py-12 text-gray-500">Loading rides...</div>
+      <div className="space-y-2">
+        {Array.from({ length: 3 }).map((_, i) => (
+          <SkeletonCard key={i} />
+        ))}
+      </div>
     );
   }
 

@@ -3,6 +3,7 @@ import type { Booking, BookingStatus } from "shared/types";
 import { listAllBookings } from "../../api/admin";
 import { formatPrice, formatDate } from "../../lib/format";
 import StatusBadge from "../../components/StatusBadge";
+import { SkeletonCard } from "../../components/Skeleton";
 import AlertsBanner from "./AlertsBanner";
 import RideDetail from "./RideDetail";
 
@@ -48,7 +49,11 @@ export default function RideTimeline() {
 
   if (loading) {
     return (
-      <div className="text-center py-12 text-gray-500">Loading rides...</div>
+      <div className="space-y-2">
+        {Array.from({ length: 5 }).map((_, i) => (
+          <SkeletonCard key={i} />
+        ))}
+      </div>
     );
   }
 

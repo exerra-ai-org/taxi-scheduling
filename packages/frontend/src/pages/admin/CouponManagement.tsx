@@ -3,6 +3,7 @@ import type { Coupon } from "shared/types";
 import { listCoupons, createCoupon } from "../../api/admin";
 import { formatPrice, formatDate } from "../../lib/format";
 import { ApiError } from "../../api/client";
+import { SkeletonCard } from "../../components/Skeleton";
 
 export default function CouponManagement() {
   const [coupons, setCoupons] = useState<Coupon[]>([]);
@@ -60,7 +61,11 @@ export default function CouponManagement() {
 
   if (loading) {
     return (
-      <div className="text-center py-12 text-gray-500">Loading coupons...</div>
+      <div className="space-y-2">
+        {Array.from({ length: 4 }).map((_, i) => (
+          <SkeletonCard key={i} />
+        ))}
+      </div>
     );
   }
 

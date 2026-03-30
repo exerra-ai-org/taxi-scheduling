@@ -9,6 +9,7 @@ import {
   statusColor,
 } from "../lib/format";
 import ReviewForm from "./ReviewForm";
+import { SkeletonCard } from "../components/Skeleton";
 
 export default function BookingHistory() {
   const navigate = useNavigate();
@@ -52,7 +53,11 @@ export default function BookingHistory() {
 
   if (loading) {
     return (
-      <div className="text-center py-12 text-gray-500">Loading bookings...</div>
+      <div className="space-y-2">
+        {Array.from({ length: 3 }).map((_, i) => (
+          <SkeletonCard key={i} />
+        ))}
+      </div>
     );
   }
 

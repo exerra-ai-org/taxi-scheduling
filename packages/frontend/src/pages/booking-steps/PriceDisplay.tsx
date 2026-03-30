@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import type { BookingData } from "../BookingFlow";
 import { getQuote } from "../../api/bookings";
 import { formatPrice } from "../../lib/format";
+import { Skeleton } from "../../components/Skeleton";
 
 interface Props {
   data: Partial<BookingData>;
@@ -30,8 +31,9 @@ export default function PriceDisplay({ data, onNext, onBack }: Props) {
 
   if (loading) {
     return (
-      <div className="text-center py-12 text-gray-500">
-        Getting your quote...
+      <div className="space-y-4 py-8">
+        <Skeleton className="h-16 w-full" />
+        <Skeleton className="h-4 w-1/2 mx-auto" />
       </div>
     );
   }

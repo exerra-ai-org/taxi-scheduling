@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { listDrivers } from "../../api/admin";
+import { SkeletonCard } from "../../components/Skeleton";
 
 interface Driver {
   id: number;
@@ -21,7 +22,11 @@ export default function DriverManagement() {
 
   if (loading) {
     return (
-      <div className="text-center py-12 text-gray-500">Loading drivers...</div>
+      <div className="space-y-2">
+        {Array.from({ length: 3 }).map((_, i) => (
+          <SkeletonCard key={i} />
+        ))}
+      </div>
     );
   }
 
