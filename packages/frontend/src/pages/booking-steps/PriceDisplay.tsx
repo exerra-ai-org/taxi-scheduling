@@ -4,6 +4,7 @@ import { getQuote } from "../../api/bookings";
 import { formatPrice } from "../../lib/format";
 import { Skeleton } from "../../components/Skeleton";
 import { IconMapPin } from "../../components/icons";
+import RouteMap from "../../components/maps/RouteMap";
 
 interface Props {
   data: Partial<BookingData>;
@@ -41,6 +42,12 @@ export default function PriceDisplay({ data, onNext, onBack }: Props) {
     data.dropoffLat,
     data.dropoffLon,
   ]);
+
+  const hasRouteCoords =
+    data.pickupLat != null &&
+    data.pickupLon != null &&
+    data.dropoffLat != null &&
+    data.dropoffLon != null;
 
   if (loading) {
     return (
@@ -87,6 +94,14 @@ export default function PriceDisplay({ data, onNext, onBack }: Props) {
           </span>
         )}
       </div>
+
+      {/* Route map when coords available */}
+      {hasRouteCoords && (
+        <RouteMap
+          pickup={{ lat: data.pickupLat!, lon: data.pickupLon! }}
+          dropoff={{ lat: data.dropoffLat!, lon: data.dropoffLon! }}
+        />
+      )}
 
       <div className="bg-gray-50 rounded-xl p-3 space-y-1.5 text-sm">
         <div className="flex items-start gap-2">

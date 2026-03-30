@@ -7,6 +7,7 @@ import { SkeletonCard } from "../../components/Skeleton";
 import AlertsBanner from "./AlertsBanner";
 import RideDetail from "./RideDetail";
 import { IconCar } from "../../components/icons";
+import ZoneMap from "../../components/maps/ZoneMap";
 
 const STATUS_OPTIONS: (BookingStatus | "all")[] = [
   "all",
@@ -25,6 +26,7 @@ export default function RideTimeline() {
     "all",
   );
   const [selectedId, setSelectedId] = useState<number | null>(null);
+  const [showZoneMap, setShowZoneMap] = useState(false);
 
   const fetchBookings = useCallback(async () => {
     try {
@@ -60,7 +62,21 @@ export default function RideTimeline() {
 
   return (
     <div>
-      <h1 className="text-xl font-semibold mb-4">Ride Timeline</h1>
+      <div className="flex items-center justify-between mb-4">
+        <h1 className="text-xl font-semibold">Ride Timeline</h1>
+        <button
+          onClick={() => setShowZoneMap((v) => !v)}
+          className="text-xs bg-gray-100 text-gray-600 hover:bg-gray-200 px-3 py-1.5 rounded-lg transition-colors"
+        >
+          {showZoneMap ? "Hide Zone Map" : "Show Zone Map"}
+        </button>
+      </div>
+
+      {showZoneMap && (
+        <div className="mb-4">
+          <ZoneMap />
+        </div>
+      )}
 
       <AlertsBanner
         bookings={bookings}

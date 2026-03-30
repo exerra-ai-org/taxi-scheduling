@@ -1,6 +1,7 @@
 import { useState } from "react";
 import type { BookingData } from "../BookingFlow";
 import AddressAutocomplete from "../../components/maps/AddressAutocomplete";
+import MapPicker from "../../components/maps/MapPicker";
 
 interface Props {
   data: Partial<BookingData>;
@@ -24,6 +25,10 @@ export default function JourneyInput({ data, onNext }: Props) {
   );
   const [date, setDate] = useState(data.date || "");
   const [time, setTime] = useState(data.time || "");
+
+  const hasCoords =
+    (pickupLat != null && pickupLon != null) ||
+    (dropoffLat != null && dropoffLon != null);
 
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -78,6 +83,30 @@ export default function JourneyInput({ data, onNext }: Props) {
           className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
         />
       </div>
+
+      {/* Map picker when coordinates available */}
+      {hasCoords && (
+        <MapPicker
+          pickupCoords={
+            pickupLat != null && pickupLon != null
+              ? { lat: pickupLat, lon: pickupLon }
+              : undefined
+          }
+          dropoffCoords={
+            dropoffLat != null && dropoffLon != null
+              ? { lat: dropoffLat, lon: dropoffLon }
+              : undefined
+          }
+          onPickupChange={(c) => {
+            setPickupLat(c.lat);
+            setPickupLon(c.lon);
+          }}
+          onDropoffChange={(c) => {
+            setDropoffLat(c.lat);
+            setDropoffLon(c.lon);
+          }}
+        />
+      )}
 
       <div className="grid grid-cols-2 gap-4">
         <div>
