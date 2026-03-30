@@ -1,8 +1,35 @@
 import { db } from "./index";
-import { users, zones, zonePricing, fixedRoutes, coupons } from "./schema";
+import { sql } from "drizzle-orm";
+import {
+  users,
+  zones,
+  zonePricing,
+  fixedRoutes,
+  coupons,
+  reviews,
+  driverAssignments,
+  bookings,
+} from "./schema";
 
 async function seed() {
   console.log("Seeding database...");
+
+  // Clear existing data (order matters for FK constraints)
+  console.log("  Clearing existing data...");
+  await db.delete(reviews);
+  await db.delete(driverAssignments);
+  await db.delete(bookings);
+  await db.delete(zonePricing);
+  await db.delete(fixedRoutes);
+  await db.delete(coupons);
+  await db.delete(zones);
+  await db.delete(users);
+  // Reset sequences
+  await db.execute(sql`ALTER SEQUENCE users_id_seq RESTART WITH 1`);
+  await db.execute(sql`ALTER SEQUENCE zones_id_seq RESTART WITH 1`);
+  await db.execute(sql`ALTER SEQUENCE zone_pricing_id_seq RESTART WITH 1`);
+  await db.execute(sql`ALTER SEQUENCE fixed_routes_id_seq RESTART WITH 1`);
+  await db.execute(sql`ALTER SEQUENCE coupons_id_seq RESTART WITH 1`);
 
   // ── Users ──────────────────────────────────────────
   const [admin] = await db
