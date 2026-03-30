@@ -9,13 +9,24 @@ pricingRoutes.get("/quote", async (c) => {
   const parsed = pricingQuoteSchema.safeParse({
     from: c.req.query("from"),
     to: c.req.query("to"),
+    fromLat: c.req.query("fromLat"),
+    fromLon: c.req.query("fromLon"),
+    toLat: c.req.query("toLat"),
+    toLon: c.req.query("toLon"),
   });
 
   if (!parsed.success) {
     return err(c, "Missing 'from' and 'to' query parameters", 400);
   }
 
-  const quote = await getPricingQuote(parsed.data.from, parsed.data.to);
+  const { from, to, fromLat, fromLon, toLat, toLon } = parsed.data;
+
+  const quote = await getPricingQuote(from, to, {
+    fromLat,
+    fromLon,
+    toLat,
+    toLon,
+  });
 
   if (!quote) {
     return err(c, "No pricing found for this route", 404);

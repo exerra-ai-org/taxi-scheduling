@@ -21,6 +21,10 @@ export const createBookingSchema = z.object({
   dropoffAddress: z.string().min(1),
   scheduledAt: z.string().datetime(),
   couponCode: z.string().optional(),
+  pickupLat: z.number().optional(),
+  pickupLon: z.number().optional(),
+  dropoffLat: z.number().optional(),
+  dropoffLon: z.number().optional(),
 });
 
 export const loginSchema = z.object({
@@ -59,4 +63,8 @@ export const createReviewSchema = z.object({
 export const pricingQuoteSchema = z.object({
   from: z.string().min(1),
   to: z.string().min(1),
+  fromLat: z.coerce.number().optional(),
+  fromLon: z.coerce.number().optional(),
+  toLat: z.coerce.number().optional(),
+  toLon: z.coerce.number().optional(),
 });

@@ -1,5 +1,5 @@
 import { Hono } from "hono";
-import { eq, and, desc, inArray, sql } from "drizzle-orm";
+import { eq, and, desc, inArray } from "drizzle-orm";
 import {
   createBookingSchema,
   updateBookingStatusSchema,
@@ -16,6 +16,7 @@ import { ok, err } from "../lib/response";
 import {
   getPricingQuote,
   getZoneByAddress,
+  getZoneByCoordinates,
   isLondonZone,
 } from "../services/pricing";
 import {
@@ -39,19 +40,38 @@ bookingRoutes.post("/", requireRole("customer"), async (c) => {
   }
 
   const payload = c.get("jwtPayload") as JwtPayload;
-  const { pickupAddress, dropoffAddress, scheduledAt, couponCode } =
-    parsed.data;
+  const {
+    pickupAddress,
+    dropoffAddress,
+    scheduledAt,
+    couponCode,
+    pickupLat,
+    pickupLon,
+    dropoffLat,
+    dropoffLon,
+  } = parsed.data;
   const scheduledDate = new Date(scheduledAt);
   const now = new Date();
 
-  // Get pricing quote
-  const quote = await getPricingQuote(pickupAddress, dropoffAddress);
+  // Get pricing quote — use coordinates when available
+  const quote = await getPricingQuote(pickupAddress, dropoffAddress, {
+    fromLat: pickupLat,
+    fromLon: pickupLon,
+    toLat: dropoffLat,
+    toLon: dropoffLon,
+  });
   if (!quote) {
     return err(c, "No pricing available for this route", 400);
   }
 
   // Determine minimum booking hours based on pickup zone
-  const pickupZone = await getZoneByAddress(pickupAddress);
+  let pickupZone = null;
+  if (pickupLat != null && pickupLon != null) {
+    pickupZone = await getZoneByCoordinates(pickupLat, pickupLon);
+  }
+  if (!pickupZone) {
+    pickupZone = await getZoneByAddress(pickupAddress);
+  }
   const minHours =
     pickupZone && isLondonZone(pickupZone.name)
       ? BOOKING_MIN_HOURS_LONDON
@@ -97,6 +117,10 @@ bookingRoutes.post("/", requireRole("customer"), async (c) => {
       customerId: payload.sub,
       pickupAddress,
       dropoffAddress,
+      pickupLat: pickupLat ?? null,
+      pickupLon: pickupLon ?? null,
+      dropoffLat: dropoffLat ?? null,
+      dropoffLon: dropoffLon ?? null,
       pickupZoneId: quote.pickupZoneId ?? null,
       dropoffZoneId: quote.dropoffZoneId ?? null,
       fixedRouteId: quote.fixedRouteId ?? null,

@@ -1,6 +1,6 @@
 import { db } from "../db/index";
 import { fixedRoutes, zones, zonePricing } from "../db/schema";
-import { ilike, eq, and, or, sql } from "drizzle-orm";
+import { eq, and, or, sql } from "drizzle-orm";
 import type { PricingQuote } from "shared/types";
 import { LONDON_ZONE_PATTERN } from "../lib/constants";
 
@@ -13,13 +13,56 @@ export async function getZoneByAddress(address: string) {
   return results[0] ?? null;
 }
 
+/**
+ * Coordinate-based zone lookup using PostGIS ST_Contains with GeoJSON boundaries.
+ * Falls back gracefully if no boundary data is stored.
+ */
+export async function getZoneByCoordinates(lat: number, lon: number) {
+  const results = await db
+    .select()
+    .from(zones)
+    .where(
+      sql`${zones.boundary} IS NOT NULL AND ST_Contains(
+        ST_GeomFromGeoJSON(${zones.boundary}::text),
+        ST_Point(${lon}, ${lat})
+      )`,
+    )
+    .limit(1);
+  return results[0] ?? null;
+}
+
 export function isLondonZone(zoneName: string): boolean {
   return LONDON_ZONE_PATTERN.test(zoneName);
+}
+
+async function getZonePriceForZones(fromZoneId: number, toZoneId: number) {
+  return db
+    .select()
+    .from(zonePricing)
+    .where(
+      or(
+        and(
+          eq(zonePricing.fromZoneId, fromZoneId),
+          eq(zonePricing.toZoneId, toZoneId),
+        ),
+        and(
+          eq(zonePricing.fromZoneId, toZoneId),
+          eq(zonePricing.toZoneId, fromZoneId),
+        ),
+      ),
+    )
+    .limit(1);
 }
 
 export async function getPricingQuote(
   from: string,
   to: string,
+  opts?: {
+    fromLat?: number;
+    fromLon?: number;
+    toLat?: number;
+    toLon?: number;
+  },
 ): Promise<
   | (PricingQuote & {
       fixedRouteId?: number;
@@ -51,31 +94,31 @@ export async function getPricingQuote(
     };
   }
 
-  // 2. Fall back to zone-based pricing
-  const pickupZone = await getZoneByAddress(from);
-  const dropoffZone = await getZoneByAddress(to);
+  // 2. Zone-based pricing — prefer coordinate lookup, fall back to text
+  let pickupZone = null;
+  let dropoffZone = null;
+
+  if (
+    opts?.fromLat != null &&
+    opts?.fromLon != null &&
+    opts?.toLat != null &&
+    opts?.toLon != null
+  ) {
+    [pickupZone, dropoffZone] = await Promise.all([
+      getZoneByCoordinates(opts.fromLat, opts.fromLon),
+      getZoneByCoordinates(opts.toLat, opts.toLon),
+    ]);
+  }
+
+  // Text fallback for either or both zones
+  if (!pickupZone) pickupZone = await getZoneByAddress(from);
+  if (!dropoffZone) dropoffZone = await getZoneByAddress(to);
 
   if (!pickupZone || !dropoffZone) {
     return null;
   }
 
-  // Try both directions for zone pricing
-  const zonePrice = await db
-    .select()
-    .from(zonePricing)
-    .where(
-      or(
-        and(
-          eq(zonePricing.fromZoneId, pickupZone.id),
-          eq(zonePricing.toZoneId, dropoffZone.id),
-        ),
-        and(
-          eq(zonePricing.fromZoneId, dropoffZone.id),
-          eq(zonePricing.toZoneId, pickupZone.id),
-        ),
-      ),
-    )
-    .limit(1);
+  const zonePrice = await getZonePriceForZones(pickupZone.id, dropoffZone.id);
 
   if (zonePrice.length > 0) {
     return {

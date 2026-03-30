@@ -7,6 +7,8 @@ import {
   timestamp,
   pgEnum,
   uniqueIndex,
+  doublePrecision,
+  jsonb,
 } from "drizzle-orm/pg-core";
 
 export const userRoleEnum = pgEnum("user_role", [
@@ -52,6 +54,10 @@ export const zones = pgTable("zones", {
   id: serial("id").primaryKey(),
   name: text("name").notNull().unique(),
   label: text("label").notNull(),
+  // GeoJSON polygon boundary (stored as jsonb, queried via ST_GeomFromGeoJSON)
+  boundary: jsonb("boundary"),
+  centerLat: doublePrecision("center_lat"),
+  centerLon: doublePrecision("center_lon"),
 });
 
 export const zonePricing = pgTable(
@@ -95,6 +101,10 @@ export const bookings = pgTable("bookings", {
     .references(() => users.id),
   pickupAddress: text("pickup_address").notNull(),
   dropoffAddress: text("dropoff_address").notNull(),
+  pickupLat: doublePrecision("pickup_lat"),
+  pickupLon: doublePrecision("pickup_lon"),
+  dropoffLat: doublePrecision("dropoff_lat"),
+  dropoffLon: doublePrecision("dropoff_lon"),
   pickupZoneId: integer("pickup_zone_id").references(() => zones.id),
   dropoffZoneId: integer("dropoff_zone_id").references(() => zones.id),
   fixedRouteId: integer("fixed_route_id").references(() => fixedRoutes.id),

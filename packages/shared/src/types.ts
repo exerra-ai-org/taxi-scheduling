@@ -25,6 +25,9 @@ export interface Zone {
   id: number;
   name: string;
   label: string;
+  boundary?: object | null;
+  centerLat?: number | null;
+  centerLon?: number | null;
 }
 
 export interface ZonePricing {
@@ -50,6 +53,10 @@ export interface Booking {
   customerId: number;
   pickupAddress: string;
   dropoffAddress: string;
+  pickupLat?: number | null;
+  pickupLon?: number | null;
+  dropoffLat?: number | null;
+  dropoffLon?: number | null;
   pickupZoneId: number | null;
   dropoffZoneId: number | null;
   fixedRouteId: number | null;
