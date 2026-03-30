@@ -5,9 +5,22 @@ interface Props {
   onClose: () => void;
   title?: string;
   children: ReactNode;
+  size?: "sm" | "md" | "lg";
 }
 
-export default function Modal({ isOpen, onClose, title, children }: Props) {
+const SIZE_CLASSES = {
+  sm: "max-w-sm",
+  md: "max-w-lg",
+  lg: "max-w-2xl",
+};
+
+export default function Modal({
+  isOpen,
+  onClose,
+  title,
+  children,
+  size = "md",
+}: Props) {
   useEffect(() => {
     function handleEsc(e: KeyboardEvent) {
       if (e.key === "Escape") onClose();
@@ -19,21 +32,26 @@ export default function Modal({ isOpen, onClose, title, children }: Props) {
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center">
-      <div className="absolute inset-0 bg-black/50" onClick={onClose} />
-      <div className="relative bg-white rounded-lg shadow-xl max-w-lg w-full mx-4 max-h-[90vh] overflow-y-auto">
+    <div className="fixed inset-0 z-50 flex items-center justify-center animate-fade-in">
+      <div
+        className="absolute inset-0 bg-black/50 backdrop-blur-sm"
+        onClick={onClose}
+      />
+      <div
+        className={`relative bg-white rounded-xl shadow-2xl ${SIZE_CLASSES[size]} w-full mx-4 max-h-[90vh] overflow-y-auto animate-scale-in`}
+      >
         {title && (
-          <div className="flex items-center justify-between px-4 py-3 border-b">
-            <h2 className="font-semibold">{title}</h2>
+          <div className="flex items-center justify-between px-5 py-4 border-b border-gray-100">
+            <h2 className="font-semibold text-gray-900">{title}</h2>
             <button
               onClick={onClose}
-              className="text-gray-400 hover:text-gray-600 text-xl"
+              className="w-8 h-8 flex items-center justify-center text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-lg transition-colors"
             >
-              &times;
+              ×
             </button>
           </div>
         )}
-        <div className="p-4">{children}</div>
+        <div className="p-5">{children}</div>
       </div>
     </div>
   );

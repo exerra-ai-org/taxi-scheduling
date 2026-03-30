@@ -42,26 +42,46 @@ export default function BookingFlow() {
 
   return (
     <div className="mx-auto max-w-lg">
-      {/* Step indicator */}
-      <div className="flex items-center justify-between mb-8">
+      {/* Step indicator with connecting lines */}
+      <div className="flex items-start mb-8">
         {STEP_LABELS.map((label, i) => {
           const num = i + 1;
           const isActive = num === step;
           const isComplete = num < step;
+          const isLast = i === STEP_LABELS.length - 1;
           return (
-            <div key={label} className="flex flex-col items-center flex-1">
-              <div
-                className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-medium ${
-                  isComplete
-                    ? "bg-green-500 text-white"
-                    : isActive
-                      ? "bg-blue-600 text-white"
-                      : "bg-gray-200 text-gray-500"
-                }`}
-              >
-                {isComplete ? "✓" : num}
+            <div key={label} className="flex items-start flex-1">
+              <div className="flex flex-col items-center">
+                <div
+                  className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-semibold transition-colors ${
+                    isComplete
+                      ? "bg-green-500 text-white"
+                      : isActive
+                        ? "bg-blue-600 text-white ring-4 ring-blue-100"
+                        : "bg-gray-100 text-gray-400"
+                  }`}
+                >
+                  {isComplete ? "✓" : num}
+                </div>
+                <span
+                  className={`text-xs mt-1.5 font-medium ${
+                    isActive
+                      ? "text-blue-600"
+                      : isComplete
+                        ? "text-green-600"
+                        : "text-gray-400"
+                  }`}
+                >
+                  {label}
+                </span>
               </div>
-              <span className="text-xs mt-1 text-gray-500">{label}</span>
+              {!isLast && (
+                <div
+                  className={`flex-1 h-0.5 mt-4 mx-1 transition-colors ${
+                    isComplete ? "bg-green-400" : "bg-gray-200"
+                  }`}
+                />
+              )}
             </div>
           );
         })}
