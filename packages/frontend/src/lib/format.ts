@@ -29,12 +29,12 @@ export function statusLabel(status: BookingStatus): string {
 
 export function statusColor(status: BookingStatus): string {
   const colors: Record<BookingStatus, string> = {
-    scheduled: "bg-blue-100/80 text-blue-700",
-    assigned: "bg-yellow-100/80 text-yellow-600",
-    en_route: "bg-orange-100/80 text-orange-600",
-    arrived: "bg-purple-100/80 text-purple-600",
-    completed: "bg-green-100/80 text-green-700",
-    cancelled: "bg-red-100/80 text-red-600",
+    scheduled: "status-scheduled",
+    assigned: "status-assigned",
+    en_route: "status-en-route",
+    arrived: "status-arrived",
+    completed: "status-completed",
+    cancelled: "status-cancelled",
   };
-  return colors[status] || "bg-gray-100 text-gray-500";
+  return colors[status] || "status-inactive";
 }

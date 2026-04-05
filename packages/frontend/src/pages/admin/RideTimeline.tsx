@@ -61,12 +61,15 @@ export default function RideTimeline() {
   }
 
   return (
-    <div>
-      <div className="flex items-center justify-between mb-4">
-        <h1 className="text-xl font-semibold">Ride Timeline</h1>
+    <div className="page-stack">
+      <div className="page-header">
+        <div>
+          <p className="section-label">Admin</p>
+          <h1 className="page-title mt-4 text-[40px]">Ride timeline</h1>
+        </div>
         <button
           onClick={() => setShowZoneMap((v) => !v)}
-          className="btn-secondary text-xs !py-1.5 !px-3"
+          className="btn-secondary button-text-compact"
         >
           {showZoneMap ? "Hide Zone Map" : "Show Zone Map"}
         </button>
@@ -84,17 +87,12 @@ export default function RideTimeline() {
         onFilterStartingSoon={() => setStatusFilter("all")}
       />
 
-      {/* Filters */}
-      <div className="flex gap-1.5 mb-4 overflow-x-auto pb-1">
+      <div className="segmented-filter overflow-x-auto pb-1">
         {STATUS_OPTIONS.map((s) => (
           <button
             key={s}
             onClick={() => setStatusFilter(s)}
-            className={`px-3 py-1.5 rounded-lg text-xs font-medium whitespace-nowrap transition-colors ${
-              statusFilter === s
-                ? "bg-blue-100/80 text-blue-600 ring-1 ring-blue-300/40"
-                : "bg-blue-50/60 text-gray-500 hover:bg-blue-50/80"
-            }`}
+            className={`whitespace-nowrap ${statusFilter === s ? "is-active" : ""}`}
           >
             {s === "all" ? "All" : s.replace("_", " ").toUpperCase()}
           </button>
@@ -103,57 +101,48 @@ export default function RideTimeline() {
 
       {/* Empty state */}
       {filtered.length === 0 ? (
-        <div className="text-center py-16">
-          <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-blue-50/60 mb-4">
-            <IconCar className="w-8 h-8 text-gray-400" />
+        <div className="empty-state">
+          <div className="empty-state-icon">
+            <IconCar className="h-8 w-8" />
           </div>
-          <p className="text-gray-400 text-sm">No rides found</p>
+          <p className="caption-copy">No rides found</p>
         </div>
       ) : (
         <>
-          {/* Desktop table */}
           <div className="hidden md:block glass-table">
-            <table className="w-full text-sm">
+            <table className="ds-table w-full text-sm">
               <thead>
-                <tr className="bg-blue-50/60 border-b border-black/8 text-left">
-                  <th className="px-4 py-3 font-medium text-gray-500 text-xs uppercase tracking-wide">
-                    Route
-                  </th>
-                  <th className="px-4 py-3 font-medium text-gray-500 text-xs uppercase tracking-wide">
-                    Scheduled
-                  </th>
-                  <th className="px-4 py-3 font-medium text-gray-500 text-xs uppercase tracking-wide">
-                    Price
-                  </th>
-                  <th className="px-4 py-3 font-medium text-gray-500 text-xs uppercase tracking-wide">
-                    Status
-                  </th>
+                <tr className="text-left">
+                  <th className="px-4 py-3">Route</th>
+                  <th className="px-4 py-3">Scheduled</th>
+                  <th className="px-4 py-3">Price</th>
+                  <th className="px-4 py-3">Status</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-black/5">
+              <tbody>
                 {filtered.map((b) => (
                   <tr
                     key={b.id}
                     onClick={() => setSelectedId(b.id)}
-                    className="hover:bg-blue-50 cursor-pointer transition-colors"
+                    className="cursor-pointer"
                   >
                     <td className="px-4 py-3">
-                      <div className="font-medium text-gray-900 truncate max-w-xs">
+                      <div className="max-w-xs truncate font-medium text-[var(--color-dark)]">
                         {b.pickupAddress}
                       </div>
-                      <div className="text-xs text-gray-400 truncate max-w-xs">
+                      <div className="mono-label max-w-xs truncate">
                         → {b.dropoffAddress}
                       </div>
                       {b.isAirport && (
-                        <span className="inline-block mt-1 bg-amber-100/80 text-amber-700 text-xs px-1.5 py-0.5 rounded font-medium">
+                        <span className="ds-tag tag-airport mt-2 inline-flex">
                           AIRPORT
                         </span>
                       )}
                     </td>
-                    <td className="px-4 py-3 text-gray-500 text-xs whitespace-nowrap">
+                    <td className="mono-label whitespace-nowrap px-4 py-3">
                       {formatDate(b.scheduledAt)}
                     </td>
-                    <td className="px-4 py-3 font-medium text-gray-900 whitespace-nowrap">
+                    <td className="whitespace-nowrap px-4 py-3 font-medium text-[var(--color-dark)]">
                       {formatPrice(b.pricePence)}
                     </td>
                     <td className="px-4 py-3">
@@ -165,32 +154,29 @@ export default function RideTimeline() {
             </table>
           </div>
 
-          {/* Mobile cards */}
           <div className="md:hidden space-y-2">
             {filtered.map((b) => (
               <button
                 key={b.id}
                 onClick={() => setSelectedId(b.id)}
-                className="w-full text-left glass-card p-3 hover:border-blue-300 hover:shadow-sm transition-all"
+                className="w-full text-left glass-card p-3"
               >
                 <div className="flex items-start justify-between">
                   <div className="space-y-0.5 min-w-0 flex-1 pr-2">
-                    <div className="text-sm font-medium text-gray-900 truncate">
+                    <div className="truncate text-sm font-medium text-[var(--color-dark)]">
                       {b.pickupAddress}
                     </div>
-                    <div className="text-xs text-gray-400 truncate">
+                    <div className="mono-label truncate">
                       → {b.dropoffAddress}
                     </div>
-                    <div className="text-xs text-gray-400">
+                    <div className="mono-label">
                       {formatDate(b.scheduledAt)} · {formatPrice(b.pricePence)}
                     </div>
                   </div>
                   <div className="flex flex-col items-end gap-1 shrink-0">
                     <StatusBadge status={b.status} />
                     {b.isAirport && (
-                      <span className="bg-amber-100/80 text-amber-700 text-xs px-2 py-0.5 rounded-full font-medium">
-                        AIRPORT
-                      </span>
+                      <span className="ds-tag tag-airport">AIRPORT</span>
                     )}
                   </div>
                 </div>

@@ -18,7 +18,7 @@ const DARK_TILES =
 
 function pickupIcon() {
   return L.divIcon({
-    html: '<div style="background:#22c55e;width:24px;height:24px;border-radius:50%;display:flex;align-items:center;justify-content:center;color:#fff;font-weight:700;font-size:10px;border:2px solid #fff;box-shadow:0 2px 6px rgba(0,0,0,.4)">P</div>',
+    html: '<div style="background:#98fe00;width:24px;height:24px;border-radius:4px;display:flex;align-items:center;justify-content:center;color:#131313;font-family:Roboto Mono,monospace;font-weight:700;font-size:10px;border:1px solid #131313;box-shadow:0 6px 14px rgba(19,19,19,.16)">P</div>',
     className: "",
     iconSize: [24, 24],
     iconAnchor: [12, 12],
@@ -27,7 +27,7 @@ function pickupIcon() {
 
 function dropoffIcon() {
   return L.divIcon({
-    html: '<div style="background:#ef4444;width:24px;height:24px;border-radius:50%;display:flex;align-items:center;justify-content:center;color:#fff;font-weight:700;font-size:10px;border:2px solid #fff;box-shadow:0 2px 6px rgba(0,0,0,.4)">D</div>',
+    html: '<div style="background:#131313;width:24px;height:24px;border-radius:4px;display:flex;align-items:center;justify-content:center;color:#98fe00;font-family:Roboto Mono,monospace;font-weight:700;font-size:10px;border:1px solid #98fe00;box-shadow:0 6px 14px rgba(19,19,19,.16)">D</div>',
     className: "",
     iconSize: [24, 24],
     iconAnchor: [12, 12],
@@ -81,7 +81,7 @@ export default function RouteMap({ pickup, dropoff }: RouteMapProps) {
   ];
 
   return (
-    <div className="w-full h-48 rounded-xl overflow-hidden border border-gray-800">
+    <div className="map-shell h-48 w-full">
       <MapContainer
         center={center}
         zoom={10}
@@ -99,7 +99,7 @@ export default function RouteMap({ pickup, dropoff }: RouteMapProps) {
           <Polyline
             positions={route}
             pathOptions={{
-              color: "#3b82f6",
+              color: "#131313",
               weight: 4,
               opacity: 0.8,
             }}

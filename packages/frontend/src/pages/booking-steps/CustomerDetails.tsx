@@ -58,28 +58,31 @@ export default function CustomerDetails({ onNext, onBack }: Props) {
   if (user && mode === "found") {
     return (
       <div className="space-y-4">
-        <h2 className="text-xl font-semibold text-gray-900">Your Details</h2>
+        <div>
+          <p className="section-label">Step 03</p>
+          <h2 className="mt-4 text-[32px] font-bold leading-[1.1] tracking-[-0.04em] text-[var(--color-dark)]">
+            Your details
+          </h2>
+        </div>
 
-        <div className="glass-card p-4 space-y-2">
-          <div className="flex justify-between text-sm">
-            <span className="text-gray-500">Name</span>
-            <span className="font-medium text-gray-900">{user.name}</span>
+        <div className="glass-card space-y-3 p-4">
+          <div className="data-pair">
+            <span>Name</span>
+            <span>{user.name}</span>
           </div>
-          <div className="flex justify-between text-sm">
-            <span className="text-gray-500">Email</span>
-            <span className="font-medium text-gray-900">{user.email}</span>
+          <div className="data-pair">
+            <span>Email</span>
+            <span>{user.email}</span>
           </div>
           {user.phone && (
-            <div className="flex justify-between text-sm">
-              <span className="text-gray-500">Phone</span>
-              <span className="font-medium text-gray-900">{user.phone}</span>
+            <div className="data-pair">
+              <span>Phone</span>
+              <span>{user.phone}</span>
             </div>
           )}
         </div>
 
-        <div className="glass-card !border-green-500/20 px-4 py-3 text-green-700 text-sm">
-          Welcome back, {user.name}!
-        </div>
+        <div className="alert alert-success">Welcome back, {user.name}!</div>
 
         <div className="flex gap-3">
           <button onClick={onBack} className="btn-secondary flex-1">
@@ -95,23 +98,22 @@ export default function CustomerDetails({ onNext, onBack }: Props) {
 
   return (
     <div className="space-y-4">
-      <h2 className="text-xl font-semibold text-gray-900">Your Details</h2>
-      <p className="text-sm text-gray-500">
+      <div>
+        <p className="section-label">Step 03</p>
+        <h2 className="mt-4 text-[32px] font-bold leading-[1.1] tracking-[-0.04em] text-[var(--color-dark)]">
+          Your details
+        </h2>
+      </div>
+      <p className="caption-copy">
         {mode === "check"
           ? "Enter your email to check if you have an account"
           : "Complete your details to continue"}
       </p>
 
-      {error && (
-        <div className="glass-card !border-red-500/20 px-4 py-3 text-red-600 text-sm">
-          {error}
-        </div>
-      )}
+      {error && <div className="alert alert-error">{error}</div>}
 
       <div>
-        <label className="block text-sm font-medium text-gray-700 mb-1">
-          Email
-        </label>
+        <label className="field-label mb-2 block">Email</label>
         <div className="flex gap-2">
           <input
             type="email"
@@ -134,7 +136,7 @@ export default function CustomerDetails({ onNext, onBack }: Props) {
             <button
               onClick={handleCheckEmail}
               disabled={loading || !email.trim()}
-              className="btn-primary !py-2 !px-4 text-sm"
+              className="btn-primary button-text-compact"
             >
               {loading ? "..." : "Check"}
             </button>
@@ -144,13 +146,11 @@ export default function CustomerDetails({ onNext, onBack }: Props) {
 
       {mode === "new" && (
         <>
-          <div className="glass-card !border-blue-500/20 px-4 py-3 text-blue-700 text-sm">
+          <div className="alert alert-info">
             No account found — fill in your details to create one
           </div>
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              Full Name
-            </label>
+            <label className="field-label mb-2 block">Full Name</label>
             <input
               type="text"
               value={name}
@@ -161,9 +161,7 @@ export default function CustomerDetails({ onNext, onBack }: Props) {
             />
           </div>
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              Phone Number
-            </label>
+            <label className="field-label mb-2 block">Phone Number</label>
             <input
               type="tel"
               value={phone}

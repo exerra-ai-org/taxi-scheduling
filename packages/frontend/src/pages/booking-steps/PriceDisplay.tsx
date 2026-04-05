@@ -61,13 +61,10 @@ export default function PriceDisplay({ data, onNext, onBack }: Props) {
   if (error || !quote) {
     return (
       <div className="space-y-4">
-        <div className="glass-card !border-red-300/40 px-4 py-3 text-red-600 text-sm">
+        <div className="alert alert-error">
           {error || "No pricing available for this route"}
         </div>
-        <button
-          onClick={onBack}
-          className="text-sm text-blue-600 hover:text-blue-800"
-        >
+        <button onClick={onBack} className="subtle-link">
           &larr; Change locations
         </button>
       </div>
@@ -76,22 +73,25 @@ export default function PriceDisplay({ data, onNext, onBack }: Props) {
 
   return (
     <div className="space-y-4">
-      <h2 className="text-xl font-semibold text-gray-900">Your Quote</h2>
+      <div>
+        <p className="section-label">Step 02</p>
+        <h2 className="mt-4 text-[32px] font-bold leading-[1.1] tracking-[-0.04em] text-[var(--color-dark)]">
+          Your quote
+        </h2>
+      </div>
 
       <div className="glass-card p-6 text-center">
-        <div className="text-4xl font-bold text-blue-600">
+        <div className="metric-value text-[56px]">
           {formatPrice(quote.pricePence)}
         </div>
         {quote.routeName && (
-          <div className="text-sm text-gray-500 mt-1">{quote.routeName}</div>
+          <div className="caption-copy mt-1">{quote.routeName}</div>
         )}
-        <div className="text-xs text-gray-400 mt-1">
+        <div className="mono-label mt-2">
           {quote.routeType === "fixed" ? "Fixed route" : "Zone-based"} pricing
         </div>
         {quote.isAirport && (
-          <span className="inline-block mt-2 bg-amber-100/80 text-amber-700 text-xs px-2 py-0.5 rounded-full font-medium">
-            AIRPORT
-          </span>
+          <span className="ds-tag tag-airport mt-3 inline-flex">AIRPORT</span>
         )}
       </div>
 
@@ -103,14 +103,14 @@ export default function PriceDisplay({ data, onNext, onBack }: Props) {
         />
       )}
 
-      <div className="glass-card p-3 space-y-1.5 text-sm">
+      <div className="page-card-muted space-y-3 p-4 text-sm">
         <div className="flex items-start gap-2">
-          <IconMapPin className="w-4 h-4 text-green-500 shrink-0 mt-0.5" />
-          <span className="text-gray-700">{data.pickupAddress}</span>
+          <IconMapPin className="mt-0.5 h-4 w-4 shrink-0 text-[var(--color-forest)]" />
+          <span className="body-copy">{data.pickupAddress}</span>
         </div>
         <div className="flex items-start gap-2">
-          <IconMapPin className="w-4 h-4 text-red-400 shrink-0 mt-0.5" />
-          <span className="text-gray-700">{data.dropoffAddress}</span>
+          <IconMapPin className="mt-0.5 h-4 w-4 shrink-0 text-[var(--color-dark)]" />
+          <span className="body-copy">{data.dropoffAddress}</span>
         </div>
       </div>
 

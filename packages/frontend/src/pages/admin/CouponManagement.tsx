@@ -71,12 +71,15 @@ export default function CouponManagement() {
   }
 
   return (
-    <div>
-      <div className="flex items-center justify-between mb-4">
-        <h1 className="text-xl font-semibold">Coupons</h1>
+    <div className="page-stack">
+      <div className="page-header">
+        <div>
+          <p className="section-label">Admin</p>
+          <h1 className="page-title mt-4 text-[40px]">Coupons</h1>
+        </div>
         <button
           onClick={() => setShowForm(!showForm)}
-          className="btn-primary text-sm !py-1.5 !px-3"
+          className="btn-primary button-text-compact"
         >
           {showForm ? "Cancel" : "New Coupon"}
         </button>
@@ -84,16 +87,10 @@ export default function CouponManagement() {
 
       {showForm && (
         <form onSubmit={handleCreate} className="glass-card p-5 mb-4 space-y-4">
-          {formError && (
-            <div className="glass-card !border-red-300/40 px-3 py-2 text-red-600 text-xs">
-              {formError}
-            </div>
-          )}
+          {formError && <div className="alert alert-error">{formError}</div>}
           <div className="grid grid-cols-2 gap-4">
             <div>
-              <label className="block text-xs font-medium text-gray-500 mb-1.5">
-                Code
-              </label>
+              <label className="field-label mb-2 block">Code</label>
               <input
                 type="text"
                 value={code}
@@ -104,9 +101,7 @@ export default function CouponManagement() {
               />
             </div>
             <div>
-              <label className="block text-xs font-medium text-gray-500 mb-1.5">
-                Type
-              </label>
+              <label className="field-label mb-2 block">Type</label>
               <select
                 value={discountType}
                 onChange={(e) =>
@@ -119,7 +114,7 @@ export default function CouponManagement() {
               </select>
             </div>
             <div>
-              <label className="block text-xs font-medium text-gray-500 mb-1.5">
+              <label className="field-label mb-2 block">
                 Value {discountType === "percentage" ? "(%)" : "(pence)"}
               </label>
               <input
@@ -132,9 +127,11 @@ export default function CouponManagement() {
               />
             </div>
             <div>
-              <label className="block text-xs font-medium text-gray-500 mb-1.5">
+              <label className="field-label mb-2 block">
                 Max Uses{" "}
-                <span className="text-gray-400 font-normal">(optional)</span>
+                <span className="normal-case tracking-normal text-[var(--color-muted)]">
+                  (optional)
+                </span>
               </label>
               <input
                 type="number"
@@ -146,9 +143,11 @@ export default function CouponManagement() {
             </div>
           </div>
           <div>
-            <label className="block text-xs font-medium text-gray-500 mb-1.5">
+            <label className="field-label mb-2 block">
               Expires{" "}
-              <span className="text-gray-700 font-normal">(optional)</span>
+              <span className="normal-case tracking-normal text-[var(--color-muted)]">
+                (optional)
+              </span>
             </label>
             <input
               type="date"
@@ -160,7 +159,7 @@ export default function CouponManagement() {
           <button
             type="submit"
             disabled={submitting}
-            className="btn-primary w-full text-sm"
+            className="btn-primary w-full"
           >
             {submitting ? "Creating..." : "Create Coupon"}
           </button>
@@ -168,37 +167,26 @@ export default function CouponManagement() {
       )}
 
       {coupons.length === 0 ? (
-        <div className="text-center py-12">
-          <div className="inline-flex items-center justify-center w-14 h-14 rounded-full bg-blue-50/60 mb-3">
-            <IconTicket className="w-7 h-7 text-gray-400" />
+        <div className="empty-state">
+          <div className="empty-state-icon">
+            <IconTicket className="h-7 w-7" />
           </div>
-          <p className="text-gray-400 text-sm">No coupons yet</p>
+          <p className="caption-copy">No coupons yet</p>
         </div>
       ) : (
         <>
-          {/* Desktop table */}
           <div className="hidden md:block glass-table">
-            <table className="w-full text-sm">
+            <table className="ds-table w-full text-sm">
               <thead>
-                <tr className="bg-blue-50/60 border-b border-black/8 text-left">
-                  <th className="px-4 py-3 font-medium text-gray-500 text-xs uppercase tracking-wide">
-                    Code
-                  </th>
-                  <th className="px-4 py-3 font-medium text-gray-500 text-xs uppercase tracking-wide">
-                    Discount
-                  </th>
-                  <th className="px-4 py-3 font-medium text-gray-500 text-xs uppercase tracking-wide">
-                    Uses
-                  </th>
-                  <th className="px-4 py-3 font-medium text-gray-500 text-xs uppercase tracking-wide">
-                    Expires
-                  </th>
-                  <th className="px-4 py-3 font-medium text-gray-500 text-xs uppercase tracking-wide">
-                    Status
-                  </th>
+                <tr className="text-left">
+                  <th className="px-4 py-3">Code</th>
+                  <th className="px-4 py-3">Discount</th>
+                  <th className="px-4 py-3">Uses</th>
+                  <th className="px-4 py-3">Expires</th>
+                  <th className="px-4 py-3">Status</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-black/5">
+              <tbody>
                 {coupons.map((c) => {
                   const expired =
                     c.expiresAt && new Date(c.expiresAt) < new Date();
@@ -206,31 +194,24 @@ export default function CouponManagement() {
                     c.maxUses !== null && c.currentUses >= c.maxUses;
                   const inactive = expired || maxedOut;
                   return (
-                    <tr
-                      key={c.id}
-                      className={`hover:bg-blue-50/80 transition-colors ${inactive ? "opacity-50" : ""}`}
-                    >
-                      <td className="px-4 py-3 font-mono font-semibold text-gray-900">
+                    <tr key={c.id} className={inactive ? "opacity-50" : ""}>
+                      <td className="px-4 py-3 font-mono font-semibold text-[var(--color-dark)]">
                         {c.code}
                       </td>
-                      <td className="px-4 py-3 text-gray-700">
+                      <td className="px-4 py-3 text-[var(--color-mid)]">
                         {c.discountType === "percentage"
                           ? `${c.discountValue}% off`
                           : `${formatPrice(c.discountValue)} off`}
                       </td>
-                      <td className="px-4 py-3 text-gray-500">
+                      <td className="px-4 py-3 text-[var(--color-mid)]">
                         {c.currentUses}/{c.maxUses ?? "∞"}
                       </td>
-                      <td className="px-4 py-3 text-gray-400 text-xs">
+                      <td className="px-4 py-3 mono-label">
                         {c.expiresAt ? formatDate(c.expiresAt) : "—"}
                       </td>
                       <td className="px-4 py-3">
                         <span
-                          className={`px-2 py-0.5 rounded-full text-xs font-medium ${
-                            inactive
-                              ? "bg-gray-100 text-gray-400"
-                              : "bg-green-100/80 text-green-700"
-                          }`}
+                          className={`status-pill ${inactive ? "status-inactive" : "status-completed"}`}
                         >
                           {inactive ? "Inactive" : "Active"}
                         </span>
@@ -242,7 +223,6 @@ export default function CouponManagement() {
             </table>
           </div>
 
-          {/* Mobile cards */}
           <div className="md:hidden space-y-2">
             {coupons.map((c) => {
               const expired = c.expiresAt && new Date(c.expiresAt) < new Date();
@@ -254,21 +234,21 @@ export default function CouponManagement() {
                 >
                   <div className="flex items-center justify-between">
                     <div>
-                      <span className="font-mono font-semibold text-sm text-gray-900">
+                      <span className="font-mono text-sm font-semibold text-[var(--color-dark)]">
                         {c.code}
                       </span>
-                      <span className="text-xs text-gray-500 ml-2">
+                      <span className="caption-copy ml-2">
                         {c.discountType === "percentage"
                           ? `${c.discountValue}% off`
                           : `${formatPrice(c.discountValue)} off`}
                       </span>
                     </div>
-                    <div className="text-xs text-gray-400">
+                    <div className="mono-label">
                       {c.currentUses}/{c.maxUses ?? "∞"} used
                     </div>
                   </div>
                   {c.expiresAt && (
-                    <div className="text-xs text-gray-400 mt-1">
+                    <div className="mono-label mt-1">
                       Expires: {formatDate(c.expiresAt)}
                     </div>
                   )}

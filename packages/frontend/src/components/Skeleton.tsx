@@ -18,13 +18,13 @@ export function SkeletonText({ lines = 3 }: { lines?: number }) {
 
 export function SkeletonCard() {
   return (
-    <div className="glass-card p-4 space-y-3">
+    <div className="glass-card space-y-3 p-4">
       <div className="flex items-start justify-between">
         <div className="flex-1 space-y-2">
           <div className="skeleton h-4 w-3/4" />
           <div className="skeleton h-3 w-1/2" />
         </div>
-        <div className="skeleton h-6 w-20 rounded-full" />
+        <div className="skeleton h-6 w-20 rounded-[4px]" />
       </div>
       <div className="skeleton h-3 w-1/3" />
     </div>

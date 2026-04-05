@@ -43,11 +43,10 @@ export default function Confirmation({ data, onBack, onReset }: Props) {
   if (success) {
     return (
       <div className="text-center space-y-4 animate-fade-in">
-        {/* Animated SVG checkmark */}
         <div className="flex justify-center">
           <svg
             viewBox="0 0 52 52"
-            className="w-20 h-20 text-green-500"
+            className="h-20 w-20 text-[var(--color-green)]"
             fill="none"
           >
             <circle
@@ -70,10 +69,10 @@ export default function Confirmation({ data, onBack, onReset }: Props) {
             />
           </svg>
         </div>
-        <h2 className="text-xl font-semibold text-green-700">
-          Booking Confirmed!
+        <h2 className="text-[32px] font-bold leading-[1.1] tracking-[-0.04em] text-[var(--color-dark)]">
+          Booking confirmed
         </h2>
-        <p className="text-sm text-gray-500">
+        <p className="caption-copy">
           Your ride from {data.pickupAddress} to {data.dropoffAddress} is
           scheduled.
         </p>
@@ -96,59 +95,52 @@ export default function Confirmation({ data, onBack, onReset }: Props) {
 
   return (
     <div className="space-y-4">
-      <h2 className="text-xl font-semibold text-gray-900">Confirm Booking</h2>
+      <div>
+        <p className="section-label">Step 05</p>
+        <h2 className="mt-4 text-[32px] font-bold leading-[1.1] tracking-[-0.04em] text-[var(--color-dark)]">
+          Confirm booking
+        </h2>
+      </div>
 
-      <div className="glass-card p-4 space-y-3">
-        <div className="flex justify-between text-sm">
-          <span className="text-gray-500">Pickup</span>
-          <span className="font-medium text-right max-w-[60%]">
-            {data.pickupAddress}
-          </span>
+      <div className="glass-card space-y-3 p-4">
+        <div className="data-pair">
+          <span>Pickup</span>
+          <span className="max-w-[60%]">{data.pickupAddress}</span>
         </div>
-        <div className="flex justify-between text-sm">
-          <span className="text-gray-500">Drop-off</span>
-          <span className="font-medium text-right max-w-[60%]">
-            {data.dropoffAddress}
-          </span>
+        <div className="data-pair">
+          <span>Drop-off</span>
+          <span className="max-w-[60%]">{data.dropoffAddress}</span>
         </div>
-        <div className="flex justify-between text-sm">
-          <span className="text-gray-500">Date & Time</span>
-          <span className="font-medium">{formatDate(scheduledDate)}</span>
+        <div className="data-pair">
+          <span>Date & Time</span>
+          <span>{formatDate(scheduledDate)}</span>
         </div>
-        <hr className="border-white/10" />
-        <div className="flex justify-between text-sm">
-          <span className="text-gray-500">Price</span>
+        <div className="card-divider" />
+        <div className="data-pair">
+          <span>Price</span>
           <span>{formatPrice(data.pricePence)}</span>
         </div>
         {data.discountPence > 0 && (
           <>
-            <div className="flex justify-between text-sm text-green-700">
+            <div className="data-pair">
               <span>Discount ({data.couponCode})</span>
               <span>-{formatPrice(data.discountPence)}</span>
             </div>
-            <hr className="border-white/10" />
+            <div className="card-divider" />
           </>
         )}
-        <div className="flex justify-between font-semibold">
+        <div className="data-pair">
           <span>Total</span>
-          <span className="text-blue-600">
-            {formatPrice(data.finalPricePence)}
-          </span>
+          <span>{formatPrice(data.finalPricePence)}</span>
         </div>
         {data.isAirport && (
           <div className="text-center">
-            <span className="inline-block bg-amber-100/80 text-amber-700 text-xs px-2 py-0.5 rounded-full font-medium">
-              AIRPORT TRANSFER
-            </span>
+            <span className="ds-tag tag-airport">AIRPORT TRANSFER</span>
           </div>
         )}
       </div>
 
-      {error && (
-        <div className="glass-card !border-red-300/40 px-4 py-3 text-red-600 text-sm">
-          {error}
-        </div>
-      )}
+      {error && <div className="alert alert-error">{error}</div>}
 
       <div className="flex gap-3">
         <button onClick={onBack} className="btn-secondary w-full flex-1">

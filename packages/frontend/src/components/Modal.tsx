@@ -34,19 +34,21 @@ export default function Modal({
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center animate-fade-in">
       <div
-        className="absolute inset-0 bg-black/60 backdrop-blur-sm"
+        className="absolute inset-0 bg-[rgb(19_19_19_/_0.55)] backdrop-blur-sm"
         onClick={onClose}
       />
       <div
-        className={`relative bg-white/80 backdrop-blur-2xl border border-black/8 rounded-2xl shadow-2xl ${SIZE_CLASSES[size]} w-full mx-4 max-h-[90vh] overflow-y-auto animate-scale-in`}
+        className={`modal-panel relative ${SIZE_CLASSES[size]} mx-4 max-h-[90vh] w-full overflow-y-auto animate-scale-in`}
       >
         {title && (
-          <div className="flex items-center justify-between px-5 py-4 border-b border-black/8">
-            <h2 className="font-semibold text-gray-900">{title}</h2>
-            <button
-              onClick={onClose}
-              className="w-8 h-8 flex items-center justify-center text-gray-400 hover:text-gray-700 hover:bg-blue-50/80 rounded-lg transition-colors"
-            >
+          <div className="flex items-center justify-between border-b border-[var(--color-border)] px-5 py-4">
+            <div>
+              <div className="page-eyebrow">Modal</div>
+              <h2 className="text-[26px] font-bold tracking-[-0.04em] text-[var(--color-dark)]">
+                {title}
+              </h2>
+            </div>
+            <button onClick={onClose} className="icon-chip h-8 w-8">
               ×
             </button>
           </div>

@@ -32,49 +32,44 @@ export default function DriverManagement() {
   }
 
   return (
-    <div>
-      <h1 className="text-xl font-semibold mb-4">Drivers</h1>
+    <div className="page-stack">
+      <div className="page-header">
+        <div>
+          <p className="section-label">Admin</p>
+          <h1 className="page-title mt-4 text-[40px]">Drivers</h1>
+        </div>
+      </div>
 
       {drivers.length === 0 ? (
-        <div className="text-center py-16">
-          <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-blue-50/60 mb-4">
-            <IconUser className="w-8 h-8 text-gray-400" />
+        <div className="empty-state">
+          <div className="empty-state-icon">
+            <IconUser className="h-8 w-8" />
           </div>
-          <p className="text-gray-400 text-sm">No drivers registered</p>
+          <p className="caption-copy">No drivers registered</p>
         </div>
       ) : (
         <>
-          {/* Desktop table */}
           <div className="hidden md:block glass-table">
-            <table className="w-full text-sm">
+            <table className="ds-table w-full text-sm">
               <thead>
-                <tr className="bg-blue-50/60 border-b border-black/8 text-left">
-                  <th className="px-4 py-3 font-medium text-gray-500 text-xs uppercase tracking-wide">
-                    Driver
-                  </th>
-                  <th className="px-4 py-3 font-medium text-gray-500 text-xs uppercase tracking-wide">
-                    Contact
-                  </th>
-                  <th className="px-4 py-3 font-medium text-gray-500 text-xs uppercase tracking-wide text-right">
-                    Upcoming
-                  </th>
+                <tr className="text-left">
+                  <th className="px-4 py-3">Driver</th>
+                  <th className="px-4 py-3">Contact</th>
+                  <th className="px-4 py-3 text-right">Upcoming</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-black/5">
+              <tbody>
                 {drivers.map((d) => (
-                  <tr
-                    key={d.id}
-                    className="hover:bg-blue-50/80 transition-colors"
-                  >
-                    <td className="px-4 py-3 font-medium text-gray-900">
+                  <tr key={d.id}>
+                    <td className="px-4 py-3 font-medium text-[var(--color-dark)]">
                       {d.name}
                     </td>
-                    <td className="px-4 py-3 text-gray-500">
+                    <td className="px-4 py-3 text-[var(--color-mid)]">
                       <div>{d.email}</div>
-                      <div className="text-xs text-gray-400">{d.phone}</div>
+                      <div className="mono-label mt-1">{d.phone}</div>
                     </td>
                     <td className="px-4 py-3 text-right">
-                      <span className="inline-flex items-center justify-center w-8 h-8 rounded-full bg-blue-100/80 text-blue-600 font-semibold text-sm">
+                      <span className="number-chip">
                         {d.upcomingAssignments}
                       </span>
                     </td>
@@ -84,25 +79,22 @@ export default function DriverManagement() {
             </table>
           </div>
 
-          {/* Mobile cards */}
           <div className="md:hidden space-y-2">
             {drivers.map((d) => (
               <div key={d.id} className="glass-card p-4">
                 <div className="flex items-center justify-between">
                   <div>
-                    <div className="font-medium text-sm text-gray-900">
+                    <div className="body-copy font-medium text-[var(--color-dark)]">
                       {d.name}
                     </div>
-                    <div className="text-xs text-gray-500 mt-0.5">
-                      {d.email}
-                    </div>
-                    <div className="text-xs text-gray-400">{d.phone}</div>
+                    <div className="caption-copy mt-0.5">{d.email}</div>
+                    <div className="mono-label">{d.phone}</div>
                   </div>
                   <div className="text-center">
-                    <div className="text-xl font-bold text-blue-600">
+                    <div className="metric-value text-[32px]">
                       {d.upcomingAssignments}
                     </div>
-                    <div className="text-xs text-gray-400">upcoming</div>
+                    <div className="mono-label">upcoming</div>
                   </div>
                 </div>
               </div>

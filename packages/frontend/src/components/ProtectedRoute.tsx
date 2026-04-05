@@ -8,7 +8,7 @@ export default function ProtectedRoute({ roles }: { roles?: UserRole[] }) {
   if (loading) {
     return (
       <div className="flex justify-center py-20">
-        <div className="text-gray-500">Loading...</div>
+        <div className="caption-copy">Loading...</div>
       </div>
     );
   }

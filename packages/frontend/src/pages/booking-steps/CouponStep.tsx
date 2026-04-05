@@ -64,7 +64,12 @@ export default function CouponStep({ pricePence, onNext, onBack }: Props) {
 
   return (
     <div className="space-y-4">
-      <h2 className="text-xl font-semibold text-gray-900">Have a Coupon?</h2>
+      <div>
+        <p className="section-label">Step 04</p>
+        <h2 className="mt-4 text-[32px] font-bold leading-[1.1] tracking-[-0.04em] text-[var(--color-dark)]">
+          Have a coupon?
+        </h2>
+      </div>
 
       <div className="flex gap-2">
         <input
@@ -77,20 +82,16 @@ export default function CouponStep({ pricePence, onNext, onBack }: Props) {
         <button
           onClick={handleApply}
           disabled={loading || !code.trim()}
-          className="bg-gray-100 text-gray-900 px-4 py-2 rounded text-sm font-medium hover:bg-gray-100 disabled:opacity-50"
+          className="btn-secondary button-text-compact"
         >
           {loading ? "..." : "Apply"}
         </button>
       </div>
 
-      {error && (
-        <div className="glass-card !border-red-300/40 px-4 py-3 text-red-600 text-sm">
-          {error}
-        </div>
-      )}
+      {error && <div className="alert alert-error">{error}</div>}
 
       {applied && (
-        <div className="glass-card !border-green-300/40 px-4 py-3 text-green-700 text-sm">
+        <div className="alert alert-success">
           <div className="font-medium">Coupon applied: {applied.code}</div>
           <div>
             {applied.discountType === "percentage"

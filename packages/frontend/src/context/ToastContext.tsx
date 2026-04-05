@@ -42,9 +42,9 @@ export function ToastProvider({ children }: { children: ReactNode }) {
   };
 
   const typeStyles: Record<ToastType, string> = {
-    success: "bg-green-600 text-white",
-    error: "bg-red-600 text-white",
-    info: "bg-blue-600 text-white",
+    success: "toast-success",
+    error: "toast-error",
+    info: "toast-info",
   };
 
   return (
@@ -54,7 +54,7 @@ export function ToastProvider({ children }: { children: ReactNode }) {
         {toasts.map((t) => (
           <div
             key={t.id}
-            className={`animate-slide-up rounded-lg px-4 py-3 text-sm font-medium shadow-lg ${typeStyles[t.type]}`}
+            className={`toast-card animate-slide-up ${typeStyles[t.type]}`}
           >
             {t.message}
           </div>

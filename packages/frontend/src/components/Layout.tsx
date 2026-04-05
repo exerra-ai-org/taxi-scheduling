@@ -29,11 +29,7 @@ function NavItem({
       to={to}
       end={to === "/" || to === "/admin" || to === "/driver"}
       className={({ isActive }) =>
-        `flex flex-col items-center gap-0.5 px-3 py-2 rounded-lg text-xs font-medium transition-colors ${
-          isActive
-            ? "text-blue-600 bg-blue-100/80"
-            : "text-gray-500 hover:text-gray-900 hover:bg-white/60"
-        }`
+        `mobile-nav-link ${isActive ? "mobile-nav-link-active" : ""}`
       }
     >
       {icon}
@@ -56,11 +52,7 @@ function DesktopNavItem({
       to={to}
       end={end}
       className={({ isActive }) =>
-        `text-sm font-medium px-3 py-1.5 rounded-lg transition-colors ${
-          isActive
-            ? "text-blue-700 bg-blue-100/80"
-            : "text-gray-500 hover:text-gray-900 hover:bg-white/60"
-        }`
+        `nav-link ${isActive ? "nav-link-active" : ""}`
       }
     >
       {label}
@@ -80,24 +72,18 @@ export default function Layout() {
   }
 
   return (
-    <div
-      className={isLandingPage ? "min-h-screen" : "min-h-screen pb-16 md:pb-0"}
-    >
-      {/* Top nav */}
-      <nav className="bg-white/70 backdrop-blur-xl border-b border-black/5 sticky top-0 z-40">
-        <div className="mx-auto max-w-5xl px-4 h-14 flex items-center justify-between">
-          {/* Brand */}
-          <Link
-            to="/"
-            className="flex items-center gap-2 text-base font-bold text-blue-600"
-          >
-            <IconCar className="w-5 h-5" />
+    <div className={`app-shell ${isLandingPage ? "" : "pb-16 md:pb-0"}`}>
+      <nav className="app-topbar">
+        <div className="mx-auto flex h-[72px] w-full max-w-[1280px] items-center justify-between gap-4 px-5">
+          <Link to="/" className="app-brand">
+            <span className="btn-icon">
+              <IconCar className="h-4 w-4" />
+            </span>
             <span className="hidden sm:inline">Taxi Concierge</span>
             <span className="sm:hidden">TC</span>
           </Link>
 
-          {/* Desktop nav links */}
-          <div className="hidden md:flex items-center gap-1">
+          <div className="hidden md:flex items-center gap-2">
             {user?.role === "customer" && (
               <>
                 <DesktopNavItem to="/" label="Book" end />
@@ -116,40 +102,43 @@ export default function Layout() {
             )}
           </div>
 
-          {/* User actions */}
           <div className="flex items-center gap-2">
             {user ? (
               <>
-                <span className="hidden sm:block text-sm text-gray-500">
-                  {user.name}
-                </span>
+                <div className="hidden sm:block text-right">
+                  <div className="page-eyebrow">Signed In</div>
+                  <div className="text-sm font-medium text-[var(--color-dark)]">
+                    {user.name}
+                  </div>
+                </div>
                 <button
                   onClick={handleLogout}
                   title="Logout"
-                  className="flex items-center gap-1.5 text-sm text-gray-500 hover:text-red-600 px-2 py-1.5 rounded-lg hover:bg-red-50 transition-colors"
+                  className="btn-ghost"
                 >
                   <IconLogout className="w-4 h-4" />
                   <span className="hidden sm:inline">Logout</span>
                 </button>
               </>
             ) : (
-              <Link to="/login" className="btn-primary text-sm !py-1.5 !px-4">
-                Login
+              <Link to="/login" className="btn-primary button-text-compact">
+                <span>Login</span>
+                <span className="btn-icon">
+                  <span className="btn-icon-glyph">↗</span>
+                </span>
               </Link>
             )}
           </div>
         </div>
       </nav>
 
-      {/* Page content */}
-      <main className={isLandingPage ? "" : "mx-auto max-w-5xl px-4 py-6"}>
+      <main className={isLandingPage ? "" : "app-main"}>
         <Outlet />
       </main>
 
-      {/* Mobile bottom nav */}
       {user && !isLandingPage && (
-        <nav className="md:hidden fixed bottom-0 inset-x-0 bg-white/80 backdrop-blur-xl border-t border-black/5 z-40 safe-area-inset-bottom">
-          <div className="flex items-center justify-around px-2 py-1">
+        <nav className="fixed inset-x-0 bottom-0 z-40 border-t border-[var(--color-border)] bg-[rgb(249_249_249_/_0.96)] backdrop-blur md:hidden safe-area-inset-bottom">
+          <div className="flex items-center justify-around px-2 py-2">
             {user.role === "customer" && (
               <>
                 <NavItem

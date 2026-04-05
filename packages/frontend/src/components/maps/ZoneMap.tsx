@@ -31,7 +31,7 @@ export default function ZoneMap() {
   }, []);
 
   return (
-    <div className="w-full h-72 rounded-xl overflow-hidden border border-gray-800">
+    <div className="map-shell h-72 w-full">
       <MapContainer
         center={LONDON_CENTER}
         zoom={9}

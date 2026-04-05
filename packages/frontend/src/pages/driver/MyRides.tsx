@@ -43,12 +43,15 @@ export default function MyRides() {
   );
 
   return (
-    <div>
-      <div className="flex items-center justify-between mb-4">
-        <h1 className="text-xl font-semibold">My Rides</h1>
+    <div className="page-stack">
+      <div className="page-header">
+        <div>
+          <p className="section-label">Driver</p>
+          <h1 className="page-title mt-4 text-[40px]">My rides</h1>
+        </div>
         <button
           onClick={fetchBookings}
-          className="text-sm text-blue-600 hover:text-blue-500"
+          className="btn-secondary button-text-compact"
         >
           Refresh
         </button>
@@ -56,7 +59,7 @@ export default function MyRides() {
 
       {active.length > 0 && (
         <div className="space-y-2 mb-6">
-          <h2 className="text-sm font-medium text-gray-500">Upcoming</h2>
+          <h2 className="section-label">Upcoming</h2>
           {active.map((b) => (
             <RideCard key={b.id} booking={b} onStatusUpdate={fetchBookings} />
           ))}
@@ -65,7 +68,7 @@ export default function MyRides() {
 
       {past.length > 0 && (
         <div className="space-y-2">
-          <h2 className="text-sm font-medium text-gray-500">Past</h2>
+          <h2 className="section-label">Past</h2>
           {past.map((b) => (
             <RideCard key={b.id} booking={b} onStatusUpdate={fetchBookings} />
           ))}
@@ -73,9 +76,7 @@ export default function MyRides() {
       )}
 
       {bookings.length === 0 && (
-        <div className="text-center py-8 text-gray-400">
-          No rides assigned yet
-        </div>
+        <div className="empty-state caption-copy">No rides assigned yet</div>
       )}
     </div>
   );

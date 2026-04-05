@@ -47,16 +47,10 @@ export default function DriverAssignmentForm({ bookingId, onAssigned }: Props) {
 
   return (
     <div className="space-y-3">
-      <h3 className="font-medium text-sm">Assign Drivers</h3>
-      {error && (
-        <div className="glass-card !border-red-300/40 px-3 py-2 text-red-600 text-xs">
-          {error}
-        </div>
-      )}
+      <h3 className="section-label">Assign Drivers</h3>
+      {error && <div className="alert alert-error">{error}</div>}
       <div>
-        <label className="block text-xs text-gray-500 mb-1">
-          Primary Driver
-        </label>
+        <label className="field-label mb-2 block">Primary Driver</label>
         <select
           value={primaryId}
           onChange={(e) => setPrimaryId(Number(e.target.value))}
@@ -71,9 +65,7 @@ export default function DriverAssignmentForm({ bookingId, onAssigned }: Props) {
         </select>
       </div>
       <div>
-        <label className="block text-xs text-gray-500 mb-1">
-          Backup Driver
-        </label>
+        <label className="field-label mb-2 block">Backup Driver</label>
         <select
           value={backupId}
           onChange={(e) => setBackupId(Number(e.target.value))}
@@ -90,7 +82,7 @@ export default function DriverAssignmentForm({ bookingId, onAssigned }: Props) {
       <button
         onClick={handleAssign}
         disabled={loading}
-        className="btn-primary w-full text-sm"
+        className="btn-primary w-full"
       >
         {loading ? "Assigning..." : "Assign Drivers"}
       </button>

@@ -17,8 +17,12 @@ export default function StarRating({
           type="button"
           onClick={() => !readonly && onChange?.(star)}
           disabled={readonly}
-          className={`text-2xl ${readonly ? "cursor-default" : "cursor-pointer"} ${
-            star <= value ? "text-yellow-400" : "text-gray-300"
+          className={`flex h-10 w-10 items-center justify-center rounded-[4px] border text-2xl transition-colors ${
+            readonly ? "cursor-default" : "cursor-pointer"
+          } ${
+            star <= value
+              ? "border-[var(--color-green)] bg-[rgb(152_254_0_/_0.2)] text-[var(--color-dark)]"
+              : "border-[var(--color-border-light)] bg-[var(--color-surface)] text-[var(--color-border-light)]"
           }`}
           aria-label={`${star} star${star !== 1 ? "s" : ""}`}
         >

@@ -101,53 +101,43 @@ export default function RideDetail({ bookingId, onClose, onUpdated }: Props) {
           </div>
         ) : (
           <div className="space-y-4">
-            {/* Booking info */}
-            <div className="space-y-2 text-sm">
-              <div className="flex justify-between">
-                <span className="text-gray-500">Status</span>
+            <div className="space-y-3 text-sm">
+              <div className="data-pair">
+                <span>Status</span>
                 <StatusBadge status={booking.status} />
               </div>
-              <div className="flex justify-between">
-                <span className="text-gray-500">Pickup</span>
-                <span className="font-medium">{booking.pickupAddress}</span>
+              <div className="data-pair">
+                <span>Pickup</span>
+                <span>{booking.pickupAddress}</span>
               </div>
-              <div className="flex justify-between">
-                <span className="text-gray-500">Drop-off</span>
-                <span className="font-medium">{booking.dropoffAddress}</span>
+              <div className="data-pair">
+                <span>Drop-off</span>
+                <span>{booking.dropoffAddress}</span>
               </div>
-              <div className="flex justify-between">
-                <span className="text-gray-500">Scheduled</span>
-                <span className="font-medium">
-                  {formatDate(booking.scheduledAt)}
-                </span>
+              <div className="data-pair">
+                <span>Scheduled</span>
+                <span>{formatDate(booking.scheduledAt)}</span>
               </div>
-              <div className="flex justify-between">
-                <span className="text-gray-500">Price</span>
-                <span className="font-medium">
-                  {formatPrice(booking.pricePence)}
-                </span>
+              <div className="data-pair">
+                <span>Price</span>
+                <span>{formatPrice(booking.pricePence)}</span>
               </div>
               {booking.isAirport && (
                 <div className="text-center">
-                  <span className="bg-amber-100/80 text-amber-700 text-xs px-2 py-0.5 rounded-full font-medium">
-                    AIRPORT
-                  </span>
+                  <span className="ds-tag tag-airport">AIRPORT</span>
                 </div>
               )}
             </div>
 
-            {/* Assignments */}
             {assignments.length > 0 && (
               <div>
-                <h3 className="font-medium text-sm mb-2">Assigned Drivers</h3>
+                <h3 className="section-label mb-2">Assigned Drivers</h3>
                 <div className="space-y-1">
                   {assignments.map((a) => (
                     <div
                       key={a.id}
-                      className={`flex justify-between text-sm px-2 py-1 rounded ${
-                        a.isActive
-                          ? "bg-green-100/80"
-                          : "bg-gray-100 text-gray-400"
+                      className={`flex justify-between rounded-[4px] px-3 py-2 text-sm ${
+                        a.isActive ? "status-completed" : "status-inactive"
                       }`}
                     >
                       <span>
@@ -161,14 +151,13 @@ export default function RideDetail({ bookingId, onClose, onUpdated }: Props) {
               </div>
             )}
 
-            {/* Status actions */}
             <div>
-              <h3 className="font-medium text-sm mb-2">Actions</h3>
+              <h3 className="section-label mb-2">Actions</h3>
               <div className="flex flex-wrap gap-2">
                 {booking.status === "scheduled" && (
                   <button
                     onClick={() => handleStatusChange("cancelled")}
-                    className="text-xs bg-red-100/80 text-red-600 px-3 py-1.5 rounded hover:bg-red-100"
+                    className="btn-danger button-text-compact"
                   >
                     Cancel
                   </button>
@@ -176,7 +165,7 @@ export default function RideDetail({ bookingId, onClose, onUpdated }: Props) {
                 {booking.status === "assigned" && (
                   <button
                     onClick={() => handleStatusChange("en_route")}
-                    className="text-xs bg-orange-100/80 text-orange-600 px-3 py-1.5 rounded hover:bg-orange-100"
+                    className="btn-secondary button-text-compact"
                   >
                     Set En Route
                   </button>
@@ -184,7 +173,7 @@ export default function RideDetail({ bookingId, onClose, onUpdated }: Props) {
                 {booking.status === "en_route" && (
                   <button
                     onClick={() => handleStatusChange("arrived")}
-                    className="text-xs bg-purple-100/80 text-purple-600 px-3 py-1.5 rounded hover:bg-purple-100"
+                    className="btn-secondary button-text-compact"
                   >
                     Set Arrived
                   </button>
@@ -192,7 +181,7 @@ export default function RideDetail({ bookingId, onClose, onUpdated }: Props) {
                 {booking.status === "arrived" && (
                   <button
                     onClick={() => handleStatusChange("completed")}
-                    className="text-xs bg-green-100/80 text-green-700 px-3 py-1.5 rounded hover:bg-green-100"
+                    className="btn-green button-text-compact"
                   >
                     Complete
                   </button>
@@ -200,7 +189,7 @@ export default function RideDetail({ bookingId, onClose, onUpdated }: Props) {
                 {canFallback && (
                   <button
                     onClick={handleFallback}
-                    className="btn-danger text-xs !py-1.5 !px-3"
+                    className="btn-danger button-text-compact"
                   >
                     Trigger Fallback
                   </button>

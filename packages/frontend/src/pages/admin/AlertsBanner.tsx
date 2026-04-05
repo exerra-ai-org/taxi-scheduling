@@ -26,7 +26,7 @@ export default function AlertsBanner({
       {unassigned > 0 && (
         <button
           onClick={onFilterUnassigned}
-          className="glass-card !border-amber-300/40 text-amber-700 px-3 py-2 text-sm flex-1 hover:bg-amber-100"
+          className="alert alert-warning flex-1 text-left"
         >
           <span className="font-semibold">{unassigned}</span> ride
           {unassigned !== 1 ? "s" : ""} unassigned
@@ -35,7 +35,7 @@ export default function AlertsBanner({
       {startingSoon > 0 && (
         <button
           onClick={onFilterStartingSoon}
-          className="glass-card !border-red-300/40 text-red-600 px-3 py-2 text-sm flex-1 hover:bg-red-100"
+          className="alert alert-error flex-1 text-left"
         >
           <span className="font-semibold">{startingSoon}</span> ride
           {startingSoon !== 1 ? "s" : ""} starting within 2h

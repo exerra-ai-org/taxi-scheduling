@@ -19,25 +19,25 @@ const NEXT_STATUS: Partial<
   assigned: {
     label: "Start En Route",
     status: "en_route",
-    color: "bg-orange-500 hover:bg-orange-600",
+    color: "btn-secondary",
   },
   en_route: {
     label: "Mark Arrived",
     status: "arrived",
-    color: "bg-purple-600 hover:bg-purple-700",
+    color: "btn-secondary",
   },
   arrived: {
     label: "Complete Ride",
     status: "completed",
-    color: "bg-green-600 hover:bg-green-700",
+    color: "btn-green",
   },
 };
 
 const STATUS_BORDER: Partial<Record<BookingStatus, string>> = {
-  assigned: "border-l-indigo-400",
-  en_route: "border-l-orange-400",
-  arrived: "border-l-purple-400",
-  completed: "border-l-green-500",
+  assigned: "border-l-[var(--color-orange)]",
+  en_route: "border-l-[var(--color-navy)]",
+  arrived: "border-l-[var(--color-forest)]",
+  completed: "border-l-[var(--color-green)]",
 };
 
 export default function RideCard({ booking, onStatusUpdate }: Props) {
@@ -73,15 +73,15 @@ export default function RideCard({ booking, onStatusUpdate }: Props) {
     >
       <div className="flex items-start justify-between">
         <div className="space-y-1 flex-1 min-w-0 pr-3">
-          <div className="flex items-start gap-1.5 text-sm font-medium">
-            <IconMapPin className="w-3.5 h-3.5 text-green-500 mt-0.5 shrink-0" />
+          <div className="flex items-start gap-1.5 text-sm font-medium text-[var(--color-dark)]">
+            <IconMapPin className="mt-0.5 h-3.5 w-3.5 shrink-0 text-[var(--color-forest)]" />
             <span className="truncate">{booking.pickupAddress}</span>
           </div>
-          <div className="flex items-start gap-1.5 text-sm text-gray-500">
-            <IconMapPin className="w-3.5 h-3.5 text-red-600 mt-0.5 shrink-0" />
+          <div className="caption-copy flex items-start gap-1.5">
+            <IconMapPin className="mt-0.5 h-3.5 w-3.5 shrink-0 text-[var(--color-dark)]" />
             <span className="truncate">{booking.dropoffAddress}</span>
           </div>
-          <div className="text-xs text-gray-400">
+          <div className="mono-label">
             {formatDate(booking.scheduledAt)} ·{" "}
             {formatPrice(booking.pricePence)}
           </div>
@@ -89,9 +89,7 @@ export default function RideCard({ booking, onStatusUpdate }: Props) {
         <div className="flex flex-col items-end gap-1.5 shrink-0">
           <StatusBadge status={booking.status} />
           {booking.isAirport && (
-            <span className="bg-amber-100/80 text-amber-700 text-xs px-2 py-0.5 rounded-full font-medium">
-              AIRPORT
-            </span>
+            <span className="ds-tag tag-airport">AIRPORT</span>
           )}
         </div>
       </div>
@@ -99,7 +97,7 @@ export default function RideCard({ booking, onStatusUpdate }: Props) {
         <button
           onClick={handleAction}
           disabled={loading}
-          className={`mt-3 w-full text-white py-2 rounded-lg text-sm font-semibold transition-colors disabled:opacity-50 btn-press ${next.color}`}
+          className={`btn-press mt-3 w-full ${next.color}`}
         >
           {loading ? "Updating..." : next.label}
         </button>

@@ -55,27 +55,24 @@ export default function ReviewForm({ bookingId, onClose }: Props) {
   return (
     <Modal isOpen={!!bookingId} onClose={onClose} title="Leave a Review">
       <form onSubmit={handleSubmit} className="space-y-4">
-        {error && (
-          <div className="glass-card !border-red-300/40 px-3 py-2 text-red-600 text-sm">
-            {error}
-          </div>
-        )}
+        {error && <div className="alert alert-error">{error}</div>}
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-2">
-            Rating
-          </label>
+          <label className="field-label mb-2 block">Rating</label>
           <StarRating value={rating} onChange={setRating} />
         </div>
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">
+          <label className="field-label mb-2 block">
             Comment
-            <span className="text-gray-400 font-normal"> (optional)</span>
+            <span className="normal-case tracking-normal text-[var(--color-muted)]">
+              {" "}
+              (optional)
+            </span>
           </label>
           <textarea
             value={comment}
             onChange={(e) => setComment(e.target.value)}
             rows={3}
-            className="input-glass w-full"
+            className="ds-textarea"
             placeholder="How was your ride?"
           />
         </div>

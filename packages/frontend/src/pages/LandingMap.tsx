@@ -32,7 +32,7 @@ interface Coords {
 
 function pickupIcon() {
   return L.divIcon({
-    html: '<div style="background:#22c55e;width:36px;height:36px;border-radius:50%;display:flex;align-items:center;justify-content:center;color:#fff;font-weight:700;font-size:14px;border:2px solid #fff;box-shadow:0 2px 10px rgba(0,0,0,.5)">P</div>',
+    html: '<div style="background:#98fe00;width:36px;height:36px;border-radius:4px;display:flex;align-items:center;justify-content:center;color:#131313;font-family:Roboto Mono,monospace;font-weight:700;font-size:14px;border:1px solid #131313;box-shadow:0 8px 20px rgba(19,19,19,.18)">P</div>',
     className: "",
     iconSize: [36, 36],
     iconAnchor: [18, 18],
@@ -41,7 +41,7 @@ function pickupIcon() {
 
 function dropoffIcon() {
   return L.divIcon({
-    html: '<div style="background:#ef4444;width:36px;height:36px;border-radius:50%;display:flex;align-items:center;justify-content:center;color:#fff;font-weight:700;font-size:14px;border:2px solid #fff;box-shadow:0 2px 10px rgba(0,0,0,.5)">D</div>',
+    html: '<div style="background:#131313;width:36px;height:36px;border-radius:4px;display:flex;align-items:center;justify-content:center;color:#98fe00;font-family:Roboto Mono,monospace;font-weight:700;font-size:14px;border:1px solid #98fe00;box-shadow:0 8px 20px rgba(19,19,19,.18)">D</div>',
     className: "",
     iconSize: [36, 36],
     iconAnchor: [18, 18],
@@ -224,7 +224,7 @@ export default function LandingMap({ data, onNext }: Props) {
       : null;
 
   return (
-    <div className="fixed inset-0 top-14">
+    <div className="fixed inset-0 top-[72px]">
       {/* Full-page map */}
       <MapContainer
         center={UK_CENTER}
@@ -274,34 +274,33 @@ export default function LandingMap({ data, onNext }: Props) {
         {route.length > 0 && (
           <Polyline
             positions={route}
-            pathOptions={{ color: "#3b82f6", weight: 4, opacity: 0.8 }}
+            pathOptions={{ color: "#131313", weight: 4, opacity: 0.8 }}
           />
         )}
       </MapContainer>
 
-      {/* Floating guide text */}
       {!pickupCoords && !dropoffCoords && (
-        <div className="hidden md:block absolute top-6 left-1/2 -translate-x-1/2 bg-white/80 backdrop-blur text-gray-700 px-5 py-3 rounded-full text-sm font-medium animate-fade-in pointer-events-none z-[1001]">
+        <div className="pointer-events-none absolute left-1/2 top-6 z-[1001] hidden -translate-x-1/2 animate-fade-in rounded-[64px] border border-[var(--color-border)] bg-[rgb(255_255_255_/_0.94)] px-5 py-3 text-sm font-medium text-[var(--color-dark)] shadow-[var(--shadow-card)] md:block">
           Enter your pickup and drop-off locations to get started
         </div>
       )}
 
-      {/* ── CENTERED BOOKING CARD ── */}
       <form
         onSubmit={handleSubmit}
-        className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 z-[1001] pointer-events-auto w-full max-w-md mx-4 bg-white/80 backdrop-blur-2xl rounded-2xl border border-black/8 shadow-2xl p-6 space-y-4 animate-scale-in"
+        className="floating-panel absolute left-1/2 top-1/2 z-[1001] mx-4 w-full max-w-lg -translate-x-1/2 -translate-y-1/2 space-y-5 p-6 pointer-events-auto animate-scale-in"
       >
         <div>
-          <h1 className="text-xl font-bold text-gray-900">Book Your Ride</h1>
-          <p className="text-sm text-gray-500 mt-1">
+          <p className="section-label">New Booking</p>
+          <h1 className="mt-4 text-[40px] font-bold leading-none tracking-[-0.04em] text-[var(--color-dark)]">
+            Book your ride
+          </h1>
+          <p className="caption-copy mt-2">
             Enter your locations or click on the map
           </p>
         </div>
 
         <div>
-          <label className="block text-xs font-medium text-gray-600 mb-1">
-            Pickup
-          </label>
+          <label className="field-label mb-2 block">Pickup</label>
           <div className="relative">
             <AddressAutocomplete
               value={pickup}
@@ -312,7 +311,7 @@ export default function LandingMap({ data, onNext }: Props) {
               }}
               required
               placeholder="e.g. Heathrow Airport"
-              className="input-glass w-full pr-9"
+              className="input-glass w-full pr-12"
             />
             <button
               type="button"
@@ -320,11 +319,7 @@ export default function LandingMap({ data, onNext }: Props) {
                 setActiveField(activeField === "pickup" ? null : "pickup")
               }
               title="Pick on map"
-              className={`absolute right-2 top-1/2 -translate-y-1/2 p-1 rounded transition-colors ${
-                activeField === "pickup"
-                  ? "text-blue-600 bg-blue-100/80"
-                  : "text-gray-400 hover:text-gray-600"
-              }`}
+              className={`icon-chip absolute right-2 top-1/2 -translate-y-1/2 ${activeField === "pickup" ? "icon-chip-active" : ""}`}
             >
               <IconMapPin className="w-4 h-4" />
             </button>
@@ -332,9 +327,7 @@ export default function LandingMap({ data, onNext }: Props) {
         </div>
 
         <div>
-          <label className="block text-xs font-medium text-gray-600 mb-1">
-            Drop-off
-          </label>
+          <label className="field-label mb-2 block">Drop-off</label>
           <div className="relative">
             <AddressAutocomplete
               value={dropoff}
@@ -345,7 +338,7 @@ export default function LandingMap({ data, onNext }: Props) {
               }}
               required
               placeholder="e.g. Central London"
-              className="input-glass w-full pr-9"
+              className="input-glass w-full pr-12"
             />
             <button
               type="button"
@@ -353,11 +346,7 @@ export default function LandingMap({ data, onNext }: Props) {
                 setActiveField(activeField === "dropoff" ? null : "dropoff")
               }
               title="Pick on map"
-              className={`absolute right-2 top-1/2 -translate-y-1/2 p-1 rounded transition-colors ${
-                activeField === "dropoff"
-                  ? "text-blue-600 bg-blue-100/80"
-                  : "text-gray-400 hover:text-gray-600"
-              }`}
+              className={`icon-chip absolute right-2 top-1/2 -translate-y-1/2 ${activeField === "dropoff" ? "icon-chip-active" : ""}`}
             >
               <IconMapPin className="w-4 h-4" />
             </button>
@@ -365,7 +354,7 @@ export default function LandingMap({ data, onNext }: Props) {
         </div>
 
         {activeField && (
-          <div className="flex items-center gap-2 bg-blue-100/80 text-blue-700 px-3 py-2 rounded-lg text-sm animate-fade-in">
+          <div className="alert alert-info flex items-center gap-2 animate-fade-in">
             <IconMapPin className="w-4 h-4 shrink-0" />
             Click the map to set your{" "}
             {activeField === "pickup" ? "pickup" : "drop-off"}
@@ -374,34 +363,33 @@ export default function LandingMap({ data, onNext }: Props) {
 
         <div className="grid grid-cols-2 gap-3">
           <div>
-            <label className="block text-xs font-medium text-gray-600 mb-1">
-              Date
-            </label>
+            <label className="field-label mb-2 block">Date</label>
             <input
               type="date"
               value={date}
               onChange={(e) => setDate(e.target.value)}
               required
               min={today}
-              className="input-glass w-full"
+              className="input-glass"
             />
           </div>
           <div>
-            <label className="block text-xs font-medium text-gray-600 mb-1">
-              Time
-            </label>
+            <label className="field-label mb-2 block">Time</label>
             <input
               type="time"
               value={time}
               onChange={(e) => setTime(e.target.value)}
               required
-              className="input-glass w-full"
+              className="input-glass"
             />
           </div>
         </div>
 
-        <button type="submit" className="w-full btn-primary text-base">
-          Get Quote
+        <button type="submit" className="btn-primary w-full">
+          <span>Get Quote</span>
+          <span className="btn-icon">
+            <span className="btn-icon-glyph">↗</span>
+          </span>
         </button>
       </form>
     </div>

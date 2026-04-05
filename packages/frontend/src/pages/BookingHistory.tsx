@@ -16,12 +16,12 @@ import { useToast } from "../context/ToastContext";
 import { IconMapPin, IconCar } from "../components/icons";
 
 const STATUS_LEFT_BORDER: Record<string, string> = {
-  scheduled: "border-l-blue-400",
-  assigned: "border-l-indigo-400",
-  en_route: "border-l-orange-400",
-  arrived: "border-l-purple-400",
-  completed: "border-l-green-500",
-  cancelled: "border-l-gray-300",
+  scheduled: "border-l-[var(--color-blue-mid)]",
+  assigned: "border-l-[var(--color-orange)]",
+  en_route: "border-l-[var(--color-navy)]",
+  arrived: "border-l-[var(--color-forest)]",
+  completed: "border-l-[var(--color-green)]",
+  cancelled: "border-l-[var(--color-border-light)]",
 };
 
 export default function BookingHistory() {
@@ -85,76 +85,73 @@ export default function BookingHistory() {
 
   if (bookings.length === 0) {
     return (
-      <div className="text-center py-16">
-        <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-blue-500/15 mb-4">
-          <IconCar className="w-8 h-8 text-blue-600" />
+      <div className="empty-state">
+        <div className="empty-state-icon">
+          <IconCar className="h-8 w-8" />
         </div>
-        <p className="text-gray-500 mb-1 font-medium">No bookings yet</p>
-        <p className="text-sm text-gray-400 mb-6">
-          Book your first ride to get started
-        </p>
-        <button onClick={() => navigate("/")} className="btn-primary text-sm">
-          Book a Ride
+        <p className="body-copy mb-1 font-medium">No bookings yet</p>
+        <p className="caption-copy mb-6">Book your first ride to get started</p>
+        <button onClick={() => navigate("/")} className="btn-primary">
+          <span>Book a Ride</span>
+          <span className="btn-icon">
+            <span className="btn-icon-glyph">↗</span>
+          </span>
         </button>
       </div>
     );
   }
 
   return (
-    <div className="space-y-4">
-      <h1 className="text-xl font-semibold">My Bookings</h1>
+    <div className="page-stack">
+      <div className="page-header">
+        <div>
+          <p className="section-label">Customer</p>
+          <h1 className="page-title mt-4 text-[40px]">My bookings</h1>
+        </div>
+      </div>
       {bookings.map((b, i) => (
         <div
           key={b.id}
-          className={`glass-card border-l-4 p-4 hover-lift animate-stagger-in ${STATUS_LEFT_BORDER[b.status] ?? "border-l-gray-200"}`}
+          className={`glass-card hover-lift animate-stagger-in border-l-4 p-4 ${STATUS_LEFT_BORDER[b.status] ?? "border-l-[var(--color-border-light)]"}`}
           style={{ animationDelay: `${i * 60}ms` }}
         >
           <div className="flex items-start justify-between">
             <div className="space-y-1 flex-1 min-w-0 pr-3">
-              <div className="flex items-start gap-1.5 text-sm font-medium">
-                <IconMapPin className="w-3.5 h-3.5 text-green-500 mt-0.5 shrink-0" />
+              <div className="flex items-start gap-1.5 text-sm font-medium text-[var(--color-dark)]">
+                <IconMapPin className="mt-0.5 h-3.5 w-3.5 shrink-0 text-[var(--color-forest)]" />
                 <span className="truncate">{b.pickupAddress}</span>
               </div>
-              <div className="flex items-start gap-1.5 text-sm text-gray-500">
-                <IconMapPin className="w-3.5 h-3.5 text-red-400 mt-0.5 shrink-0" />
+              <div className="caption-copy flex items-start gap-1.5">
+                <IconMapPin className="mt-0.5 h-3.5 w-3.5 shrink-0 text-[var(--color-dark)]" />
                 <span className="truncate">{b.dropoffAddress}</span>
               </div>
-              <div className="text-xs text-gray-400">
-                {formatDate(b.scheduledAt)}
-              </div>
-              <div className="text-sm font-semibold text-blue-600">
+              <div className="mono-label">{formatDate(b.scheduledAt)}</div>
+              <div className="body-copy font-bold text-[var(--color-dark)]">
                 {formatPrice(b.pricePence)}
                 {b.discountPence > 0 && (
-                  <span className="text-green-700 text-xs ml-1.5 font-normal">
+                  <span className="ml-1.5 text-xs font-normal text-[var(--color-forest)]">
                     (-{formatPrice(b.discountPence)})
                   </span>
                 )}
               </div>
             </div>
             <div className="flex flex-col items-end gap-2 shrink-0">
-              <span
-                className={`px-2 py-0.5 rounded-full text-xs font-medium ${statusColor(b.status)}`}
-              >
+              <span className={`status-pill ${statusColor(b.status)}`}>
                 {statusLabel(b.status)}
               </span>
               {b.isAirport && (
-                <span className="bg-amber-100/80 text-amber-700 text-xs px-2 py-0.5 rounded-full font-medium">
-                  AIRPORT
-                </span>
+                <span className="ds-tag tag-airport">AIRPORT</span>
               )}
             </div>
           </div>
-          <div className="flex gap-3 mt-3 pt-3 border-t border-white/10">
-            <button
-              onClick={() => handleRebook(b)}
-              className="text-xs text-blue-600 hover:text-blue-500 font-medium"
-            >
+          <div className="mt-3 flex gap-4 border-t border-[var(--color-border)] pt-3">
+            <button onClick={() => handleRebook(b)} className="subtle-link">
               Rebook
             </button>
             {(b.status === "scheduled" || b.status === "assigned") && (
               <button
                 onClick={() => handleCancel(b.id)}
-                className="text-xs text-red-600 hover:text-red-500 font-medium"
+                className="subtle-link text-[var(--color-error)]"
               >
                 Cancel
               </button>
@@ -162,7 +159,7 @@ export default function BookingHistory() {
             {b.status === "completed" && (
               <button
                 onClick={() => setReviewBookingId(b.id)}
-                className="text-xs text-green-700 hover:text-green-600 font-medium"
+                className="subtle-link text-[var(--color-forest)]"
               >
                 Leave Review
               </button>

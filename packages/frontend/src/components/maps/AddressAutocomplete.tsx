@@ -112,16 +112,16 @@ export default function AddressAutocomplete({
         autoComplete="off"
       />
       {open && suggestions.length > 0 && (
-        <ul className="absolute z-[1002] left-0 right-0 mt-1 bg-white border border-black/10 rounded-lg shadow-xl max-h-48 overflow-y-auto">
+        <ul className="absolute left-0 right-0 z-[1002] mt-2 max-h-48 overflow-y-auto rounded-[4px] border border-[var(--color-border)] bg-[var(--color-surface)] shadow-[var(--shadow-card)]">
           {suggestions.map((s, i) => (
             <li
               key={`${s.lat}-${s.lon}`}
               onMouseDown={() => handleSelect(s)}
               onMouseEnter={() => setHighlighted(i)}
-              className={`px-3 py-2 text-sm cursor-pointer transition-colors ${
+              className={`cursor-pointer px-3 py-3 text-sm transition-colors ${
                 i === highlighted
-                  ? "bg-blue-600 text-white"
-                  : "text-gray-700 hover:bg-blue-50"
+                  ? "bg-[var(--color-dark)] text-[var(--color-surface)]"
+                  : "text-[var(--color-dark)] hover:bg-[var(--color-surface-alt)]"
               }`}
             >
               {s.display_name}

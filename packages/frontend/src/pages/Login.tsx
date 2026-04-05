@@ -29,35 +29,32 @@ export default function Login() {
   }
 
   return (
-    <div className="mx-auto max-w-sm mt-16 animate-fade-in">
-      <div className="text-center mb-8">
-        <h1 className="text-2xl font-bold text-gray-900">Welcome back</h1>
-        <p className="text-sm text-gray-500 mt-1">Sign in to your account</p>
+    <div className="mx-auto mt-16 max-w-xl animate-fade-in">
+      <div className="mb-8">
+        <p className="section-label">Account Access</p>
+        <h1 className="page-title mt-4 text-[40px]">Welcome back</h1>
+        <p className="page-subtitle">
+          Sign in to manage rides, schedules, and bookings.
+        </p>
       </div>
-      <form onSubmit={handleSubmit} className="glass-card p-8 space-y-4">
-        {error && (
-          <div className="glass-card !border-red-300/40 px-4 py-3 text-red-600 text-sm">
-            {error}
-          </div>
-        )}
+      <form onSubmit={handleSubmit} className="glass-card space-y-4 p-8">
+        {error && <div className="alert alert-error">{error}</div>}
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">
-            Email
-          </label>
+          <label className="field-label mb-2 block">Email</label>
           <input
             type="email"
             value={email}
             onChange={(e) => setEmail(e.target.value)}
             required
             autoFocus
-            className="input-glass w-full"
+            className="input-glass"
             placeholder="you@example.com"
           />
         </div>
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">
+          <label className="field-label mb-2 block">
             Password
-            <span className="text-gray-400 font-normal">
+            <span className="normal-case tracking-normal text-[var(--color-muted)]">
               {" "}
               (admin/driver only)
             </span>
@@ -66,7 +63,7 @@ export default function Login() {
             type="password"
             value={password}
             onChange={(e) => setPassword(e.target.value)}
-            className="input-glass w-full"
+            className="input-glass"
             placeholder="Leave empty for customer login"
           />
         </div>

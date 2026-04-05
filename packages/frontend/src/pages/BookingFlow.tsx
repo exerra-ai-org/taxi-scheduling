@@ -64,44 +64,29 @@ export default function BookingFlow() {
   }
 
   return (
-    <div className="mx-auto max-w-3xl flex gap-8 py-2">
-      {/* Vertical timeline */}
-      <div className="hidden md:flex flex-col items-center pt-1 shrink-0">
+    <div className="mx-auto flex min-h-[calc(100vh-180px)] max-w-5xl items-center justify-center gap-8 py-8">
+      <div className="hidden shrink-0 md:flex md:flex-col md:pt-1">
         {STEPS.map(({ num, label }, i) => {
           const isActive = num === step;
           const isComplete = num < step;
           const isLast = i === STEPS.length - 1;
           return (
-            <div key={num} className="flex flex-col items-center">
-              <div className="flex items-center gap-3">
+            <div key={num} className="stepper-shell">
+              <div className="step-row">
                 <div
-                  className={`w-9 h-9 rounded-full flex items-center justify-center text-sm font-semibold transition-all ${
-                    isComplete
-                      ? "bg-green-500/20 text-green-700 ring-2 ring-green-400/30"
-                      : isActive
-                        ? "bg-blue-100/80 text-blue-600 ring-2 ring-blue-400/30 shadow-lg shadow-blue-500/20"
-                        : "bg-white/60 text-gray-500 ring-1 ring-black/5"
-                  }`}
+                  className={`step-dot ${isComplete ? "step-dot-complete" : isActive ? "step-dot-active" : ""}`}
                 >
                   {isComplete ? "✓" : num}
                 </div>
                 <span
-                  className={`text-sm font-medium w-16 ${
-                    isActive
-                      ? "text-blue-600"
-                      : isComplete
-                        ? "text-green-700"
-                        : "text-gray-500"
-                  }`}
+                  className={`step-label w-20 ${isActive ? "step-label-active" : isComplete ? "step-label-complete" : ""}`}
                 >
                   {label}
                 </span>
               </div>
               {!isLast && (
                 <div
-                  className={`w-px h-10 my-1 transition-colors ${
-                    isComplete ? "bg-green-500/40" : "bg-black/5"
-                  }`}
+                  className={`step-line ${isComplete ? "step-line-complete" : ""}`}
                 />
               )}
             </div>
@@ -109,24 +94,16 @@ export default function BookingFlow() {
         })}
       </div>
 
-      {/* Mobile step indicator */}
-      <div className="md:hidden flex items-center gap-2 mb-4 w-full">
+      <div className="mb-4 flex w-full items-center gap-2 md:hidden">
         {STEPS.map(({ num }) => (
           <div
             key={num}
-            className={`h-1 flex-1 rounded-full transition-colors ${
-              num < step
-                ? "bg-green-500/60"
-                : num === step
-                  ? "bg-blue-500"
-                  : "bg-black/5"
-            }`}
+            className={`progress-rail flex-1 ${num <= step ? "progress-rail-active" : ""}`}
           />
         ))}
       </div>
 
-      {/* Step content */}
-      <div className="flex-1 min-w-0">
+      <div className="w-full max-w-2xl min-w-0">
         {step === 2 && (
           <PriceDisplay
             data={data}

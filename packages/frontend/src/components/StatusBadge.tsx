@@ -9,12 +9,10 @@ export default function StatusBadge({ status }: { status: BookingStatus }) {
     <span className="relative inline-flex items-center">
       {pulse && (
         <span
-          className={`absolute -inset-0.5 rounded-full opacity-60 animate-pulse-ring ${statusColor(status)}`}
+          className={`absolute -inset-1 rounded-[6px] opacity-60 animate-pulse-ring ${statusColor(status)}`}
         />
       )}
-      <span
-        className={`relative px-2 py-0.5 rounded-full text-xs font-medium ${statusColor(status)}`}
-      >
+      <span className={`relative status-pill ${statusColor(status)}`}>
         {statusLabel(status)}
       </span>
     </span>

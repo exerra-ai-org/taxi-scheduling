@@ -48,12 +48,15 @@ export default function JourneyInput({ data, onNext }: Props) {
 
   return (
     <form onSubmit={handleSubmit} className="space-y-4">
-      <h2 className="text-xl font-semibold">Where are you going?</h2>
+      <div>
+        <p className="section-label">Step 01</p>
+        <h2 className="mt-4 text-[32px] font-bold leading-[1.1] tracking-[-0.04em] text-[var(--color-dark)]">
+          Where are you going?
+        </h2>
+      </div>
 
       <div>
-        <label className="block text-sm font-medium text-gray-700 mb-1">
-          Pickup Location
-        </label>
+        <label className="field-label mb-2 block">Pickup Location</label>
         <AddressAutocomplete
           value={pickup}
           onChange={(address, coords) => {
@@ -63,14 +66,12 @@ export default function JourneyInput({ data, onNext }: Props) {
           }}
           required
           placeholder="e.g. Heathrow Airport"
-          className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+          className="input-glass"
         />
       </div>
 
       <div>
-        <label className="block text-sm font-medium text-gray-700 mb-1">
-          Drop-off Location
-        </label>
+        <label className="field-label mb-2 block">Drop-off Location</label>
         <AddressAutocomplete
           value={dropoff}
           onChange={(address, coords) => {
@@ -80,7 +81,7 @@ export default function JourneyInput({ data, onNext }: Props) {
           }}
           required
           placeholder="e.g. Central London"
-          className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+          className="input-glass"
         />
       </div>
 
@@ -110,37 +111,33 @@ export default function JourneyInput({ data, onNext }: Props) {
 
       <div className="grid grid-cols-2 gap-4">
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">
-            Date
-          </label>
+          <label className="field-label mb-2 block">Date</label>
           <input
             type="date"
             value={date}
             onChange={(e) => setDate(e.target.value)}
             required
             min={today}
-            className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+            className="input-glass"
           />
         </div>
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">
-            Time
-          </label>
+          <label className="field-label mb-2 block">Time</label>
           <input
             type="time"
             value={time}
             onChange={(e) => setTime(e.target.value)}
             required
-            className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+            className="input-glass"
           />
         </div>
       </div>
 
-      <button
-        type="submit"
-        className="w-full bg-blue-600 text-white py-2 rounded-lg font-semibold hover:bg-blue-700 transition-colors"
-      >
-        Get Quote
+      <button type="submit" className="btn-primary w-full">
+        <span>Get Quote</span>
+        <span className="btn-icon">
+          <span className="btn-icon-glyph">↗</span>
+        </span>
       </button>
     </form>
   );
