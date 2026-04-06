@@ -2,7 +2,7 @@ import { z } from "zod";
 
 // Booking time constraints
 export const BOOKING_MIN_HOURS_STANDARD = 4;
-export const BOOKING_MIN_HOURS_LONDON = 2;
+export const BOOKING_MIN_HOURS_LONDON = 4;
 export const BOOKING_MAX_DAYS = 30;
 
 export const bookingStatusEnum = z.enum([
@@ -30,6 +30,11 @@ export const createBookingSchema = z.object({
 export const loginSchema = z.object({
   email: z.string().email(),
   password: z.string().optional(),
+  phone: z.string().min(6).optional(),
+});
+
+export const checkEmailSchema = z.object({
+  email: z.string().email(),
 });
 
 export const registerSchema = z.object({
@@ -64,6 +69,32 @@ export const createReviewSchema = z.object({
   driverId: z.number().int().positive(),
   rating: z.number().int().min(1).max(5),
   comment: z.string().optional(),
+});
+
+export const createFixedRouteSchema = z.object({
+  name: z.string().min(1).max(120),
+  fromLabel: z.string().min(1).max(120),
+  toLabel: z.string().min(1).max(120),
+  pricePence: z.number().int().positive(),
+  isAirport: z.boolean().optional(),
+});
+
+export const updateFixedRouteSchema = createFixedRouteSchema.partial().extend({
+  id: z.number().int().positive().optional(),
+});
+
+export const driverHeartbeatSchema = z.object({
+  bookingId: z.number().int().positive(),
+});
+
+export const notificationSubscriptionSchema = z.object({
+  endpoint: z.string().url(),
+  p256dh: z.string().min(1),
+  auth: z.string().min(1),
+});
+
+export const notificationUnsubscribeSchema = z.object({
+  endpoint: z.string().url(),
 });
 
 export const pricingQuoteSchema = z.object({

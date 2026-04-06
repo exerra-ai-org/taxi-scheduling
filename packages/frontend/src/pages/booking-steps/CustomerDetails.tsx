@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { useAuth } from "../../context/AuthContext";
+import { checkEmail } from "../../api/auth";
 import { ApiError } from "../../api/client";
 
 interface Props {
@@ -12,8 +13,9 @@ export default function CustomerDetails({ onNext, onBack }: Props) {
   const [email, setEmail] = useState(user?.email || "");
   const [name, setName] = useState(user?.name || "");
   const [phone, setPhone] = useState(user?.phone || "");
-  const [mode, setMode] = useState<"check" | "found" | "new">(
-    user ? "found" : "check",
+  const [existingName, setExistingName] = useState("");
+  const [mode, setMode] = useState<"check" | "existing" | "new">(
+    user ? "existing" : "check",
   );
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
@@ -22,19 +24,44 @@ export default function CustomerDetails({ onNext, onBack }: Props) {
     if (!email.trim()) return;
     setLoading(true);
     setError("");
+
     try {
-      const u = await login(email);
-      setName(u.name);
-      setPhone((u as { phone?: string }).phone || "");
-      setMode("found");
-    } catch (err) {
-      if (err instanceof ApiError && err.status === 404) {
+      const result = await checkEmail(email.trim());
+
+      if (!result.exists) {
+        setName("");
+        setPhone("");
+        setExistingName("");
         setMode("new");
-      } else if (err instanceof ApiError) {
-        setError(err.message);
-      } else {
-        setError("Something went wrong");
+        return;
       }
+
+      if (result.role && result.role !== "customer") {
+        setError("This email belongs to a staff account. Please use the login page.");
+        setMode("check");
+        return;
+      }
+
+      setExistingName(result.name || "");
+      setPhone("");
+      setMode("existing");
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : "Something went wrong");
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  async function handleExistingLogin() {
+    if (!phone.trim()) return;
+
+    setLoading(true);
+    setError("");
+    try {
+      await login(email, undefined, phone);
+      onNext();
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : "Login failed");
     } finally {
       setLoading(false);
     }
@@ -55,7 +82,7 @@ export default function CustomerDetails({ onNext, onBack }: Props) {
   }
 
   // Already logged in — show confirmation
-  if (user && mode === "found") {
+  if (user) {
     return (
       <div className="space-y-4">
         <div>
@@ -106,8 +133,10 @@ export default function CustomerDetails({ onNext, onBack }: Props) {
       </div>
       <p className="caption-copy">
         {mode === "check"
-          ? "Enter your email to check if you have an account"
-          : "Complete your details to continue"}
+          ? "Enter your email to find your account"
+          : mode === "existing"
+            ? "Account found. Enter your phone number to continue"
+            : "Complete your details to create an account"}
       </p>
 
       {error && <div className="alert alert-error">{error}</div>}
@@ -120,6 +149,7 @@ export default function CustomerDetails({ onNext, onBack }: Props) {
             value={email}
             onChange={(e) => {
               setEmail(e.target.value);
+              setError("");
               if (mode !== "check") setMode("check");
             }}
             required
@@ -144,10 +174,35 @@ export default function CustomerDetails({ onNext, onBack }: Props) {
         </div>
       </div>
 
+      {mode === "existing" && (
+        <>
+          <div className="alert alert-info">
+            {existingName ? `Welcome back, ${existingName}.` : "Existing account found."} Verify your phone number to continue.
+          </div>
+          <div>
+            <label className="field-label mb-2 block">Phone Number</label>
+            <input
+              type="tel"
+              value={phone}
+              onChange={(e) => setPhone(e.target.value)}
+              required
+              placeholder="07700 000 000"
+              className="input-glass w-full"
+              onKeyDown={(e) => {
+                if (e.key === "Enter") {
+                  e.preventDefault();
+                  handleExistingLogin();
+                }
+              }}
+            />
+          </div>
+        </>
+      )}
+
       {mode === "new" && (
         <>
           <div className="alert alert-info">
-            No account found — fill in your details to create one
+            No account found. Fill in your details to create one.
           </div>
           <div>
             <label className="field-label mb-2 block">Full Name</label>
@@ -185,6 +240,15 @@ export default function CustomerDetails({ onNext, onBack }: Props) {
             className="btn-primary flex-1"
           >
             {loading ? "Creating account..." : "Continue"}
+          </button>
+        )}
+        {mode === "existing" && (
+          <button
+            onClick={handleExistingLogin}
+            disabled={loading || !phone.trim()}
+            className="btn-primary flex-1"
+          >
+            {loading ? "Signing in..." : "Continue"}
           </button>
         )}
       </div>

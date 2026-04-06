@@ -78,16 +78,24 @@ reviewRoutes.post("/", async (c) => {
     return err(c, "You have already reviewed this booking", 409);
   }
 
-  const [review] = await db
-    .insert(reviews)
-    .values({
-      bookingId,
-      customerId: payload.sub,
-      driverId,
-      rating,
-      comment: comment ?? null,
-    })
-    .returning();
+  let review;
+  try {
+    [review] = await db
+      .insert(reviews)
+      .values({
+        bookingId,
+        customerId: payload.sub,
+        driverId,
+        rating,
+        comment: comment ?? null,
+      })
+      .returning();
+  } catch (e: unknown) {
+    if (e instanceof Error && e.message.includes("reviews_booking_customer")) {
+      return err(c, "You have already reviewed this booking", 409);
+    }
+    throw e;
+  }
 
   return ok(c, { review }, 201);
 });

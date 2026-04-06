@@ -26,7 +26,7 @@ const STATUS_LEFT_BORDER: Record<string, string> = {
 
 export default function BookingHistory() {
   const navigate = useNavigate();
-  const [bookings, setBookings] = useState<Booking[]>([]);
+  const [bookings, setBookings] = useState<Array<Booking & { hasReview?: boolean }>>([]);
   const [loading, setLoading] = useState(true);
   const [reviewBookingId, setReviewBookingId] = useState<number | null>(null);
   const { confirm, dialogProps } = useConfirm();
@@ -156,7 +156,7 @@ export default function BookingHistory() {
                 Cancel
               </button>
             )}
-            {b.status === "completed" && (
+            {b.status === "completed" && !b.hasReview && (
               <button
                 onClick={() => setReviewBookingId(b.id)}
                 className="subtle-link text-[var(--color-forest)]"
@@ -171,6 +171,7 @@ export default function BookingHistory() {
       <ReviewForm
         bookingId={reviewBookingId}
         onClose={() => setReviewBookingId(null)}
+        onSubmitted={fetchBookings}
       />
       {dialogProps && <ConfirmDialog {...dialogProps} />}
     </div>

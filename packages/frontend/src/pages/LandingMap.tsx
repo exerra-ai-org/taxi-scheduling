@@ -8,9 +8,12 @@ import {
   useMapEvents,
 } from "react-leaflet";
 import L from "leaflet";
+import type { FixedRoute } from "shared/types";
 import type { BookingData } from "./BookingFlow";
 import AddressAutocomplete from "../components/maps/AddressAutocomplete";
 import { IconMapPin } from "../components/icons";
+import { listQuickRoutes } from "../api/fixedRoutes";
+import { formatPrice } from "../lib/format";
 
 const DARK_TILES =
   "https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png";
@@ -125,6 +128,7 @@ export default function LandingMap({ data, onNext }: Props) {
     null,
   );
   const [route, setRoute] = useState<L.LatLngExpression[]>([]);
+  const [quickRoutes, setQuickRoutes] = useState<FixedRoute[]>([]);
 
   // Fetch route when both coords set
   useEffect(() => {
@@ -156,6 +160,12 @@ export default function LandingMap({ data, onNext }: Props) {
         ]);
       });
   }, [pickupLat, pickupLon, dropoffLat, dropoffLon]);
+
+  useEffect(() => {
+    listQuickRoutes()
+      .then((res) => setQuickRoutes(res.routes.slice(0, 8)))
+      .catch(() => setQuickRoutes([]));
+  }, []);
 
   // Reverse geocode a map click
   const handleMapClick = useCallback(
@@ -298,6 +308,37 @@ export default function LandingMap({ data, onNext }: Props) {
             Enter your locations or click on the map
           </p>
         </div>
+
+        {quickRoutes.length > 0 && (
+          <div className="space-y-2">
+            <div className="field-label">Quick Routes</div>
+            <div className="max-h-32 space-y-2 overflow-y-auto pr-1">
+              {quickRoutes.map((r) => (
+                <button
+                  key={r.id}
+                  type="button"
+                  onClick={() => {
+                    setPickup(r.fromLabel);
+                    setDropoff(r.toLabel);
+                    setPickupLat(undefined);
+                    setPickupLon(undefined);
+                    setDropoffLat(undefined);
+                    setDropoffLon(undefined);
+                    setActiveField(null);
+                  }}
+                  className="w-full rounded-[4px] border border-[var(--color-border)] bg-[var(--color-surface)] px-3 py-2 text-left transition hover:border-[var(--color-dark)]"
+                >
+                  <div className="body-copy text-sm font-medium text-[var(--color-dark)]">
+                    {r.name}
+                  </div>
+                  <div className="mono-label mt-1">
+                    {r.fromLabel} → {r.toLabel} · {formatPrice(r.pricePence)}
+                  </div>
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
 
         <div>
           <label className="field-label mb-2 block">Pickup</label>

@@ -1,6 +1,7 @@
 import { useEffect, useState, useCallback } from "react";
 import type { Booking } from "shared/types";
 import { listBookings } from "../../api/bookings";
+import { api } from "../../api/client";
 import RideCard from "./RideCard";
 import { SkeletonCard } from "../../components/Skeleton";
 
@@ -12,6 +13,15 @@ export default function MyRides() {
     try {
       const data = await listBookings();
       setBookings(data.bookings);
+
+      const activeForHeartbeat = data.bookings.filter((b) =>
+        ["assigned", "en_route"].includes(b.status),
+      );
+      await Promise.all(
+        activeForHeartbeat.map((b) =>
+          api.post("/api/drivers/heartbeat", { bookingId: b.id }).catch(() => {}),
+        ),
+      );
     } catch {
       // ignore
     } finally {

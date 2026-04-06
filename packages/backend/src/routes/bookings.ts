@@ -1,5 +1,6 @@
 import { Hono } from "hono";
-import { eq, and, desc, inArray } from "drizzle-orm";
+import { eq, and, desc, inArray, sql } from "drizzle-orm";
+import type { BookingStatus } from "shared/types";
 import {
   createBookingSchema,
   updateBookingStatusSchema,
@@ -22,10 +23,55 @@ import {
 import {
   validateCoupon,
   applyCoupon,
-  incrementCouponUsage,
+  reserveCouponUsage,
 } from "../services/coupon";
+import {
+  notifyBookingCancelled,
+  notifyBookingCreated,
+  notifyBookingStatusChanged,
+  notifyDriverFallbackActivated,
+  notifyDriversAssigned,
+} from "../services/notifications";
 
 export const bookingRoutes = new Hono();
+
+const STATUS_TRANSITIONS: Record<BookingStatus, BookingStatus[]> = {
+  scheduled: ["assigned", "cancelled"],
+  assigned: ["en_route", "cancelled"],
+  en_route: ["arrived"],
+  arrived: ["completed"],
+  completed: [],
+  cancelled: [],
+};
+
+class BookingRequestError extends Error {
+  status: 400 | 401 | 403 | 404 | 409;
+
+  constructor(message: string, status: 400 | 401 | 403 | 404 | 409 = 400) {
+    super(message);
+    this.status = status;
+  }
+}
+
+function parseRouteId(raw: string): number | null {
+  const id = Number(raw);
+  if (!Number.isInteger(id) || id <= 0) return null;
+  return id;
+}
+
+function canTransitionStatus(
+  current: BookingStatus,
+  next: BookingStatus,
+): boolean {
+  if (current === next) return true;
+  return STATUS_TRANSITIONS[current].includes(next);
+}
+
+function runAsyncSideEffect(label: string, promise: Promise<unknown>) {
+  void promise.catch((cause) => {
+    console.error(`${label} failed:`, cause);
+  });
+}
 
 // All booking routes require auth
 bookingRoutes.use("*", authMiddleware);
@@ -94,50 +140,65 @@ bookingRoutes.post("/", requireRole("customer"), async (c) => {
     );
   }
 
-  // Handle coupon
-  let discountPence = 0;
-  let couponId: number | null = null;
-  let finalPrice = quote.pricePence;
+  try {
+    const booking = await db.transaction(async (tx) => {
+      let discountPence = 0;
+      let couponId: number | null = null;
+      let finalPrice = quote.pricePence;
 
-  if (couponCode) {
-    const couponResult = await validateCoupon(couponCode);
-    if (!couponResult.valid || !couponResult.coupon) {
-      return err(c, couponResult.reason || "Invalid coupon", 400);
+      if (couponCode) {
+        const couponResult = await validateCoupon(couponCode, tx);
+        if (!couponResult.valid || !couponResult.coupon) {
+          throw new BookingRequestError(couponResult.reason || "Invalid coupon");
+        }
+
+        const discount = applyCoupon(couponResult.coupon, quote.pricePence);
+        discountPence = discount.discountPence;
+        finalPrice = discount.finalPricePence;
+        couponId = couponResult.coupon.id;
+
+        const reserved = await reserveCouponUsage(couponId, tx);
+        if (!reserved) {
+          throw new BookingRequestError(
+            "Coupon usage limit reached or coupon expired",
+          );
+        }
+      }
+
+      const [created] = await tx
+        .insert(bookings)
+        .values({
+          customerId: payload.sub,
+          pickupAddress,
+          dropoffAddress,
+          pickupLat: pickupLat ?? null,
+          pickupLon: pickupLon ?? null,
+          dropoffLat: dropoffLat ?? null,
+          dropoffLon: dropoffLon ?? null,
+          pickupZoneId: quote.pickupZoneId ?? null,
+          dropoffZoneId: quote.dropoffZoneId ?? null,
+          fixedRouteId: quote.fixedRouteId ?? null,
+          scheduledAt: scheduledDate,
+          pricePence: finalPrice,
+          discountPence,
+          couponId,
+          isAirport: quote.isAirport,
+        })
+        .returning();
+
+      return created;
+    });
+
+    runAsyncSideEffect("notifyBookingCreated", notifyBookingCreated(booking.id));
+
+    return ok(c, { booking }, 201);
+  } catch (cause) {
+    if (cause instanceof BookingRequestError) {
+      return err(c, cause.message, cause.status);
     }
-    const discount = applyCoupon(couponResult.coupon, quote.pricePence);
-    discountPence = discount.discountPence;
-    finalPrice = discount.finalPricePence;
-    couponId = couponResult.coupon.id;
+    console.error("Create booking failed:", cause);
+    return err(c, "Failed to create booking", 500);
   }
-
-  // Insert booking
-  const [booking] = await db
-    .insert(bookings)
-    .values({
-      customerId: payload.sub,
-      pickupAddress,
-      dropoffAddress,
-      pickupLat: pickupLat ?? null,
-      pickupLon: pickupLon ?? null,
-      dropoffLat: dropoffLat ?? null,
-      dropoffLon: dropoffLon ?? null,
-      pickupZoneId: quote.pickupZoneId ?? null,
-      dropoffZoneId: quote.dropoffZoneId ?? null,
-      fixedRouteId: quote.fixedRouteId ?? null,
-      scheduledAt: scheduledDate,
-      pricePence: finalPrice,
-      discountPence,
-      couponId,
-      isAirport: quote.isAirport,
-    })
-    .returning();
-
-  // Increment coupon usage
-  if (couponId) {
-    await incrementCouponUsage(couponId);
-  }
-
-  return ok(c, { booking }, 201);
 });
 
 // ── List Bookings ──────────────────────────────────────
@@ -149,7 +210,14 @@ bookingRoutes.get("/", async (c) => {
 
   if (payload.role === "customer") {
     results = await db
-      .select()
+      .select({
+        ...bookings,
+        hasReview: sql<boolean>`EXISTS (
+          SELECT 1 FROM reviews r
+          WHERE r.booking_id = ${bookings.id}
+            AND r.customer_id = ${payload.sub}
+        )`,
+      })
       .from(bookings)
       .where(eq(bookings.customerId, payload.sub))
       .orderBy(desc(bookings.scheduledAt));
@@ -161,9 +229,14 @@ bookingRoutes.get("/", async (c) => {
   } else {
     // Driver: get bookings where driver has active assignment
     results = await db
-      .select({ booking: bookings })
+      .select({
+        booking: bookings,
+        customerName: users.name,
+        customerPhone: users.phone,
+      })
       .from(driverAssignments)
       .innerJoin(bookings, eq(driverAssignments.bookingId, bookings.id))
+      .innerJoin(users, eq(bookings.customerId, users.id))
       .where(
         and(
           eq(driverAssignments.driverId, payload.sub),
@@ -171,7 +244,13 @@ bookingRoutes.get("/", async (c) => {
         ),
       )
       .orderBy(desc(bookings.scheduledAt))
-      .then((rows) => rows.map((r) => r.booking));
+      .then((rows) =>
+        rows.map((r) => ({
+          ...r.booking,
+          customerName: r.customerName,
+          customerPhone: r.customerPhone,
+        })),
+      );
   }
 
   return ok(c, { bookings: results });
@@ -181,7 +260,8 @@ bookingRoutes.get("/", async (c) => {
 
 bookingRoutes.get("/:id", async (c) => {
   const payload = c.get("jwtPayload") as JwtPayload;
-  const id = parseInt(c.req.param("id"));
+  const id = parseRouteId(c.req.param("id"));
+  if (!id) return err(c, "Invalid booking ID", 400);
 
   const result = await db
     .select()
@@ -242,7 +322,8 @@ bookingRoutes.patch(
   requireRole("driver", "admin"),
   async (c) => {
     const payload = c.get("jwtPayload") as JwtPayload;
-    const id = parseInt(c.req.param("id"));
+    const id = parseRouteId(c.req.param("id"));
+    if (!id) return err(c, "Invalid booking ID", 400);
 
     const body = await c.req.json();
     const parsed = updateBookingStatusSchema.safeParse(body);
@@ -260,10 +341,25 @@ bookingRoutes.patch(
       return err(c, "Booking not found", 404);
     }
 
-    // Driver can only set en_route, arrived, completed and must be active primary
+    const booking = result[0];
+    const nextStatus = parsed.data.status;
+
+    if (!canTransitionStatus(booking.status, nextStatus)) {
+      return err(
+        c,
+        `Invalid transition from ${booking.status} to ${nextStatus}`,
+        400,
+      );
+    }
+
+    // Driver can only set en_route, arrived, completed and must be active primary.
     if (payload.role === "driver") {
-      const allowed = ["en_route", "arrived", "completed"];
-      if (!allowed.includes(parsed.data.status)) {
+      const allowedByDriver: BookingStatus[] = [
+        "en_route",
+        "arrived",
+        "completed",
+      ];
+      if (!allowedByDriver.includes(nextStatus)) {
         return err(
           c,
           "Drivers can only set: en_route, arrived, completed",
@@ -279,20 +375,30 @@ bookingRoutes.patch(
             eq(driverAssignments.bookingId, id),
             eq(driverAssignments.driverId, payload.sub),
             eq(driverAssignments.isActive, true),
+            eq(driverAssignments.role, "primary"),
           ),
         )
         .limit(1);
 
       if (assignment.length === 0) {
-        return err(c, "You are not assigned to this booking", 403);
+        return err(c, "Only the active primary driver can update status", 403);
       }
+    }
+
+    if (booking.status === nextStatus) {
+      return ok(c, { booking });
     }
 
     const [updated] = await db
       .update(bookings)
-      .set({ status: parsed.data.status })
+      .set({ status: nextStatus })
       .where(eq(bookings.id, id))
       .returning();
+
+    runAsyncSideEffect(
+      "notifyBookingStatusChanged",
+      notifyBookingStatusChanged(id, nextStatus),
+    );
 
     return ok(c, { booking: updated });
   },
@@ -305,7 +411,8 @@ bookingRoutes.patch(
   requireRole("customer", "admin"),
   async (c) => {
     const payload = c.get("jwtPayload") as JwtPayload;
-    const id = parseInt(c.req.param("id"));
+    const id = parseRouteId(c.req.param("id"));
+    if (!id) return err(c, "Invalid booking ID", 400);
 
     const result = await db
       .select()
@@ -323,7 +430,7 @@ bookingRoutes.patch(
       return err(c, "Forbidden", 403);
     }
 
-    const cancellable = ["scheduled", "assigned"];
+    const cancellable: BookingStatus[] = ["scheduled", "assigned"];
     if (!cancellable.includes(booking.status)) {
       return err(c, "Booking cannot be cancelled in its current status", 400);
     }
@@ -334,6 +441,8 @@ bookingRoutes.patch(
       .where(eq(bookings.id, id))
       .returning();
 
+    runAsyncSideEffect("notifyBookingCancelled", notifyBookingCancelled(id));
+
     return ok(c, { booking: updated });
   },
 );
@@ -341,7 +450,8 @@ bookingRoutes.patch(
 // ── Assign Drivers ─────────────────────────────────────
 
 bookingRoutes.post("/:id/assign", requireRole("admin"), async (c) => {
-  const id = parseInt(c.req.param("id"));
+  const id = parseRouteId(c.req.param("id"));
+  if (!id) return err(c, "Invalid booking ID", 400);
 
   const body = await c.req.json();
   const parsed = assignDriversSchema.safeParse(body);
@@ -355,7 +465,7 @@ bookingRoutes.post("/:id/assign", requireRole("admin"), async (c) => {
     return err(c, "Primary and backup driver must be different", 400);
   }
 
-  // Verify booking exists
+  // Verify booking exists and is assignable
   const bookingResult = await db
     .select()
     .from(bookings)
@@ -364,6 +474,11 @@ bookingRoutes.post("/:id/assign", requireRole("admin"), async (c) => {
 
   if (bookingResult.length === 0) {
     return err(c, "Booking not found", 404);
+  }
+
+  const booking = bookingResult[0];
+  if (!["scheduled", "assigned"].includes(booking.status)) {
+    return err(c, "Can only assign drivers to scheduled or assigned rides", 400);
   }
 
   // Verify both drivers exist and are drivers
@@ -428,13 +543,19 @@ bookingRoutes.post("/:id/assign", requireRole("admin"), async (c) => {
       ),
     );
 
+  runAsyncSideEffect(
+    "notifyDriversAssigned",
+    notifyDriversAssigned(id, primaryDriverId, backupDriverId),
+  );
+
   return ok(c, { booking: updatedBooking, assignments });
 });
 
 // ── Trigger Fallback ───────────────────────────────────
 
 bookingRoutes.post("/:id/fallback", requireRole("admin"), async (c) => {
-  const id = parseInt(c.req.param("id"));
+  const id = parseRouteId(c.req.param("id"));
+  if (!id) return err(c, "Invalid booking ID", 400);
 
   const bookingResult = await db
     .select()
@@ -447,7 +568,7 @@ bookingRoutes.post("/:id/fallback", requireRole("admin"), async (c) => {
   }
 
   const booking = bookingResult[0];
-  const allowedStatuses = ["assigned", "en_route"];
+  const allowedStatuses: BookingStatus[] = ["assigned", "en_route"];
   if (!allowedStatuses.includes(booking.status)) {
     return err(
       c,
@@ -477,11 +598,23 @@ bookingRoutes.post("/:id/fallback", requireRole("admin"), async (c) => {
     return err(c, "No backup driver available for fallback", 400);
   }
 
-  // Deactivate primary, backup becomes the executing driver
-  await db
-    .update(driverAssignments)
-    .set({ isActive: false })
-    .where(eq(driverAssignments.id, primary.id));
+  // Deactivate primary and promote backup to primary.
+  await db.transaction(async (tx) => {
+    await tx
+      .update(driverAssignments)
+      .set({ isActive: false })
+      .where(eq(driverAssignments.id, primary.id));
+
+    await tx
+      .update(driverAssignments)
+      .set({ role: "primary" })
+      .where(eq(driverAssignments.id, backup.id));
+  });
+
+  runAsyncSideEffect(
+    "notifyDriverFallbackActivated",
+    notifyDriverFallbackActivated(id, primary.driverId, backup.driverId),
+  );
 
   const updatedAssignments = await db
     .select({

@@ -8,6 +8,9 @@ import { driverRoutes } from "./routes/drivers";
 import { couponRoutes } from "./routes/coupons";
 import { reviewRoutes } from "./routes/reviews";
 import { zoneRoutes } from "./routes/zones";
+import { fixedRouteRoutes } from "./routes/fixedRoutes";
+import { notificationRoutes } from "./routes/notifications";
+import { startBackgroundJobs } from "./services/jobs";
 
 const app = new Hono();
 
@@ -31,6 +34,10 @@ app.route("/api/drivers", driverRoutes);
 app.route("/api/coupons", couponRoutes);
 app.route("/api/reviews", reviewRoutes);
 app.route("/api/zones", zoneRoutes);
+app.route("/api/fixed-routes", fixedRouteRoutes);
+app.route("/api/notifications", notificationRoutes);
+
+startBackgroundJobs();
 
 export default {
   port: 3000,

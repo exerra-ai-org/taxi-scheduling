@@ -1,6 +1,6 @@
 import { db } from "../db/index";
 import { coupons } from "../db/schema";
-import { eq, sql } from "drizzle-orm";
+import { eq, and, sql } from "drizzle-orm";
 
 interface CouponRecord {
   id: number;
@@ -14,8 +14,9 @@ interface CouponRecord {
 
 export async function validateCoupon(
   code: string,
+  executor: any = db,
 ): Promise<{ valid: boolean; coupon?: CouponRecord; reason?: string }> {
-  const results = await db
+  const results = await executor
     .select()
     .from(coupons)
     .where(sql`UPPER(${coupons.code}) = UPPER(${code})`);
@@ -55,9 +56,21 @@ export function applyCoupon(
   };
 }
 
-export async function incrementCouponUsage(couponId: number): Promise<void> {
-  await db
+export async function reserveCouponUsage(
+  couponId: number,
+  executor: any = db,
+): Promise<boolean> {
+  const updated = await executor
     .update(coupons)
     .set({ currentUses: sql`${coupons.currentUses} + 1` })
-    .where(eq(coupons.id, couponId));
+    .where(
+      and(
+        eq(coupons.id, couponId),
+        sql`(${coupons.expiresAt} IS NULL OR ${coupons.expiresAt} > NOW())`,
+        sql`(${coupons.maxUses} IS NULL OR ${coupons.currentUses} < ${coupons.maxUses})`,
+      ),
+    )
+    .returning({ id: coupons.id });
+
+  return updated.length > 0;
 }

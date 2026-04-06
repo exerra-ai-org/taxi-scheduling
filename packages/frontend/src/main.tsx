@@ -16,6 +16,7 @@ import BookingHistory from "./pages/BookingHistory";
 import RideTimeline from "./pages/admin/RideTimeline";
 import DriverManagement from "./pages/admin/DriverManagement";
 import CouponManagement from "./pages/admin/CouponManagement";
+import FixedRouteManagement from "./pages/admin/FixedRouteManagement";
 
 import MyRides from "./pages/driver/MyRides";
 
@@ -44,6 +45,7 @@ ReactDOM.createRoot(document.getElementById("root")!).render(
                 <Route path="/admin" element={<RideTimeline />} />
                 <Route path="/admin/drivers" element={<DriverManagement />} />
                 <Route path="/admin/coupons" element={<CouponManagement />} />
+                <Route path="/admin/routes" element={<FixedRouteManagement />} />
               </Route>
 
               {/* Driver */}

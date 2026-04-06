@@ -5,6 +5,7 @@ interface AuthUser {
   email: string;
   name: string;
   role: "customer" | "admin" | "driver";
+  phone?: string | null;
 }
 
 interface MeUser extends AuthUser {
@@ -12,8 +13,20 @@ interface MeUser extends AuthUser {
   createdAt: string;
 }
 
-export async function login(email: string, password?: string) {
-  return api.post<{ user: AuthUser }>("/api/auth/login", { email, password });
+export async function login(email: string, password?: string, phone?: string) {
+  return api.post<{ user: AuthUser }>("/api/auth/login", {
+    email,
+    password,
+    phone,
+  });
+}
+
+export async function checkEmail(email: string) {
+  return api.post<{
+    exists: boolean;
+    role?: "customer" | "admin" | "driver";
+    name?: string;
+  }>("/api/auth/check-email", { email });
 }
 
 export async function register(email: string, name: string, phone: string) {

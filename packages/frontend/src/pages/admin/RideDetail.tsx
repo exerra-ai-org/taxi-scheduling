@@ -92,6 +92,13 @@ export default function RideDetail({ bookingId, onClose, onUpdated }: Props) {
     assignments.some((a) => a.role === "primary" && a.isActive) &&
     assignments.some((a) => a.role === "backup" && a.isActive);
 
+  const activePrimaryDriverId =
+    assignments.find((a) => a.role === "primary" && a.isActive)?.driverId ||
+    null;
+  const activeBackupDriverId =
+    assignments.find((a) => a.role === "backup" && a.isActive)?.driverId ||
+    null;
+
   return (
     <>
       <Modal isOpen={!!bookingId} onClose={onClose} title="Ride Detail">
@@ -202,6 +209,8 @@ export default function RideDetail({ bookingId, onClose, onUpdated }: Props) {
               booking.status === "assigned") && (
               <DriverAssignmentForm
                 bookingId={booking.id}
+                initialPrimaryDriverId={activePrimaryDriverId}
+                initialBackupDriverId={activeBackupDriverId}
                 onAssigned={() => {
                   fetchDetail();
                   onUpdated();

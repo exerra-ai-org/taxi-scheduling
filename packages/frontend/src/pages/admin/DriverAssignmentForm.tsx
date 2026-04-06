@@ -10,18 +10,42 @@ interface Driver {
 
 interface Props {
   bookingId: number;
+  initialPrimaryDriverId?: number | null;
+  initialBackupDriverId?: number | null;
   onAssigned: () => void;
 }
 
-export default function DriverAssignmentForm({ bookingId, onAssigned }: Props) {
+export default function DriverAssignmentForm({
+  bookingId,
+  initialPrimaryDriverId,
+  initialBackupDriverId,
+  onAssigned,
+}: Props) {
   const [drivers, setDrivers] = useState<Driver[]>([]);
-  const [primaryId, setPrimaryId] = useState<number>(0);
-  const [backupId, setBackupId] = useState<number>(0);
+  const [primaryId, setPrimaryId] = useState<number>(initialPrimaryDriverId || 0);
+  const [backupId, setBackupId] = useState<number>(initialBackupDriverId || 0);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
 
   useEffect(() => {
-    listDrivers().then((d) => setDrivers(d.drivers));
+    setPrimaryId(initialPrimaryDriverId || 0);
+    setBackupId(initialBackupDriverId || 0);
+  }, [bookingId, initialPrimaryDriverId, initialBackupDriverId]);
+
+  useEffect(() => {
+    listDrivers()
+      .then((d) => {
+        setDrivers(d.drivers);
+        setError("");
+      })
+      .catch((cause) => {
+        setDrivers([]);
+        setError(
+          cause instanceof ApiError
+            ? cause.message
+            : "Failed to load drivers",
+        );
+      });
   }, []);
 
   async function handleAssign() {

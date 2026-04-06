@@ -1,5 +1,5 @@
 import { api } from "./client";
-import type { Booking, BookingStatus, Coupon } from "shared/types";
+import type { Booking, BookingStatus, Coupon, FixedRoute } from "shared/types";
 
 export async function listAllBookings() {
   return api.get<{ bookings: Booking[] }>("/api/bookings");
@@ -54,6 +54,15 @@ export async function listDrivers() {
   }>("/api/drivers");
 }
 
+export async function runDriverWatchdog() {
+  return api.post<{
+    checked: number;
+    warnings: number[];
+    fallbacks: number[];
+    config: { staleMinutes: number; fallbackWindows: number };
+  }>("/api/drivers/watchdog");
+}
+
 export async function listCoupons() {
   return api.get<{ coupons: Coupon[] }>("/api/coupons");
 }
@@ -66,4 +75,35 @@ export async function createCoupon(data: {
   maxUses?: number;
 }) {
   return api.post<{ coupon: Coupon }>("/api/coupons", data);
+}
+
+export async function listFixedRoutes() {
+  return api.get<{ routes: FixedRoute[] }>("/api/fixed-routes");
+}
+
+export async function createFixedRoute(data: {
+  name: string;
+  fromLabel: string;
+  toLabel: string;
+  pricePence: number;
+  isAirport?: boolean;
+}) {
+  return api.post<{ route: FixedRoute }>("/api/fixed-routes", data);
+}
+
+export async function updateFixedRoute(
+  id: number,
+  data: Partial<{
+    name: string;
+    fromLabel: string;
+    toLabel: string;
+    pricePence: number;
+    isAirport: boolean;
+  }>,
+) {
+  return api.patch<{ route: FixedRoute }>(`/api/fixed-routes/${id}`, data);
+}
+
+export async function deleteFixedRoute(id: number) {
+  return api.delete<{ route: FixedRoute }>(`/api/fixed-routes/${id}`);
 }

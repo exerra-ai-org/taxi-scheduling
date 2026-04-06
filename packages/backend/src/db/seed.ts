@@ -7,8 +7,11 @@ import {
   fixedRoutes,
   coupons,
   reviews,
+  driverHeartbeats,
   driverAssignments,
   bookings,
+  notificationSubscriptions,
+  notificationEvents,
 } from "./schema";
 
 // Approximate GeoJSON polygon boundaries for London zones
@@ -183,6 +186,9 @@ async function seed() {
   // Clear existing data (order matters for FK constraints)
   console.log("  Clearing existing data...");
   await db.delete(reviews);
+  await db.delete(driverHeartbeats);
+  await db.delete(notificationEvents);
+  await db.delete(notificationSubscriptions);
   await db.delete(driverAssignments);
   await db.delete(bookings);
   await db.delete(zonePricing);
@@ -196,6 +202,14 @@ async function seed() {
   await db.execute(sql`ALTER SEQUENCE zone_pricing_id_seq RESTART WITH 1`);
   await db.execute(sql`ALTER SEQUENCE fixed_routes_id_seq RESTART WITH 1`);
   await db.execute(sql`ALTER SEQUENCE coupons_id_seq RESTART WITH 1`);
+  await db.execute(sql`ALTER SEQUENCE bookings_id_seq RESTART WITH 1`);
+  await db.execute(sql`ALTER SEQUENCE driver_assignments_id_seq RESTART WITH 1`);
+  await db.execute(sql`ALTER SEQUENCE driver_heartbeats_id_seq RESTART WITH 1`);
+  await db.execute(sql`ALTER SEQUENCE reviews_id_seq RESTART WITH 1`);
+  await db.execute(
+    sql`ALTER SEQUENCE notification_subscriptions_id_seq RESTART WITH 1`,
+  );
+  await db.execute(sql`ALTER SEQUENCE notification_events_id_seq RESTART WITH 1`);
 
   // ── Users ──────────────────────────────────────────
   const [admin] = await db

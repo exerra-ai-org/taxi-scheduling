@@ -8,6 +8,7 @@ export default function Login() {
   const navigate = useNavigate();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [phone, setPhone] = useState("");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
 
@@ -17,7 +18,7 @@ export default function Login() {
     setLoading(true);
 
     try {
-      const user = await login(email, password || undefined);
+      const user = await login(email, password || undefined, phone || undefined);
       if (user.role === "admin") navigate("/admin");
       else if (user.role === "driver") navigate("/driver");
       else navigate("/");
@@ -56,7 +57,7 @@ export default function Login() {
             Password
             <span className="normal-case tracking-normal text-[var(--color-muted)]">
               {" "}
-              (admin/driver only)
+              (staff accounts)
             </span>
           </label>
           <input
@@ -64,7 +65,23 @@ export default function Login() {
             value={password}
             onChange={(e) => setPassword(e.target.value)}
             className="input-glass"
-            placeholder="Leave empty for customer login"
+            placeholder="Required for admin/driver"
+          />
+        </div>
+        <div>
+          <label className="field-label mb-2 block">
+            Phone Number
+            <span className="normal-case tracking-normal text-[var(--color-muted)]">
+              {" "}
+              (customer accounts)
+            </span>
+          </label>
+          <input
+            type="tel"
+            value={phone}
+            onChange={(e) => setPhone(e.target.value)}
+            className="input-glass"
+            placeholder="Required for customer login"
           />
         </div>
         <button type="submit" disabled={loading} className="btn-primary w-full">

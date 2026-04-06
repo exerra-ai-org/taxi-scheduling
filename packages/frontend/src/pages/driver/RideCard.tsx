@@ -85,6 +85,12 @@ export default function RideCard({ booking, onStatusUpdate }: Props) {
             {formatDate(booking.scheduledAt)} ·{" "}
             {formatPrice(booking.pricePence)}
           </div>
+          {(booking.customerName || booking.customerPhone) && (
+            <div className="mono-label">
+              Customer: {booking.customerName || "—"}
+              {booking.customerPhone ? ` · ${booking.customerPhone}` : ""}
+            </div>
+          )}
         </div>
         <div className="flex flex-col items-end gap-1.5 shrink-0">
           <StatusBadge status={booking.status} />

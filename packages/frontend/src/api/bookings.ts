@@ -37,7 +37,9 @@ export async function createBooking(data: {
 }
 
 export async function listBookings() {
-  return api.get<{ bookings: Booking[] }>("/api/bookings");
+  return api.get<{ bookings: Array<Booking & { hasReview?: boolean }> }>(
+    "/api/bookings",
+  );
 }
 
 export async function getBooking(id: number) {

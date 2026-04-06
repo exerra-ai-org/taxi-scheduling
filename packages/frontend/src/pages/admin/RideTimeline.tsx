@@ -1,6 +1,6 @@
 import { useEffect, useState, useCallback } from "react";
 import type { Booking, BookingStatus } from "shared/types";
-import { listAllBookings } from "../../api/admin";
+import { listAllBookings, runDriverWatchdog } from "../../api/admin";
 import { formatPrice, formatDate } from "../../lib/format";
 import StatusBadge from "../../components/StatusBadge";
 import { SkeletonCard } from "../../components/Skeleton";
@@ -8,6 +8,7 @@ import AlertsBanner from "./AlertsBanner";
 import RideDetail from "./RideDetail";
 import { IconCar } from "../../components/icons";
 import ZoneMap from "../../components/maps/ZoneMap";
+import { useToast } from "../../context/ToastContext";
 
 const STATUS_OPTIONS: (BookingStatus | "all")[] = [
   "all",
@@ -27,6 +28,8 @@ export default function RideTimeline() {
   );
   const [selectedId, setSelectedId] = useState<number | null>(null);
   const [showZoneMap, setShowZoneMap] = useState(false);
+  const [watchdogLoading, setWatchdogLoading] = useState(false);
+  const toast = useToast();
 
   const fetchBookings = useCallback(async () => {
     try {
@@ -44,6 +47,27 @@ export default function RideTimeline() {
     const interval = setInterval(fetchBookings, 30000);
     return () => clearInterval(interval);
   }, [fetchBookings]);
+
+  async function handleRunWatchdog() {
+    setWatchdogLoading(true);
+    try {
+      const result = await runDriverWatchdog();
+      if (result.fallbacks.length > 0) {
+        toast.info(
+          `Watchdog ran: ${result.fallbacks.length} fallback(s), ${result.warnings.length} warning(s)`,
+        );
+      } else {
+        toast.success(
+          `Watchdog ran: ${result.warnings.length} warning(s), no fallback needed`,
+        );
+      }
+      fetchBookings();
+    } catch {
+      toast.error("Failed to run watchdog");
+    } finally {
+      setWatchdogLoading(false);
+    }
+  }
 
   const filtered =
     statusFilter === "all"
@@ -67,12 +91,21 @@ export default function RideTimeline() {
           <p className="section-label">Admin</p>
           <h1 className="page-title mt-4 text-[40px]">Ride timeline</h1>
         </div>
-        <button
-          onClick={() => setShowZoneMap((v) => !v)}
-          className="btn-secondary button-text-compact"
-        >
-          {showZoneMap ? "Hide Zone Map" : "Show Zone Map"}
-        </button>
+        <div className="flex items-center gap-2">
+          <button
+            onClick={handleRunWatchdog}
+            disabled={watchdogLoading}
+            className="btn-secondary button-text-compact"
+          >
+            {watchdogLoading ? "Running..." : "Run Watchdog"}
+          </button>
+          <button
+            onClick={() => setShowZoneMap((v) => !v)}
+            className="btn-secondary button-text-compact"
+          >
+            {showZoneMap ? "Hide Zone Map" : "Show Zone Map"}
+          </button>
+        </div>
       </div>
 
       {showZoneMap && (

@@ -66,6 +66,9 @@ export interface Booking {
   couponId: number | null;
   status: BookingStatus;
   isAirport: boolean;
+  hasReview?: boolean;
+  customerName?: string | null;
+  customerPhone?: string | null;
   createdAt: Date;
 }
 
@@ -95,6 +98,23 @@ export interface Review {
   driverId: number;
   rating: number;
   comment: string | null;
+  createdAt: Date;
+}
+
+export interface DriverHeartbeat {
+  id: number;
+  bookingId: number;
+  driverId: number;
+  lastHeartbeatAt: Date;
+  missedWindows: number;
+}
+
+export interface NotificationSubscription {
+  id: number;
+  userId: number;
+  endpoint: string;
+  p256dh: string;
+  auth: string;
   createdAt: Date;
 }
 

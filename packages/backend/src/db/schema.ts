@@ -132,6 +132,27 @@ export const driverAssignments = pgTable("driver_assignments", {
   assignedAt: timestamp("assigned_at").notNull().defaultNow(),
 });
 
+export const driverHeartbeats = pgTable(
+  "driver_heartbeats",
+  {
+    id: serial("id").primaryKey(),
+    bookingId: integer("booking_id")
+      .notNull()
+      .references(() => bookings.id),
+    driverId: integer("driver_id")
+      .notNull()
+      .references(() => users.id),
+    lastHeartbeatAt: timestamp("last_heartbeat_at").notNull().defaultNow(),
+    missedWindows: integer("missed_windows").notNull().default(0),
+  },
+  (table) => [
+    uniqueIndex("driver_heartbeats_booking_driver_unique").on(
+      table.bookingId,
+      table.driverId,
+    ),
+  ],
+);
+
 // ── Coupons ────────────────────────────────────────────
 
 export const coupons = pgTable("coupons", {
@@ -144,20 +165,48 @@ export const coupons = pgTable("coupons", {
   currentUses: integer("current_uses").notNull().default(0),
 });
 
-// ── Reviews ────────────────────────────────────────────
-
-export const reviews = pgTable("reviews", {
+export const notificationSubscriptions = pgTable("notification_subscriptions", {
   id: serial("id").primaryKey(),
-  bookingId: integer("booking_id")
-    .notNull()
-    .references(() => bookings.id),
-  customerId: integer("customer_id")
+  userId: integer("user_id")
     .notNull()
     .references(() => users.id),
-  driverId: integer("driver_id")
-    .notNull()
-    .references(() => users.id),
-  rating: integer("rating").notNull(),
-  comment: text("comment"),
+  endpoint: text("endpoint").notNull().unique(),
+  p256dh: text("p256dh").notNull(),
+  auth: text("auth").notNull(),
   createdAt: timestamp("created_at").notNull().defaultNow(),
 });
+
+export const notificationEvents = pgTable("notification_events", {
+  id: serial("id").primaryKey(),
+  eventKey: text("event_key").notNull().unique(),
+  bookingId: integer("booking_id").references(() => bookings.id),
+  userId: integer("user_id").references(() => users.id),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+});
+
+// ── Reviews ────────────────────────────────────────────
+
+export const reviews = pgTable(
+  "reviews",
+  {
+    id: serial("id").primaryKey(),
+    bookingId: integer("booking_id")
+      .notNull()
+      .references(() => bookings.id),
+    customerId: integer("customer_id")
+      .notNull()
+      .references(() => users.id),
+    driverId: integer("driver_id")
+      .notNull()
+      .references(() => users.id),
+    rating: integer("rating").notNull(),
+    comment: text("comment"),
+    createdAt: timestamp("created_at").notNull().defaultNow(),
+  },
+  (table) => [
+    uniqueIndex("reviews_booking_customer_unique").on(
+      table.bookingId,
+      table.customerId,
+    ),
+  ],
+);

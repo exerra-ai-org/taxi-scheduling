@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { listDrivers } from "../../api/admin";
 import { SkeletonCard } from "../../components/Skeleton";
 import { IconUser } from "../../components/icons";
+import { ApiError } from "../../api/client";
 
 interface Driver {
   id: number;
@@ -14,10 +15,22 @@ interface Driver {
 export default function DriverManagement() {
   const [drivers, setDrivers] = useState<Driver[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
 
   useEffect(() => {
     listDrivers()
-      .then((d) => setDrivers(d.drivers))
+      .then((d) => {
+        setDrivers(d.drivers);
+        setError("");
+      })
+      .catch((cause) => {
+        setDrivers([]);
+        setError(
+          cause instanceof ApiError
+            ? cause.message
+            : "Failed to load drivers. Please try again.",
+        );
+      })
       .finally(() => setLoading(false));
   }, []);
 
@@ -39,6 +52,8 @@ export default function DriverManagement() {
           <h1 className="page-title mt-4 text-[40px]">Drivers</h1>
         </div>
       </div>
+
+      {error && <div className="alert alert-error">{error}</div>}
 
       {drivers.length === 0 ? (
         <div className="empty-state">
