@@ -1,5 +1,7 @@
-import { useState } from "react";
+import { useCallback, useRef, useState } from "react";
 import { useLocation } from "react-router-dom";
+import { getQuote } from "../api/bookings";
+import { ApiError } from "../api/client";
 import LandingMap from "./LandingMap";
 import PriceDisplay from "./booking-steps/PriceDisplay";
 import CustomerDetails from "./booking-steps/CustomerDetails";
@@ -24,13 +26,7 @@ export interface BookingData {
   finalPricePence: number;
 }
 
-const STEPS = [
-  { num: 1, label: "Journey" },
-  { num: 2, label: "Price" },
-  { num: 3, label: "Details" },
-  { num: 4, label: "Coupon" },
-  { num: 5, label: "Confirm" },
-];
+type QuoteStatus = "idle" | "loading" | "ready" | "error";
 
 export default function BookingFlow() {
   const location = useLocation();
@@ -45,106 +41,139 @@ export default function BookingFlow() {
     dropoffAddress: prefill?.dropoffAddress || "",
     discountPence: 0,
   });
+  const [quoteStatus, setQuoteStatus] = useState<QuoteStatus>("idle");
+  const [quoteError, setQuoteError] = useState("");
+  const quoteRequestRef = useRef(0);
 
-  function update(fields: Partial<BookingData>) {
+  const update = useCallback((fields: Partial<BookingData>) => {
     setData((prev) => ({ ...prev, ...fields }));
+  }, []);
+
+  const fetchQuote = useCallback(async (nextData: Partial<BookingData>) => {
+    const requestId = quoteRequestRef.current + 1;
+    quoteRequestRef.current = requestId;
+    setQuoteStatus("loading");
+    setQuoteError("");
+
+    try {
+      const quote = await getQuote(
+        nextData.pickupAddress || "",
+        nextData.dropoffAddress || "",
+        {
+          fromLat: nextData.pickupLat,
+          fromLon: nextData.pickupLon,
+          toLat: nextData.dropoffLat,
+          toLon: nextData.dropoffLon,
+        },
+      );
+
+      if (quoteRequestRef.current !== requestId) return;
+
+      setData((prev) => ({
+        ...prev,
+        ...nextData,
+        pricePence: quote.pricePence,
+        routeType: quote.routeType,
+        routeName: quote.routeName,
+        isAirport: quote.isAirport,
+        discountPence: 0,
+        couponCode: undefined,
+        finalPricePence: quote.pricePence,
+      }));
+      setQuoteStatus("ready");
+    } catch (error) {
+      if (quoteRequestRef.current !== requestId) return;
+
+      setQuoteStatus("error");
+      setQuoteError(
+        error instanceof ApiError ? error.message : "Failed to get price",
+      );
+    }
+  }, []);
+
+  const handleQuoteRequest = useCallback(
+    (fields: Partial<BookingData>) => {
+      const nextData = {
+        ...data,
+        ...fields,
+        discountPence: 0,
+        couponCode: undefined,
+        finalPricePence: undefined,
+      };
+
+      setData((prev) => ({
+        ...prev,
+        ...fields,
+        discountPence: 0,
+        couponCode: undefined,
+        finalPricePence: undefined,
+      }));
+      setStep(2);
+      void fetchQuote(nextData);
+    },
+    [data, fetchQuote],
+  );
+
+  const handleRetryQuote = useCallback(() => {
+    void fetchQuote(data);
+  }, [data, fetchQuote]);
+
+  function handleBackToJourney() {
+    quoteRequestRef.current += 1;
+    setQuoteStatus("idle");
+    setQuoteError("");
+    setStep(1);
   }
 
-  // Step 1: full-page immersive map
-  if (step === 1) {
-    return (
-      <LandingMap
-        data={data}
-        onNext={(fields) => {
-          update(fields);
-          setStep(2);
-        }}
-      />
-    );
+  function handleReset() {
+    quoteRequestRef.current += 1;
+    setData({
+      pickupAddress: "",
+      dropoffAddress: "",
+      discountPence: 0,
+    });
+    setQuoteStatus("idle");
+    setQuoteError("");
+    setStep(1);
   }
 
   return (
-    <div className="mx-auto flex min-h-[calc(100vh-180px)] max-w-5xl items-center justify-center gap-8 py-8">
-      <div className="hidden shrink-0 md:flex md:flex-col md:pt-1">
-        {STEPS.map(({ num, label }, i) => {
-          const isActive = num === step;
-          const isComplete = num < step;
-          const isLast = i === STEPS.length - 1;
-          return (
-            <div key={num} className="stepper-shell">
-              <div className="step-row">
-                <div
-                  className={`step-dot ${isComplete ? "step-dot-complete" : isActive ? "step-dot-active" : ""}`}
-                >
-                  {isComplete ? "✓" : num}
-                </div>
-                <span
-                  className={`step-label w-20 ${isActive ? "step-label-active" : isComplete ? "step-label-complete" : ""}`}
-                >
-                  {label}
-                </span>
-              </div>
-              {!isLast && (
-                <div
-                  className={`step-line ${isComplete ? "step-line-complete" : ""}`}
-                />
-              )}
-            </div>
-          );
-        })}
-      </div>
-
-      <div className="mb-4 flex w-full items-center gap-2 md:hidden">
-        {STEPS.map(({ num }) => (
-          <div
-            key={num}
-            className={`progress-rail flex-1 ${num <= step ? "progress-rail-active" : ""}`}
-          />
-        ))}
-      </div>
-
-      <div className="w-full max-w-2xl min-w-0">
-        {step === 2 && (
-          <PriceDisplay
-            data={data}
-            onNext={(fields) => {
-              update(fields);
-              setStep(3);
-            }}
-            onBack={() => setStep(1)}
-          />
-        )}
-        {step === 3 && (
-          <CustomerDetails
-            onNext={() => setStep(4)}
-            onBack={() => setStep(2)}
-          />
-        )}
-        {step === 4 && (
-          <CouponStep
-            pricePence={data.pricePence || 0}
-            onNext={(fields) => {
-              update(fields);
-              setStep(5);
-            }}
-            onBack={() => setStep(3)}
-          />
-        )}
-        {step === 5 && (
-          <Confirmation
-            data={data as BookingData}
-            onBack={() => setStep(4)}
-            onReset={() => {
-              setData({
-                pickupAddress: "",
-                dropoffAddress: "",
-                discountPence: 0,
-              });
-              setStep(1);
-            }}
-          />
-        )}
-      </div>
-    </div>
+    <LandingMap
+      data={data}
+      step={step}
+      onFieldChange={update}
+      onGetQuote={handleQuoteRequest}
+    >
+      {step === 2 && (
+        <PriceDisplay
+          data={data}
+          status={quoteStatus}
+          error={quoteError}
+          onRetry={handleRetryQuote}
+          onBack={handleBackToJourney}
+          onNext={() => setStep(3)}
+        />
+      )}
+      {step === 3 && (
+        <CustomerDetails onNext={() => setStep(4)} onBack={() => setStep(2)} />
+      )}
+      {step === 4 && (
+        <CouponStep
+          pricePence={data.pricePence || 0}
+          onNext={(fields) => {
+            update(fields);
+            setStep(5);
+          }}
+          onBack={() => setStep(3)}
+        />
+      )}
+      {step === 5 && (
+        <Confirmation
+          data={data as BookingData}
+          onBack={() => setStep(4)}
+          onReset={handleReset}
+        />
+      )}
+    </LandingMap>
   );
 }

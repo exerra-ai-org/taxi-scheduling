@@ -15,6 +15,19 @@ export function formatDate(date: string | Date): string {
   });
 }
 
+export function formatCompactAddress(address: string, maxLength = 34): string {
+  const compact = address
+    .split(",")
+    .map((part) => part.trim())
+    .filter(Boolean)
+    .slice(0, 2)
+    .join(", ");
+
+  const source = compact || address.trim();
+  if (source.length <= maxLength) return source;
+  return `${source.slice(0, maxLength - 1).trimEnd()}…`;
+}
+
 export function statusLabel(status: BookingStatus): string {
   const labels: Record<BookingStatus, string> = {
     scheduled: "Scheduled",

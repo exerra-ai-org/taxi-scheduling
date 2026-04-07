@@ -2,7 +2,11 @@ import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import type { BookingData } from "../BookingFlow";
 import { createBooking } from "../../api/bookings";
-import { formatPrice, formatDate } from "../../lib/format";
+import {
+  formatPrice,
+  formatDate,
+  formatCompactAddress,
+} from "../../lib/format";
 import { ApiError } from "../../api/client";
 
 interface Props {
@@ -16,6 +20,8 @@ export default function Confirmation({ data, onBack, onReset }: Props) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [success, setSuccess] = useState(false);
+  const compactPickup = formatCompactAddress(data.pickupAddress);
+  const compactDropoff = formatCompactAddress(data.dropoffAddress);
 
   async function handleConfirm() {
     setLoading(true);
@@ -73,8 +79,7 @@ export default function Confirmation({ data, onBack, onReset }: Props) {
           Booking confirmed
         </h2>
         <p className="caption-copy">
-          Your ride from {data.pickupAddress} to {data.dropoffAddress} is
-          scheduled.
+          Your ride from {compactPickup} to {compactDropoff} is scheduled.
         </p>
         <div className="flex gap-3 justify-center">
           <button
@@ -105,11 +110,15 @@ export default function Confirmation({ data, onBack, onReset }: Props) {
       <div className="glass-card space-y-3 p-4">
         <div className="data-pair">
           <span>Pickup</span>
-          <span className="max-w-[60%]">{data.pickupAddress}</span>
+          <span className="max-w-[58%]" title={data.pickupAddress}>
+            {compactPickup}
+          </span>
         </div>
         <div className="data-pair">
           <span>Drop-off</span>
-          <span className="max-w-[60%]">{data.dropoffAddress}</span>
+          <span className="max-w-[58%]" title={data.dropoffAddress}>
+            {compactDropoff}
+          </span>
         </div>
         <div className="data-pair">
           <span>Date & Time</span>
@@ -152,31 +161,38 @@ export default function Confirmation({ data, onBack, onReset }: Props) {
           className="btn-primary w-full flex-1 disabled:opacity-50"
         >
           {loading ? (
-            <span className="flex items-center justify-center gap-2">
-              <svg
-                className="animate-spin w-4 h-4"
-                viewBox="0 0 24 24"
-                fill="none"
-              >
-                <circle
-                  cx="12"
-                  cy="12"
-                  r="10"
-                  stroke="currentColor"
-                  strokeWidth="3"
-                  opacity="0.25"
-                />
-                <path
-                  d="M12 2a10 10 0 0 1 10 10"
-                  stroke="currentColor"
-                  strokeWidth="3"
-                  strokeLinecap="round"
-                />
-              </svg>
-              Booking...
-            </span>
+            <>
+              <span>Booking...</span>
+              <span className="btn-icon">
+                <svg
+                  className="h-4 w-4 animate-spin"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                >
+                  <circle
+                    cx="12"
+                    cy="12"
+                    r="10"
+                    stroke="currentColor"
+                    strokeWidth="3"
+                    opacity="0.25"
+                  />
+                  <path
+                    d="M12 2a10 10 0 0 1 10 10"
+                    stroke="currentColor"
+                    strokeWidth="3"
+                    strokeLinecap="round"
+                  />
+                </svg>
+              </span>
+            </>
           ) : (
-            "Confirm Booking"
+            <>
+              <span>Confirm</span>
+              <span className="btn-icon">
+                <span className="btn-icon-glyph">↗</span>
+              </span>
+            </>
           )}
         </button>
       </div>

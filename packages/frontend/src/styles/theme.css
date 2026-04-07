@@ -948,6 +948,57 @@
   transform: translateY(-2px);
 }
 
+.booking-stage {
+  overflow: hidden;
+}
+
+.booking-stage-map {
+  width: 100%;
+  height: 100%;
+}
+
+.booking-panel-frame {
+  position: absolute;
+  top: 50%;
+  left: max(16px, calc(50% - 310px));
+  z-index: 1001;
+  width: min(calc(100% - 32px), 620px);
+  max-height: calc(100% - 32px);
+  transform: translateY(-50%);
+  pointer-events: none;
+  transition:
+    top 0.7s cubic-bezier(0.2, 1, 0.3, 1),
+    left 0.7s cubic-bezier(0.2, 1, 0.3, 1),
+    bottom 0.7s cubic-bezier(0.2, 1, 0.3, 1),
+    width 0.7s cubic-bezier(0.2, 1, 0.3, 1),
+    max-width 0.7s cubic-bezier(0.2, 1, 0.3, 1),
+    transform 0.7s cubic-bezier(0.2, 1, 0.3, 1);
+  will-change: top, left, width, transform;
+}
+
+.booking-panel-frame-docked {
+  top: 24px;
+  left: max(24px, calc(100% - 392px - 24px));
+  width: min(392px, calc(100% - 48px));
+  transform: none;
+}
+
+.booking-panel-surface {
+  width: 100%;
+  max-height: inherit;
+  overflow: hidden;
+}
+
+.booking-panel-frame .booking-panel-surface:hover {
+  transform: none;
+}
+
+.booking-panel-scroll {
+  max-height: inherit;
+  overflow-y: auto;
+  padding: 22px;
+}
+
 .toast-card {
   min-width: 280px;
   border-radius: var(--radius-default);
@@ -1100,5 +1151,25 @@
 
   .metric-value {
     font-size: 56px;
+  }
+}
+
+@media (max-width: 959px) {
+  .booking-panel-frame {
+    width: calc(100% - 24px);
+    max-width: 620px;
+    max-height: calc(100% - 20px);
+    left: 12px;
+  }
+
+  .booking-panel-frame-docked {
+    top: calc(100% - min(58vh, 520px) - 12px);
+    left: 12px;
+    width: calc(100% - 24px);
+    transform: none;
+  }
+
+  .booking-panel-scroll {
+    padding: 18px;
   }
 }

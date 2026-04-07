@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, type ReactNode } from "react";
 import {
   MapContainer,
   TileLayer,
@@ -25,7 +25,10 @@ const UK_ZOOM = 6;
 
 interface Props {
   data: Partial<BookingData>;
-  onNext: (fields: Partial<BookingData>) => void;
+  step: number;
+  onFieldChange: (fields: Partial<BookingData>) => void;
+  onGetQuote: (fields: Partial<BookingData>) => void;
+  children?: ReactNode;
 }
 
 interface Coords {
@@ -55,47 +58,56 @@ function MapController({
   pickupCoords,
   dropoffCoords,
   activeField,
+  isDocked,
   onMapClick,
 }: {
   pickupCoords: Coords | null;
   dropoffCoords: Coords | null;
   activeField: "pickup" | "dropoff" | null;
+  isDocked: boolean;
   onMapClick: (lat: number, lng: number) => void;
 }) {
   const map = useMap();
 
-  // Auto-fit bounds when both markers placed
   useEffect(() => {
     if (!pickupCoords || !dropoffCoords) return;
-    const bounds = L.latLngBounds(
-      [pickupCoords.lat, pickupCoords.lon],
-      [dropoffCoords.lat, dropoffCoords.lon],
+
+    const isDesktop = window.matchMedia("(min-width: 960px)").matches;
+    map.fitBounds(
+      L.latLngBounds(
+        [pickupCoords.lat, pickupCoords.lon],
+        [dropoffCoords.lat, dropoffCoords.lon],
+      ),
+      isDocked
+        ? isDesktop
+          ? {
+              paddingTopLeft: [56, 56],
+              paddingBottomRight: [500, 80],
+            }
+          : {
+              paddingTopLeft: [24, 24],
+              paddingBottomRight: [24, 320],
+            }
+        : {
+            padding: [80, 80],
+          },
     );
-    map.fitBounds(bounds, {
-      padding: [60, 60],
-      paddingBottomRight: [40, 200],
-    });
   }, [
     map,
     pickupCoords?.lat,
     pickupCoords?.lon,
     dropoffCoords?.lat,
     dropoffCoords?.lon,
+    isDocked,
   ]);
 
-  // Cursor style for active pick mode
   useEffect(() => {
-    if (activeField) {
-      map.getContainer().style.cursor = "crosshair";
-    } else {
-      map.getContainer().style.cursor = "";
-    }
+    map.getContainer().style.cursor = activeField ? "crosshair" : "";
     return () => {
       map.getContainer().style.cursor = "";
     };
   }, [map, activeField]);
 
-  // Map click via react-leaflet hook
   useMapEvents({
     click(e) {
       if (activeField) {
@@ -107,30 +119,25 @@ function MapController({
   return null;
 }
 
-export default function LandingMap({ data, onNext }: Props) {
-  const [pickup, setPickup] = useState(data.pickupAddress || "");
-  const [pickupLat, setPickupLat] = useState<number | undefined>(
-    data.pickupLat,
-  );
-  const [pickupLon, setPickupLon] = useState<number | undefined>(
-    data.pickupLon,
-  );
-  const [dropoff, setDropoff] = useState(data.dropoffAddress || "");
-  const [dropoffLat, setDropoffLat] = useState<number | undefined>(
-    data.dropoffLat,
-  );
-  const [dropoffLon, setDropoffLon] = useState<number | undefined>(
-    data.dropoffLon,
-  );
-  const [date, setDate] = useState(data.date || "");
-  const [time, setTime] = useState(data.time || "");
+export default function LandingMap({
+  data,
+  step,
+  onFieldChange,
+  onGetQuote,
+  children,
+}: Props) {
   const [activeField, setActiveField] = useState<"pickup" | "dropoff" | null>(
     null,
   );
   const [route, setRoute] = useState<L.LatLngExpression[]>([]);
   const [quickRoutes, setQuickRoutes] = useState<FixedRoute[]>([]);
 
-  // Fetch route when both coords set
+  const pickupLat = data.pickupLat;
+  const pickupLon = data.pickupLon;
+  const dropoffLat = data.dropoffLat;
+  const dropoffLon = data.dropoffLon;
+  const isDocked = step > 1;
+
   useEffect(() => {
     if (
       pickupLat == null ||
@@ -141,33 +148,57 @@ export default function LandingMap({ data, onNext }: Props) {
       setRoute([]);
       return;
     }
+
+    let isActive = true;
     const url = `https://router.project-osrm.org/route/v1/driving/${pickupLon},${pickupLat};${dropoffLon},${dropoffLat}?overview=full&geometries=geojson`;
+
     fetch(url)
       .then((r) => r.json())
-      .then((data) => {
-        if (data.routes?.[0]) {
+      .then((routeData) => {
+        if (!isActive) return;
+
+        if (routeData.routes?.[0]) {
           setRoute(
-            data.routes[0].geometry.coordinates.map(
+            routeData.routes[0].geometry.coordinates.map(
               (c: [number, number]) => [c[1], c[0]] as L.LatLngExpression,
             ),
           );
         }
       })
       .catch(() => {
+        if (!isActive) return;
+
         setRoute([
           [pickupLat, pickupLon],
           [dropoffLat, dropoffLon],
         ]);
       });
+
+    return () => {
+      isActive = false;
+    };
   }, [pickupLat, pickupLon, dropoffLat, dropoffLon]);
 
   useEffect(() => {
+    let isActive = true;
+
     listQuickRoutes()
-      .then((res) => setQuickRoutes(res.routes.slice(0, 8)))
-      .catch(() => setQuickRoutes([]));
+      .then((res) => {
+        if (isActive) {
+          setQuickRoutes(res.routes.slice(0, 8));
+        }
+      })
+      .catch(() => {
+        if (isActive) {
+          setQuickRoutes([]);
+        }
+      });
+
+    return () => {
+      isActive = false;
+    };
   }, []);
 
-  // Reverse geocode a map click
   const handleMapClick = useCallback(
     (lat: number, lng: number) => {
       if (!activeField) return;
@@ -176,50 +207,63 @@ export default function LandingMap({ data, onNext }: Props) {
         `https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lng}`,
       )
         .then((r) => r.json())
-        .then((data) => {
+        .then((result) => {
           const address =
-            data.display_name || `${lat.toFixed(4)}, ${lng.toFixed(4)}`;
+            result.display_name || `${lat.toFixed(4)}, ${lng.toFixed(4)}`;
+
           if (activeField === "pickup") {
-            setPickup(address);
-            setPickupLat(lat);
-            setPickupLon(lng);
+            onFieldChange({
+              pickupAddress: address,
+              pickupLat: lat,
+              pickupLon: lng,
+            });
             setActiveField("dropoff");
-          } else {
-            setDropoff(address);
-            setDropoffLat(lat);
-            setDropoffLon(lng);
-            setActiveField(null);
+            return;
           }
+
+          onFieldChange({
+            dropoffAddress: address,
+            dropoffLat: lat,
+            dropoffLon: lng,
+          });
+          setActiveField(null);
         })
         .catch(() => {
           const address = `${lat.toFixed(4)}, ${lng.toFixed(4)}`;
+
           if (activeField === "pickup") {
-            setPickup(address);
-            setPickupLat(lat);
-            setPickupLon(lng);
+            onFieldChange({
+              pickupAddress: address,
+              pickupLat: lat,
+              pickupLon: lng,
+            });
             setActiveField("dropoff");
-          } else {
-            setDropoff(address);
-            setDropoffLat(lat);
-            setDropoffLon(lng);
-            setActiveField(null);
+            return;
           }
+
+          onFieldChange({
+            dropoffAddress: address,
+            dropoffLat: lat,
+            dropoffLon: lng,
+          });
+          setActiveField(null);
         });
     },
-    [activeField],
+    [activeField, onFieldChange],
   );
 
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
-    onNext({
-      pickupAddress: pickup,
-      pickupLat,
-      pickupLon,
-      dropoffAddress: dropoff,
-      dropoffLat,
-      dropoffLon,
-      date,
-      time,
+
+    onGetQuote({
+      pickupAddress: data.pickupAddress || "",
+      pickupLat: data.pickupLat,
+      pickupLon: data.pickupLon,
+      dropoffAddress: data.dropoffAddress || "",
+      dropoffLat: data.dropoffLat,
+      dropoffLon: data.dropoffLon,
+      date: data.date || "",
+      time: data.time || "",
     });
   }
 
@@ -234,12 +278,11 @@ export default function LandingMap({ data, onNext }: Props) {
       : null;
 
   return (
-    <div className="fixed inset-0 top-[72px]">
-      {/* Full-page map */}
+    <div className="booking-stage fixed inset-0 top-[72px]">
       <MapContainer
         center={UK_CENTER}
         zoom={UK_ZOOM}
-        className="w-full h-full"
+        className="booking-stage-map"
         zoomControl
         scrollWheelZoom
         doubleClickZoom
@@ -251,6 +294,7 @@ export default function LandingMap({ data, onNext }: Props) {
           pickupCoords={pickupCoords}
           dropoffCoords={dropoffCoords}
           activeField={activeField}
+          isDocked={isDocked}
           onMapClick={handleMapClick}
         />
         {pickupCoords && (
@@ -261,8 +305,7 @@ export default function LandingMap({ data, onNext }: Props) {
             eventHandlers={{
               dragend: (e) => {
                 const ll = e.target.getLatLng();
-                setPickupLat(ll.lat);
-                setPickupLon(ll.lng);
+                onFieldChange({ pickupLat: ll.lat, pickupLon: ll.lng });
               },
             }}
           />
@@ -275,8 +318,7 @@ export default function LandingMap({ data, onNext }: Props) {
             eventHandlers={{
               dragend: (e) => {
                 const ll = e.target.getLatLng();
-                setDropoffLat(ll.lat);
-                setDropoffLon(ll.lng);
+                onFieldChange({ dropoffLat: ll.lat, dropoffLon: ll.lng });
               },
             }}
           />
@@ -289,150 +331,171 @@ export default function LandingMap({ data, onNext }: Props) {
         )}
       </MapContainer>
 
-      {!pickupCoords && !dropoffCoords && (
+      {step === 1 && !pickupCoords && !dropoffCoords && (
         <div className="pointer-events-none absolute left-1/2 top-6 z-[1001] hidden -translate-x-1/2 animate-fade-in rounded-[64px] border border-[var(--color-border)] bg-[rgb(255_255_255_/_0.94)] px-5 py-3 text-sm font-medium text-[var(--color-dark)] shadow-[var(--shadow-card)] md:block">
           Enter your pickup and drop-off locations to get started
         </div>
       )}
 
-      <form
-        onSubmit={handleSubmit}
-        className="floating-panel absolute left-1/2 top-1/2 z-[1001] mx-4 w-full max-w-lg -translate-x-1/2 -translate-y-1/2 space-y-5 p-6 pointer-events-auto animate-scale-in"
+      <div
+        className={`booking-panel-frame ${isDocked ? "booking-panel-frame-docked" : ""}`}
       >
-        <div>
-          <p className="section-label">New Booking</p>
-          <h1 className="mt-4 text-[40px] font-bold leading-none tracking-[-0.04em] text-[var(--color-dark)]">
-            Book your ride
-          </h1>
-          <p className="caption-copy mt-2">
-            Enter your locations or click on the map
-          </p>
-        </div>
+        <div className="floating-panel booking-panel-surface pointer-events-auto">
+          <div className="booking-panel-scroll">
+            {step === 1 ? (
+              <form onSubmit={handleSubmit} className="space-y-5">
+                <div>
+                  <p className="section-label">New Booking</p>
+                  <h1 className="mt-4 text-[40px] font-bold leading-none tracking-[-0.04em] text-[var(--color-dark)]">
+                    Book your ride
+                  </h1>
+                  <p className="caption-copy mt-2">
+                    Enter your locations or click on the map
+                  </p>
+                </div>
 
-        {quickRoutes.length > 0 && (
-          <div className="space-y-2">
-            <div className="field-label">Quick Routes</div>
-            <div className="max-h-32 space-y-2 overflow-y-auto pr-1">
-              {quickRoutes.map((r) => (
-                <button
-                  key={r.id}
-                  type="button"
-                  onClick={() => {
-                    setPickup(r.fromLabel);
-                    setDropoff(r.toLabel);
-                    setPickupLat(undefined);
-                    setPickupLon(undefined);
-                    setDropoffLat(undefined);
-                    setDropoffLon(undefined);
-                    setActiveField(null);
-                  }}
-                  className="w-full rounded-[4px] border border-[var(--color-border)] bg-[var(--color-surface)] px-3 py-2 text-left transition hover:border-[var(--color-dark)]"
-                >
-                  <div className="body-copy text-sm font-medium text-[var(--color-dark)]">
-                    {r.name}
+                {quickRoutes.length > 0 && (
+                  <div className="space-y-2">
+                    <div className="field-label">Quick Routes</div>
+                    <div className="max-h-24 space-y-1.5 overflow-y-auto pr-1">
+                      {quickRoutes.map((routeOption) => (
+                        <button
+                          key={routeOption.id}
+                          type="button"
+                          onClick={() => {
+                            onFieldChange({
+                              pickupAddress: routeOption.fromLabel,
+                              dropoffAddress: routeOption.toLabel,
+                              pickupLat: undefined,
+                              pickupLon: undefined,
+                              dropoffLat: undefined,
+                              dropoffLon: undefined,
+                            });
+                            setActiveField(null);
+                          }}
+                          className="w-full rounded-[4px] border border-[var(--color-border)] bg-[var(--color-surface)] px-3 py-2 text-left transition hover:border-[var(--color-dark)]"
+                        >
+                          <div className="flex items-center justify-between gap-3">
+                            <div className="body-copy text-sm font-medium text-[var(--color-dark)]">
+                              {routeOption.name}
+                            </div>
+                            <div className="mono-label shrink-0 text-[var(--color-dark)]">
+                              ~{formatPrice(routeOption.pricePence)}
+                            </div>
+                          </div>
+                        </button>
+                      ))}
+                    </div>
                   </div>
-                  <div className="mono-label mt-1">
-                    {r.fromLabel} → {r.toLabel} · {formatPrice(r.pricePence)}
+                )}
+
+                <div>
+                  <label className="field-label mb-2 block">Pickup</label>
+                  <div className="relative">
+                    <AddressAutocomplete
+                      value={data.pickupAddress || ""}
+                      onChange={(address, coords) => {
+                        onFieldChange({
+                          pickupAddress: address,
+                          pickupLat: coords?.lat,
+                          pickupLon: coords?.lon,
+                        });
+                      }}
+                      required
+                      placeholder="e.g. Heathrow Airport"
+                      className="input-glass w-full pr-12"
+                    />
+                    <button
+                      type="button"
+                      onClick={() =>
+                        setActiveField(
+                          activeField === "pickup" ? null : "pickup",
+                        )
+                      }
+                      title="Pick on map"
+                      className={`icon-chip absolute right-2 top-1/2 -translate-y-1/2 ${activeField === "pickup" ? "icon-chip-active" : ""}`}
+                    >
+                      <IconMapPin className="w-4 h-4" />
+                    </button>
                   </div>
+                </div>
+
+                <div>
+                  <label className="field-label mb-2 block">Drop-off</label>
+                  <div className="relative">
+                    <AddressAutocomplete
+                      value={data.dropoffAddress || ""}
+                      onChange={(address, coords) => {
+                        onFieldChange({
+                          dropoffAddress: address,
+                          dropoffLat: coords?.lat,
+                          dropoffLon: coords?.lon,
+                        });
+                      }}
+                      required
+                      placeholder="e.g. Central London"
+                      className="input-glass w-full pr-12"
+                    />
+                    <button
+                      type="button"
+                      onClick={() =>
+                        setActiveField(
+                          activeField === "dropoff" ? null : "dropoff",
+                        )
+                      }
+                      title="Pick on map"
+                      className={`icon-chip absolute right-2 top-1/2 -translate-y-1/2 ${activeField === "dropoff" ? "icon-chip-active" : ""}`}
+                    >
+                      <IconMapPin className="w-4 h-4" />
+                    </button>
+                  </div>
+                </div>
+
+                {activeField && (
+                  <div className="alert alert-info flex items-center gap-2 animate-fade-in">
+                    <IconMapPin className="w-4 h-4 shrink-0" />
+                    Click the map to set your{" "}
+                    {activeField === "pickup" ? "pickup" : "drop-off"}
+                  </div>
+                )}
+
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="field-label mb-2 block">Date</label>
+                    <input
+                      type="date"
+                      value={data.date || ""}
+                      onChange={(e) => onFieldChange({ date: e.target.value })}
+                      required
+                      min={today}
+                      className="input-glass"
+                    />
+                  </div>
+                  <div>
+                    <label className="field-label mb-2 block">Time</label>
+                    <input
+                      type="time"
+                      value={data.time || ""}
+                      onChange={(e) => onFieldChange({ time: e.target.value })}
+                      required
+                      className="input-glass"
+                    />
+                  </div>
+                </div>
+
+                <button type="submit" className="btn-primary w-full">
+                  <span>Get Quote</span>
+                  <span className="btn-icon">
+                    <span className="btn-icon-glyph">↗</span>
+                  </span>
                 </button>
-              ))}
-            </div>
-          </div>
-        )}
-
-        <div>
-          <label className="field-label mb-2 block">Pickup</label>
-          <div className="relative">
-            <AddressAutocomplete
-              value={pickup}
-              onChange={(addr, coords) => {
-                setPickup(addr);
-                setPickupLat(coords?.lat);
-                setPickupLon(coords?.lon);
-              }}
-              required
-              placeholder="e.g. Heathrow Airport"
-              className="input-glass w-full pr-12"
-            />
-            <button
-              type="button"
-              onClick={() =>
-                setActiveField(activeField === "pickup" ? null : "pickup")
-              }
-              title="Pick on map"
-              className={`icon-chip absolute right-2 top-1/2 -translate-y-1/2 ${activeField === "pickup" ? "icon-chip-active" : ""}`}
-            >
-              <IconMapPin className="w-4 h-4" />
-            </button>
+              </form>
+            ) : (
+              children
+            )}
           </div>
         </div>
-
-        <div>
-          <label className="field-label mb-2 block">Drop-off</label>
-          <div className="relative">
-            <AddressAutocomplete
-              value={dropoff}
-              onChange={(addr, coords) => {
-                setDropoff(addr);
-                setDropoffLat(coords?.lat);
-                setDropoffLon(coords?.lon);
-              }}
-              required
-              placeholder="e.g. Central London"
-              className="input-glass w-full pr-12"
-            />
-            <button
-              type="button"
-              onClick={() =>
-                setActiveField(activeField === "dropoff" ? null : "dropoff")
-              }
-              title="Pick on map"
-              className={`icon-chip absolute right-2 top-1/2 -translate-y-1/2 ${activeField === "dropoff" ? "icon-chip-active" : ""}`}
-            >
-              <IconMapPin className="w-4 h-4" />
-            </button>
-          </div>
-        </div>
-
-        {activeField && (
-          <div className="alert alert-info flex items-center gap-2 animate-fade-in">
-            <IconMapPin className="w-4 h-4 shrink-0" />
-            Click the map to set your{" "}
-            {activeField === "pickup" ? "pickup" : "drop-off"}
-          </div>
-        )}
-
-        <div className="grid grid-cols-2 gap-3">
-          <div>
-            <label className="field-label mb-2 block">Date</label>
-            <input
-              type="date"
-              value={date}
-              onChange={(e) => setDate(e.target.value)}
-              required
-              min={today}
-              className="input-glass"
-            />
-          </div>
-          <div>
-            <label className="field-label mb-2 block">Time</label>
-            <input
-              type="time"
-              value={time}
-              onChange={(e) => setTime(e.target.value)}
-              required
-              className="input-glass"
-            />
-          </div>
-        </div>
-
-        <button type="submit" className="btn-primary w-full">
-          <span>Get Quote</span>
-          <span className="btn-icon">
-            <span className="btn-icon-glyph">↗</span>
-          </span>
-        </button>
-      </form>
+      </div>
     </div>
   );
 }
