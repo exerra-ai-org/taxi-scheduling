@@ -16,7 +16,10 @@ export default function Confirmation({ data, onBack, onReset }: Props) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [success, setSuccess] = useState(false);
-  const [flightNumber, setFlightNumber] = useState(data.flightNumber || "");
+  const [pickupFlightNumber, setPickupFlightNumber] = useState(
+    data.flightNumber || "",
+  );
+  const [dropoffFlightNumber, setDropoffFlightNumber] = useState("");
 
   async function handleConfirm() {
     setLoading(true);
@@ -32,7 +35,12 @@ export default function Confirmation({ data, onBack, onReset }: Props) {
         pickupLon: data.pickupLon,
         dropoffLat: data.dropoffLat,
         dropoffLon: data.dropoffLon,
-        flightNumber: flightNumber || undefined,
+        pickupFlightNumber: data.isPickupAirport
+          ? pickupFlightNumber || undefined
+          : undefined,
+        dropoffFlightNumber: data.isDropoffAirport
+          ? dropoffFlightNumber || undefined
+          : undefined,
         vehicleClass: data.vehicleClass,
       });
       setSuccess(true);
@@ -99,7 +107,7 @@ export default function Confirmation({ data, onBack, onReset }: Props) {
   return (
     <div className="space-y-4">
       <div>
-        <p className="section-label">Step 05</p>
+        <p className="section-label">Step 06</p>
         <h2 className="mt-4 text-[32px] font-bold leading-[1.1] tracking-[-0.04em] text-[var(--color-dark)]">
           Confirm booking
         </h2>
@@ -147,22 +155,45 @@ export default function Confirmation({ data, onBack, onReset }: Props) {
             <span className="ds-tag tag-airport">AIRPORT TRANSFER</span>
           </div>
         )}
-        {data.isAirport && (
+        {data.isPickupAirport && (
           <div className="space-y-2 pt-2 border-t border-[var(--color-border)]">
             <label className="field-label block">
-              Flight Number{" "}
+              Arriving flight number{" "}
               <span className="text-[var(--color-muted)]">(optional)</span>
             </label>
             <input
               type="text"
-              value={flightNumber}
-              onChange={(e) => setFlightNumber(e.target.value.toUpperCase())}
+              value={pickupFlightNumber}
+              onChange={(e) =>
+                setPickupFlightNumber(e.target.value.toUpperCase())
+              }
               placeholder="e.g. BA123"
               maxLength={10}
               className="input-glass w-full"
             />
             <p className="caption-copy">
-              We'll track your flight for delays and adjust pickup accordingly
+              We'll track your arrival flight and adjust pickup timing
+            </p>
+          </div>
+        )}
+        {data.isDropoffAirport && (
+          <div className="space-y-2 pt-2 border-t border-[var(--color-border)]">
+            <label className="field-label block">
+              Departing flight number{" "}
+              <span className="text-[var(--color-muted)]">(optional)</span>
+            </label>
+            <input
+              type="text"
+              value={dropoffFlightNumber}
+              onChange={(e) =>
+                setDropoffFlightNumber(e.target.value.toUpperCase())
+              }
+              placeholder="e.g. BA456"
+              maxLength={10}
+              className="input-glass w-full"
+            />
+            <p className="caption-copy">
+              We'll factor in check-in time for your departure
             </p>
           </div>
         )}

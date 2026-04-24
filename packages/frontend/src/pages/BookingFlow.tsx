@@ -20,6 +20,8 @@ export interface BookingData {
   routeType: "fixed" | "mile";
   routeName: string | null;
   isAirport: boolean;
+  isPickupAirport?: boolean;
+  isDropoffAirport?: boolean;
   couponCode?: string;
   discountPence: number;
   finalPricePence: number;

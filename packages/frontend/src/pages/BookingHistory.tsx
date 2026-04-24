@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import type { Booking } from "shared/types";
 import { listBookings, cancelBooking } from "../api/bookings";
+import EditBookingModal from "../components/EditBookingModal";
 import {
   formatPrice,
   formatDate,
@@ -31,6 +32,7 @@ export default function BookingHistory() {
   >([]);
   const [loading, setLoading] = useState(true);
   const [reviewBookingId, setReviewBookingId] = useState<number | null>(null);
+  const [editBooking, setEditBooking] = useState<Booking | null>(null);
   const { confirm, dialogProps } = useConfirm();
   const toast = useToast();
 
@@ -145,9 +147,21 @@ export default function BookingHistory() {
               {b.isAirport && (
                 <span className="ds-tag tag-airport">AIRPORT</span>
               )}
-              {b.flightNumber && (
-                <span className="mono-label text-xs">✈ {b.flightNumber}</span>
+              {b.pickupFlightNumber && (
+                <span className="mono-label text-xs">
+                  ✈ {b.pickupFlightNumber}
+                </span>
               )}
+              {b.dropoffFlightNumber && !b.pickupFlightNumber && (
+                <span className="mono-label text-xs">
+                  ✈ {b.dropoffFlightNumber}
+                </span>
+              )}
+              {b.flightNumber &&
+                !b.pickupFlightNumber &&
+                !b.dropoffFlightNumber && (
+                  <span className="mono-label text-xs">✈ {b.flightNumber}</span>
+                )}
               <svg
                 className="h-4 w-4 text-[var(--color-muted)]"
                 viewBox="0 0 24 24"
@@ -166,6 +180,11 @@ export default function BookingHistory() {
             <button onClick={() => handleRebook(b)} className="subtle-link">
               Rebook
             </button>
+            {(b.status === "scheduled" || b.status === "assigned") && (
+              <button onClick={() => setEditBooking(b)} className="subtle-link">
+                Edit
+              </button>
+            )}
             {(b.status === "scheduled" || b.status === "assigned") && (
               <button
                 onClick={() => handleCancel(b.id)}
@@ -192,6 +211,16 @@ export default function BookingHistory() {
         onSubmitted={fetchBookings}
       />
       {dialogProps && <ConfirmDialog {...dialogProps} />}
+      {editBooking && (
+        <EditBookingModal
+          booking={editBooking}
+          onClose={() => setEditBooking(null)}
+          onSaved={() => {
+            setEditBooking(null);
+            fetchBookings();
+          }}
+        />
+      )}
     </div>
   );
 }

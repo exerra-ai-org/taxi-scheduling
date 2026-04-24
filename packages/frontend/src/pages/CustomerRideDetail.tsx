@@ -2,6 +2,7 @@ import { useEffect, useState, useCallback } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import type { Booking, Vehicle, BookingStatus } from "shared/types";
 import { getBooking, cancelBooking } from "../api/bookings";
+import EditBookingModal from "../components/EditBookingModal";
 import {
   formatPrice,
   formatDate,
@@ -54,6 +55,7 @@ export default function CustomerRideDetail() {
   const [vehicle, setVehicle] = useState<Vehicle | null>(null);
   const [loading, setLoading] = useState(true);
   const [reviewBookingId, setReviewBookingId] = useState<number | null>(null);
+  const [editOpen, setEditOpen] = useState(false);
 
   const fetchData = useCallback(async () => {
     if (!id) return;
@@ -357,11 +359,25 @@ export default function CustomerRideDetail() {
           </div>
         )}
         {booking.isAirport && (
-          <div className="flex items-center gap-2">
+          <div className="space-y-1">
             <span className="ds-tag tag-airport">AIRPORT TRANSFER</span>
-            {booking.flightNumber && (
-              <span className="mono-label">Flight: {booking.flightNumber}</span>
+            {booking.pickupFlightNumber && (
+              <div className="mono-label text-xs">
+                ✈ Arriving: {booking.pickupFlightNumber}
+              </div>
             )}
+            {booking.dropoffFlightNumber && (
+              <div className="mono-label text-xs">
+                ✈ Departing: {booking.dropoffFlightNumber}
+              </div>
+            )}
+            {!booking.pickupFlightNumber &&
+              !booking.dropoffFlightNumber &&
+              booking.flightNumber && (
+                <div className="mono-label text-xs">
+                  ✈ {booking.flightNumber}
+                </div>
+              )}
           </div>
         )}
       </div>
@@ -373,7 +389,15 @@ export default function CustomerRideDetail() {
             onClick={handleCancel}
             className="btn-secondary flex-1 text-[var(--color-error)]"
           >
-            Cancel Booking
+            Cancel
+          </button>
+        )}
+        {canCancel && (
+          <button
+            onClick={() => setEditOpen(true)}
+            className="btn-secondary flex-1"
+          >
+            Edit
           </button>
         )}
         <button onClick={handleRebook} className="btn-secondary flex-1">
@@ -395,6 +419,13 @@ export default function CustomerRideDetail() {
         onSubmitted={fetchData}
       />
       {dialogProps && <ConfirmDialog {...dialogProps} />}
+      {editOpen && booking && (
+        <EditBookingModal
+          booking={booking}
+          onClose={() => setEditOpen(false)}
+          onSaved={fetchData}
+        />
+      )}
     </div>
   );
 }

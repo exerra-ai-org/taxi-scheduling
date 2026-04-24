@@ -52,10 +52,28 @@ export async function createBooking(data: {
   pickupLon?: number;
   dropoffLat?: number;
   dropoffLon?: number;
-  flightNumber?: string;
+  pickupFlightNumber?: string;
+  dropoffFlightNumber?: string;
   vehicleClass?: string;
 }) {
   return api.post<{ booking: Booking }>("/api/bookings", data);
+}
+
+export async function updateBooking(
+  id: number,
+  data: {
+    scheduledAt?: string;
+    pickupFlightNumber?: string | null;
+    dropoffFlightNumber?: string | null;
+    pickupAddress?: string;
+    dropoffAddress?: string;
+    pickupLat?: number | null;
+    pickupLon?: number | null;
+    dropoffLat?: number | null;
+    dropoffLon?: number | null;
+  },
+) {
+  return api.patch<{ booking: Booking }>(`/api/bookings/${id}`, data);
 }
 
 export async function listBookings() {

@@ -93,6 +93,8 @@ export default function VehicleSelect({ data, onNext, onBack }: Props) {
       routeType: quotes?.routeType ?? "mile",
       routeName: quotes?.routeName ?? null,
       isAirport: quotes?.isAirport ?? false,
+      isPickupAirport: quotes?.isPickupAirport ?? false,
+      isDropoffAirport: quotes?.isDropoffAirport ?? false,
       finalPricePence: price ?? 0,
       distanceMiles: quotes?.distanceMiles ?? undefined,
       baseFarePence: quote?.baseFarePence,
