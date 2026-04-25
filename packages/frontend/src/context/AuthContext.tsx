@@ -3,59 +3,100 @@ import {
   useContext,
   useState,
   useEffect,
+  useCallback,
   type ReactNode,
 } from "react";
 import * as authApi from "../api/auth";
-
-interface User {
-  id: number;
-  email: string;
-  name: string;
-  role: "customer" | "admin" | "driver";
-  phone?: string | null;
-}
+import { setUnauthorizedHandler } from "../api/client";
+import type { AuthUser, CheckEmailResponse } from "../api/auth";
 
 interface AuthContextType {
-  user: User | null;
+  user: AuthUser | null;
   loading: boolean;
-  login: (email: string, password?: string, phone?: string) => Promise<User>;
-  register: (email: string, name: string, phone: string) => Promise<User>;
+  checkEmail: (email: string) => Promise<CheckEmailResponse>;
+  login: (
+    email: string,
+    credential: { password?: string; phone?: string },
+  ) => Promise<AuthUser>;
+  register: (email: string, name: string, phone: string) => Promise<AuthUser>;
   logout: () => Promise<void>;
+  signOutLocally: () => void;
 }
 
 const AuthContext = createContext<AuthContextType | null>(null);
 
 export function AuthProvider({ children }: { children: ReactNode }) {
-  const [user, setUser] = useState<User | null>(null);
+  const [user, setUser] = useState<AuthUser | null>(null);
   const [loading, setLoading] = useState(true);
 
+  const signOutLocally = useCallback(() => setUser(null), []);
+
   useEffect(() => {
+    setUnauthorizedHandler(signOutLocally);
+    return () => setUnauthorizedHandler(null);
+  }, [signOutLocally]);
+
+  useEffect(() => {
+    let cancelled = false;
     authApi
       .getMe()
-      .then((data) => setUser(data.user))
-      .catch(() => setUser(null))
-      .finally(() => setLoading(false));
+      .then((data) => {
+        if (!cancelled) setUser(data.user);
+      })
+      .catch(() => {
+        if (!cancelled) setUser(null);
+      })
+      .finally(() => {
+        if (!cancelled) setLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
-  async function login(email: string, password?: string, phone?: string) {
-    const data = await authApi.login(email, password, phone);
-    setUser(data.user);
-    return data.user;
-  }
+  const checkEmail = useCallback(
+    (email: string) => authApi.checkEmail(email),
+    [],
+  );
 
-  async function register(email: string, name: string, phone: string) {
-    const data = await authApi.register(email, name, phone);
-    setUser(data.user);
-    return data.user;
-  }
+  const login = useCallback(
+    async (
+      email: string,
+      credential: { password?: string; phone?: string },
+    ) => {
+      const data = await authApi.login(email, credential);
+      setUser(data.user);
+      return data.user;
+    },
+    [],
+  );
 
-  async function logout() {
+  const register = useCallback(
+    async (email: string, name: string, phone: string) => {
+      const data = await authApi.register(email, name, phone);
+      setUser(data.user);
+      return data.user;
+    },
+    [],
+  );
+
+  const logout = useCallback(async () => {
     await authApi.logout();
     setUser(null);
-  }
+  }, []);
 
   return (
-    <AuthContext.Provider value={{ user, loading, login, register, logout }}>
+    <AuthContext.Provider
+      value={{
+        user,
+        loading,
+        checkEmail,
+        login,
+        register,
+        logout,
+        signOutLocally,
+      }}
+    >
       {children}
     </AuthContext.Provider>
   );

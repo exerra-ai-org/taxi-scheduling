@@ -1,10 +1,11 @@
-import { useEffect, useState } from "react";
-import type { Vehicle, VehicleClass, PricingQuoteMulti } from "shared/types";
+import { useEffect, useMemo, useState } from "react";
 import type { BookingData } from "../BookingFlow";
+import { getQuoteAll } from "../../api/pricing";
 import { listVehicles } from "../../api/vehicles";
-import { getQuoteAllClasses } from "../../api/bookings";
 import { formatPrice } from "../../lib/format";
-import { Skeleton } from "../../components/Skeleton";
+import { ApiError } from "../../api/client";
+import { VehicleRowSkeleton } from "../../components/Skeleton";
+import type { Vehicle, VehicleClass, PricingQuoteMulti } from "shared/types";
 
 interface Props {
   data: Partial<BookingData>;
@@ -12,36 +13,105 @@ interface Props {
   onBack: () => void;
 }
 
-const CLASS_ORDER: VehicleClass[] = ["regular", "comfort", "max"];
+const ORDER: VehicleClass[] = ["regular", "comfort", "max"];
+
+function VehicleGlyph({ klass }: { klass: VehicleClass }) {
+  // Side-profile silhouettes that read distinct: a hatchback (regular), a
+  // long-wheelbase sedan (comfort), a tall MPV/van (max). Same icon family
+  // (1.5 stroke, currentColor, no fill) so they sit alongside the rest of
+  // the system iconography.
+  const common = {
+    width: 32,
+    height: 32,
+    viewBox: "0 0 24 24",
+    fill: "none",
+    stroke: "currentColor",
+    strokeWidth: 1.5,
+    strokeLinecap: "round" as const,
+    strokeLinejoin: "round" as const,
+    "aria-hidden": true,
+  };
+
+  if (klass === "regular") {
+    // Hatchback: short, sloped roofline, two wheels close together.
+    return (
+      <svg {...common}>
+        <path d="M4 15 L4 13 L7 8 L14 8 L18 11 L20 11 L20 15" />
+        <path d="M3 15 L21 15" />
+        <circle cx="8" cy="16.5" r="1.6" />
+        <circle cx="16" cy="16.5" r="1.6" />
+      </svg>
+    );
+  }
+
+  if (klass === "comfort") {
+    // Sedan: longer body, three-box profile (hood + cabin + boot).
+    return (
+      <svg {...common}>
+        <path d="M2 16 L2 13.5 L5 13.5 L7 9 L16 9 L18 13.5 L22 13.5 L22 16" />
+        <path d="M7 9 L7 13.5 M16 9 L16 13.5 M11.5 9 L11.5 13.5" />
+        <path d="M2 16 L22 16" />
+        <circle cx="6" cy="17.5" r="1.6" />
+        <circle cx="18" cy="17.5" r="1.6" />
+      </svg>
+    );
+  }
+
+  // Max: MPV / people carrier. Tall, boxy, one-box silhouette.
+  return (
+    <svg {...common}>
+      <path d="M3 17 L3 8 Q3 6.5 4.5 6.5 L17 6.5 L21 10 L21 17" />
+      <path d="M3 17 L21 17" />
+      <path d="M3 11 L19 11" />
+      <path d="M11 6.5 L11 11" />
+      <circle cx="7" cy="18.5" r="1.6" />
+      <circle cx="17" cy="18.5" r="1.6" />
+    </svg>
+  );
+}
 
 export default function VehicleSelect({ data, onNext, onBack }: Props) {
-  const [vehicles, setVehicles] = useState<Vehicle[]>([]);
-  const [quotes, setQuotes] = useState<PricingQuoteMulti | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+  const [quote, setQuote] = useState<PricingQuoteMulti | null>(null);
+  const [vehicles, setVehicles] = useState<Vehicle[]>([]);
   const [selected, setSelected] = useState<VehicleClass>(
     data.vehicleClass || "regular",
   );
 
   useEffect(() => {
+    let cancelled = false;
     setLoading(true);
     setError("");
-
     Promise.all([
-      listVehicles(),
-      getQuoteAllClasses(data.pickupAddress || "", data.dropoffAddress || "", {
+      getQuoteAll({
+        from: data.pickupAddress || "",
+        to: data.dropoffAddress || "",
         fromLat: data.pickupLat,
         fromLon: data.pickupLon,
         toLat: data.dropoffLat,
         toLon: data.dropoffLon,
       }),
+      listVehicles(),
     ])
-      .then(([vRes, qRes]) => {
-        setVehicles(vRes.vehicles);
-        setQuotes(qRes);
+      .then(([q, v]) => {
+        if (cancelled) return;
+        setQuote(q);
+        setVehicles(v.vehicles);
       })
-      .catch((err) => setError(err.message || "Failed to load vehicle options"))
-      .finally(() => setLoading(false));
+      .catch((err) => {
+        if (cancelled) return;
+        setError(
+          err instanceof ApiError ? err.message : "Could not load pricing",
+        );
+      })
+      .finally(() => {
+        if (!cancelled) setLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [
     data.pickupAddress,
     data.dropoffAddress,
@@ -51,164 +121,137 @@ export default function VehicleSelect({ data, onNext, onBack }: Props) {
     data.dropoffLon,
   ]);
 
-  if (loading) {
-    return (
-      <div className="space-y-4 py-8">
-        <Skeleton className="h-32 w-full" />
-        <Skeleton className="h-32 w-full" />
-        <Skeleton className="h-32 w-full" />
-      </div>
-    );
-  }
-
-  if (error || !quotes) {
-    return (
-      <div className="space-y-4">
-        <div className="alert alert-error">
-          {error || "No pricing available for this route"}
-        </div>
-        <button onClick={onBack} className="subtle-link">
-          &larr; Change locations
-        </button>
-      </div>
-    );
-  }
-
-  const sorted = CLASS_ORDER.map((cls) =>
-    vehicles.find((v) => v.class === cls),
-  ).filter(Boolean) as Vehicle[];
-
-  function getPrice(cls: VehicleClass): number | null {
-    if (!quotes) return null;
-    const entry = quotes.quotes.find((e) => e.vehicleClass === cls);
-    return entry?.pricePence ?? null;
-  }
+  const rows = useMemo(() => {
+    if (!quote) return [];
+    return ORDER.map((klass) => {
+      const q = quote.quotes.find((x) => x.vehicleClass === klass);
+      const v = vehicles.find((x) => x.class === klass);
+      return { klass, quote: q, vehicle: v };
+    }).filter((r) => r.quote);
+  }, [quote, vehicles]);
 
   function handleContinue() {
-    const price = getPrice(selected);
-    const quote = quotes?.quotes.find((e) => e.vehicleClass === selected);
+    if (!quote) return;
+    const chosen = quote.quotes.find((q) => q.vehicleClass === selected);
+    if (!chosen) return;
     onNext({
       vehicleClass: selected,
-      pricePence: price ?? 0,
-      routeType: quotes?.routeType ?? "mile",
-      routeName: quotes?.routeName ?? null,
-      isAirport: quotes?.isAirport ?? false,
-      isPickupAirport: quotes?.isPickupAirport ?? false,
-      isDropoffAirport: quotes?.isDropoffAirport ?? false,
-      finalPricePence: price ?? 0,
-      distanceMiles: quotes?.distanceMiles ?? undefined,
-      baseFarePence: quote?.baseFarePence,
-      ratePerMilePence: quote?.ratePerMilePence,
+      pricePence: chosen.pricePence,
+      routeType: quote.routeType,
+      routeName: quote.routeName,
+      isAirport: quote.isAirport,
+      isPickupAirport: !!quote.isPickupAirport,
+      isDropoffAirport: !!quote.isDropoffAirport,
+      distanceMiles: quote.distanceMiles ?? null,
+      baseFarePence: chosen.baseFarePence ?? null,
+      ratePerMilePence: chosen.ratePerMilePence ?? null,
+      finalPricePence: chosen.pricePence,
+      discountPence: 0,
+      couponCode: undefined,
     });
   }
 
   return (
-    <div className="space-y-4">
-      <div>
-        <p className="section-label">Step 02</p>
-        <h2 className="mt-4 text-[32px] font-bold leading-[1.1] tracking-[-0.04em] text-[var(--color-dark)]">
-          Choose your vehicle
-        </h2>
-        <p className="caption-copy mt-2">
-          Select the vehicle class that suits your journey
-        </p>
-      </div>
+    <div className="space-y-3 animate-fade-in">
+      <h2 className="text-[22px] font-bold leading-none tracking-[-0.03em] text-[var(--color-dark)]">
+        Pick a class
+      </h2>
 
-      <div className="space-y-3">
-        {sorted.map((v) => {
-          const price = getPrice(v.class);
-          const isSelected = selected === v.class;
-          return (
-            <button
-              key={v.class}
-              type="button"
-              onClick={() => setSelected(v.class)}
-              className={`glass-card w-full p-4 text-left transition-all ${
-                isSelected
-                  ? "ring-2 ring-[var(--color-green)] border-[var(--color-green)]"
-                  : "hover:border-[var(--color-dark)]"
-              }`}
-            >
-              <div className="flex items-center justify-between">
-                <div className="space-y-1">
-                  <div className="flex items-center gap-2">
-                    <h3 className="text-lg font-bold text-[var(--color-dark)]">
-                      {v.name}
-                    </h3>
-                    {isSelected && (
-                      <span className="inline-flex h-5 w-5 items-center justify-center rounded-full bg-[var(--color-green)] text-xs font-bold text-white">
-                        ✓
-                      </span>
+      {loading && (
+        <div className="space-y-3" aria-busy="true">
+          {ORDER.map((k) => (
+            <VehicleRowSkeleton key={k} />
+          ))}
+        </div>
+      )}
+
+      {error && !loading && (
+        <div className="alert alert-error" role="alert">
+          {error}
+        </div>
+      )}
+
+      {!loading && !error && rows.length === 0 && (
+        <div className="empty-state">
+          <p className="caption-copy">No pricing available for this route.</p>
+          <button onClick={onBack} className="subtle-link mt-3">
+            ← Change locations
+          </button>
+        </div>
+      )}
+
+      {!loading && !error && rows.length > 0 && (
+        <div className="space-y-3" role="radiogroup" aria-label="Vehicle class">
+          {rows.map(({ klass, quote: q, vehicle: v }, i) => {
+            const isSelected = selected === klass;
+            return (
+              <button
+                key={klass}
+                type="button"
+                role="radio"
+                aria-checked={isSelected}
+                onClick={() => setSelected(klass)}
+                style={{ animationDelay: `${i * 70}ms` }}
+                className={`vehicle-row animate-stagger-in ${isSelected ? "is-selected" : ""}`}
+              >
+                <span className="vehicle-row-glyph" aria-hidden="true">
+                  <VehicleGlyph klass={klass} />
+                </span>
+                <div className="vehicle-row-body">
+                  <div className="vehicle-row-name">{v?.name || klass}</div>
+                  <div className="mono-label vehicle-row-meta">
+                    {v
+                      ? `${v.passengerCapacity} PAX · ${v.baggageCapacity} BAGS`
+                      : "—"}
+                  </div>
+                </div>
+                <div className="vehicle-row-price">
+                  <div className="vehicle-row-amount tabular-nums">
+                    {formatPrice(q!.pricePence)}
+                  </div>
+                  {quote?.distanceMiles != null &&
+                    quote.routeType === "mile" && (
+                      <div className="mono-label">
+                        {quote.distanceMiles.toFixed(1)} MI
+                      </div>
                     )}
-                  </div>
-                  {v.description && (
-                    <p className="caption-copy text-sm">{v.description}</p>
-                  )}
-                  <div className="flex items-center gap-4 pt-1">
-                    <span className="mono-label flex items-center gap-1">
-                      <svg
-                        className="h-4 w-4"
-                        viewBox="0 0 24 24"
-                        fill="none"
-                        stroke="currentColor"
-                        strokeWidth="2"
-                      >
-                        <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" />
-                        <circle cx="9" cy="7" r="4" />
-                        <path d="M23 21v-2a4 4 0 0 0-3-3.87" />
-                        <path d="M16 3.13a4 4 0 0 1 0 7.75" />
-                      </svg>
-                      {v.passengerCapacity} passengers
-                    </span>
-                    <span className="mono-label flex items-center gap-1">
-                      <svg
-                        className="h-4 w-4"
-                        viewBox="0 0 24 24"
-                        fill="none"
-                        stroke="currentColor"
-                        strokeWidth="2"
-                      >
-                        <rect x="2" y="7" width="20" height="14" rx="2" />
-                        <path d="M16 7V4a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v3" />
-                      </svg>
-                      {v.baggageCapacity} bags
-                    </span>
-                  </div>
                 </div>
-                <div className="text-right shrink-0 pl-4">
-                  {price != null ? (
-                    <div className="text-2xl font-bold text-[var(--color-dark)]">
-                      {formatPrice(price)}
-                    </div>
-                  ) : (
-                    <div className="text-sm text-[var(--color-muted)]">--</div>
-                  )}
-                </div>
-              </div>
-            </button>
-          );
-        })}
-      </div>
-
-      {quotes.distanceMiles != null && (
-        <div className="mono-label text-center">
-          {quotes.distanceMiles.toFixed(1)} miles ·{" "}
-          {quotes.routeType === "fixed" ? "Fixed route" : "Mile-based"} pricing
+                <span
+                  className="vehicle-row-tick"
+                  aria-hidden={!isSelected}
+                >
+                  <svg
+                    width="14"
+                    height="14"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="3"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                  >
+                    <polyline points="20 6 9 17 4 12" />
+                  </svg>
+                </span>
+              </button>
+            );
+          })}
         </div>
       )}
 
-      {quotes.isAirport && (
-        <div className="text-center">
-          <span className="ds-tag tag-airport">AIRPORT TRANSFER</span>
-        </div>
-      )}
-
-      <div className="flex gap-3">
-        <button onClick={onBack} className="btn-secondary w-full flex-1">
-          Back
+      <div className="flex gap-3 pt-2">
+        <button onClick={onBack} className="btn-secondary flex-1">
+          <span>Back</span>
         </button>
-        <button onClick={handleContinue} className="btn-primary w-full flex-1">
-          Continue
+        <button
+          onClick={handleContinue}
+          disabled={loading || !!error || rows.length === 0}
+          className="btn-primary flex-1"
+        >
+          <span>Continue</span>
+          <span className="btn-icon" aria-hidden="true">
+            <span className="btn-icon-glyph">↗</span>
+          </span>
         </button>
       </div>
     </div>

@@ -2,9 +2,18 @@ export class ApiError extends Error {
   constructor(
     message: string,
     public status: number,
+    public details?: unknown,
   ) {
     super(message);
   }
+}
+
+const BASE = import.meta.env.VITE_API_BASE_URL ?? "";
+
+let unauthorizedHandler: (() => void) | null = null;
+
+export function setUnauthorizedHandler(handler: (() => void) | null) {
+  unauthorizedHandler = handler;
 }
 
 async function request<T>(
@@ -14,7 +23,7 @@ async function request<T>(
 ): Promise<T> {
   let res: Response;
   try {
-    res = await fetch(path, {
+    res = await fetch(`${BASE}${path}`, {
       method,
       credentials: "include",
       headers: body ? { "Content-Type": "application/json" } : undefined,
@@ -24,7 +33,7 @@ async function request<T>(
     throw new ApiError("Unable to connect to the server. Please try again.", 0);
   }
 
-  let json: { success?: boolean; data?: T; error?: string };
+  let json: { success?: boolean; data?: T; error?: string; details?: unknown };
   try {
     json = await res.json();
   } catch {
@@ -37,9 +46,17 @@ async function request<T>(
   }
 
   if (!res.ok || !json.success) {
+    if (
+      res.status === 401 &&
+      unauthorizedHandler &&
+      !path.startsWith("/api/auth/")
+    ) {
+      unauthorizedHandler();
+    }
     throw new ApiError(
       json.error || `Something went wrong (${res.status})`,
       res.status,
+      json.details,
     );
   }
 

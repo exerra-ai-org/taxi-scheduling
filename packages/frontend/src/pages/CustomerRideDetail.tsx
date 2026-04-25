@@ -1,431 +1,504 @@
-import { useEffect, useState, useCallback } from "react";
-import { useParams, useNavigate } from "react-router-dom";
-import type { Booking, Vehicle, BookingStatus } from "shared/types";
-import { getBooking, cancelBooking } from "../api/bookings";
-import EditBookingModal from "../components/EditBookingModal";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { Link, useNavigate, useParams } from "react-router-dom";
+import type { Booking, BookingStatus, DriverLocation } from "shared/types";
 import {
-  formatPrice,
+  cancelBooking,
+  getBooking,
+  getDriverLocation,
+  type BookingDetail,
+} from "../api/bookings";
+import { ApiError } from "../api/client";
+import {
   formatDate,
-  statusLabel,
+  formatPrice,
   statusColor,
+  statusLabel,
 } from "../lib/format";
-import { IconMapPin } from "../components/icons";
-import { SkeletonCard } from "../components/Skeleton";
-import ConfirmDialog from "../components/ConfirmDialog";
-import { useConfirm } from "../hooks/useConfirm";
 import { useToast } from "../context/ToastContext";
+import { useConfirm } from "../hooks/useConfirm";
+import ConfirmDialog from "../components/ConfirmDialog";
+import { RideDetailSkeleton } from "../components/Skeleton";
+import {
+  IconClock,
+  IconUser,
+  IconCar,
+  IconPhone,
+  IconCheck,
+  IconArrowLeft,
+  IconPlane,
+  IconStar,
+  IconEdit,
+  IconX,
+} from "../components/icons";
+import MapBackdrop, { type Coords } from "./booking/MapBackdrop";
 import ReviewForm from "./ReviewForm";
-import LiveDriverMap from "../components/maps/LiveDriverMap";
-import RouteMap from "../components/maps/RouteMap";
 
-interface Assignment {
-  id: number;
-  driverId: number;
-  role: string;
-  isActive: boolean;
-  assignedAt: string;
-  driverName: string;
-  driverPhone: string;
-}
+const TRACKABLE: BookingStatus[] = ["assigned", "en_route", "arrived"];
+const POLL_MS = 8000;
 
-const STATUS_FLOW: BookingStatus[] = [
-  "scheduled",
-  "assigned",
-  "en_route",
-  "arrived",
-  "completed",
+const TIMELINE: { key: BookingStatus; label: string }[] = [
+  { key: "scheduled", label: "Booked" },
+  { key: "assigned", label: "Driver assigned" },
+  { key: "en_route", label: "En route" },
+  { key: "arrived", label: "Driver arrived" },
+  { key: "completed", label: "Completed" },
 ];
 
-const STATUS_ICONS: Record<string, string> = {
-  scheduled: "📋",
-  assigned: "👤",
-  en_route: "🚗",
-  arrived: "📍",
-  completed: "✅",
-};
+function timelineIndex(status: BookingStatus): number {
+  if (status === "cancelled") return -1;
+  return TIMELINE.findIndex((s) => s.key === status);
+}
+
+function shortName(addr: string): string {
+  if (!addr) return "";
+  return addr.split(",")[0].trim();
+}
+
+
+interface CustomerBookingExtra extends Booking {
+  hasReview?: boolean;
+}
 
 export default function CustomerRideDetail() {
   const { id } = useParams<{ id: string }>();
+  const bookingId = id ? Number(id) : NaN;
   const navigate = useNavigate();
   const toast = useToast();
   const { confirm, dialogProps } = useConfirm();
 
-  const [booking, setBooking] = useState<Booking | null>(null);
-  const [assignments, setAssignments] = useState<Assignment[]>([]);
-  const [vehicle, setVehicle] = useState<Vehicle | null>(null);
+  const [detail, setDetail] = useState<BookingDetail | null>(null);
   const [loading, setLoading] = useState(true);
-  const [reviewBookingId, setReviewBookingId] = useState<number | null>(null);
-  const [editOpen, setEditOpen] = useState(false);
+  const [error, setError] = useState("");
+  const [driverLoc, setDriverLoc] = useState<DriverLocation | null>(null);
+  const [reviewOpen, setReviewOpen] = useState(false);
 
-  const fetchData = useCallback(async () => {
-    if (!id) return;
+  const load = useCallback(async () => {
+    if (!Number.isFinite(bookingId)) return;
     try {
-      const data = await getBooking(Number(id));
-      setBooking(data.booking);
-      setAssignments(data.assignments);
-      setVehicle(data.vehicle ?? null);
-    } catch {
-      toast.error("Failed to load booking");
+      const data = await getBooking(bookingId);
+      setDetail(data);
+      setError("");
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : "Could not load booking");
     } finally {
       setLoading(false);
     }
-  }, [id, toast]);
+  }, [bookingId]);
 
   useEffect(() => {
-    fetchData();
-    const interval = setInterval(fetchData, 15000);
-    return () => clearInterval(interval);
-  }, [fetchData]);
+    load();
+  }, [load]);
+
+  useEffect(() => {
+    function onFocus() {
+      load();
+    }
+    window.addEventListener("focus", onFocus);
+    document.addEventListener("visibilitychange", onFocus);
+    return () => {
+      window.removeEventListener("focus", onFocus);
+      document.removeEventListener("visibilitychange", onFocus);
+    };
+  }, [load]);
+
+  const booking = detail?.booking as CustomerBookingExtra | undefined;
+  const primaryAssignment = useMemo(
+    () => detail?.assignments.find((a) => a.role === "primary" && a.isActive),
+    [detail],
+  );
+
+  const trackable = !!booking && TRACKABLE.includes(booking.status);
+  const pickup: Coords | null =
+    booking?.pickupLat != null && booking?.pickupLon != null
+      ? { lat: booking.pickupLat, lon: booking.pickupLon }
+      : null;
+  const dropoff: Coords | null =
+    booking?.dropoffLat != null && booking?.dropoffLon != null
+      ? { lat: booking.dropoffLat, lon: booking.dropoffLon }
+      : null;
+  const driver: Coords | null =
+    driverLoc?.lat != null && driverLoc?.lon != null
+      ? { lat: driverLoc.lat, lon: driverLoc.lon }
+      : null;
+
+  // Poll driver location while trackable
+  const pollRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  useEffect(() => {
+    if (!trackable || !Number.isFinite(bookingId)) return;
+    let cancelled = false;
+    async function tick() {
+      if (cancelled) return;
+      if (document.visibilityState === "visible") {
+        try {
+          const loc = await getDriverLocation(bookingId);
+          if (!cancelled) setDriverLoc(loc);
+        } catch {
+          /* keep last-known on transient error */
+        }
+      }
+      pollRef.current = setTimeout(tick, POLL_MS);
+    }
+    tick();
+    return () => {
+      cancelled = true;
+      if (pollRef.current) clearTimeout(pollRef.current);
+    };
+  }, [bookingId, trackable]);
+
+  // Panel measurement so the fitted route reserves room for the floating panel
+  const panelRef = useRef<HTMLDivElement>(null);
+  const [panelSize, setPanelSize] = useState({ width: 0, height: 0 });
+  useEffect(() => {
+    if (!panelRef.current) return;
+    const ro = new ResizeObserver(() => {
+      if (panelRef.current) {
+        setPanelSize({
+          width: panelRef.current.offsetWidth,
+          height: panelRef.current.offsetHeight,
+        });
+      }
+    });
+    ro.observe(panelRef.current);
+    return () => ro.disconnect();
+  }, []);
+
+  const isDesktop =
+    typeof window !== "undefined" &&
+    window.matchMedia("(min-width: 810px)").matches;
+  const obstruct = isDesktop
+    ? { top: 80, left: 60, right: panelSize.width + 48, bottom: 60 }
+    : { top: 60, left: 40, right: 40, bottom: panelSize.height + 32 };
 
   async function handleCancel() {
     if (!booking) return;
     const ok = await confirm({
-      title: "Cancel Booking",
-      message: "Are you sure you want to cancel this booking?",
-      confirmLabel: "Cancel Booking",
+      title: "Cancel booking",
+      message: "This cannot be undone. Continue?",
+      confirmLabel: "Cancel ride",
       variant: "danger",
     });
     if (!ok) return;
     try {
       await cancelBooking(booking.id);
       toast.success("Booking cancelled");
-      fetchData();
-    } catch {
-      toast.error("Failed to cancel booking");
+      load();
+    } catch (err) {
+      toast.error(err instanceof ApiError ? err.message : "Could not cancel");
     }
   }
 
-  function handleRebook() {
-    if (!booking) return;
-    navigate("/", {
-      state: {
-        pickupAddress: booking.pickupAddress,
-        dropoffAddress: booking.dropoffAddress,
-      },
-    });
-  }
-
-  if (loading) {
+  if (loading && !detail) {
     return (
-      <div className="page-stack">
-        <SkeletonCard />
-        <SkeletonCard />
-        <SkeletonCard />
+      <div className="fixed inset-0 top-[72px] overflow-hidden">
+        <MapBackdrop pickup={null} dropoff={null} obstruct={obstruct} />
+        <div
+          className="floating-panel booking-flow-panel"
+          data-anchor="right"
+        >
+          <div className="booking-flow-panel-inner" aria-busy="true">
+            <RideDetailSkeleton />
+          </div>
+        </div>
       </div>
     );
   }
 
-  if (!booking) {
+  if (error || !detail || !booking) {
     return (
-      <div className="page-stack">
-        <div className="alert alert-error">Booking not found</div>
-        <button onClick={() => navigate("/bookings")} className="btn-secondary">
-          Back to Bookings
-        </button>
-      </div>
-    );
-  }
-
-  const primaryDriver = assignments.find(
-    (a) => a.role === "primary" && a.isActive,
-  );
-  const isCancelled = booking.status === "cancelled";
-  const isActive = ["assigned", "en_route", "arrived"].includes(booking.status);
-  const showLiveMap =
-    ["en_route", "arrived"].includes(booking.status) &&
-    booking.pickupLat != null &&
-    booking.dropoffLat != null;
-  const showStaticMap =
-    !showLiveMap &&
-    booking.pickupLat != null &&
-    booking.pickupLon != null &&
-    booking.dropoffLat != null &&
-    booking.dropoffLon != null;
-  const canCancel = ["scheduled", "assigned"].includes(booking.status);
-
-  const statusIdx = STATUS_FLOW.indexOf(booking.status as BookingStatus);
-
-  return (
-    <div className="page-stack">
-      {/* Header */}
-      <div className="page-header">
-        <div>
+      <div className="fixed inset-0 top-[72px] flex items-center justify-center">
+        <div className="page-card max-w-md p-6 space-y-4">
+          <div className="alert alert-error" role="alert">
+            {error || "Booking not found"}
+          </div>
           <button
             onClick={() => navigate("/bookings")}
-            className="subtle-link mb-2 inline-block"
+            className="btn-secondary w-full"
           >
-            &larr; All Bookings
+            <span>← Back to bookings</span>
           </button>
-          <h1 className="page-title text-[32px]">Ride #{booking.id}</h1>
         </div>
-        <span className={`status-pill ${statusColor(booking.status)}`}>
-          {statusLabel(booking.status)}
-        </span>
       </div>
+    );
+  }
 
-      {/* Status Timeline */}
-      {!isCancelled && (
-        <div className="glass-card p-4">
-          <h3 className="field-label mb-3">Ride Status</h3>
-          <div className="flex items-center gap-1">
-            {STATUS_FLOW.map((s, i) => {
-              const isPast = i < statusIdx;
-              const isCurrent = i === statusIdx;
-              const isFuture = i > statusIdx;
-              return (
-                <div
-                  key={s}
-                  className="flex flex-1 flex-col items-center gap-1"
+  const tIdx = timelineIndex(booking.status);
+  const isCancelled = booking.status === "cancelled";
+  const canEdit = booking.status === "scheduled" || booking.status === "assigned";
+  const canReview = booking.status === "completed" && !booking.hasReview;
+
+  return (
+    <div className="fixed inset-0 top-[72px] overflow-hidden">
+      <MapBackdrop
+        pickup={pickup}
+        dropoff={dropoff}
+        driver={driver}
+        obstruct={obstruct}
+        interactive
+      />
+
+      <div
+        ref={panelRef}
+        className="floating-panel booking-flow-panel"
+        data-anchor="right"
+      >
+        <div className="booking-flow-panel-inner">
+        <div className="ride-detail animate-fade-in">
+          {/* Top row: back link + (live dot) + airport chip + status pill */}
+          <div className="ride-detail-topbar">
+            <Link
+              to="/bookings"
+              className="subtle-link inline-flex items-center gap-1.5"
+            >
+              <IconArrowLeft className="h-3.5 w-3.5" />
+              <span>All rides</span>
+            </Link>
+            <div className="flex items-center gap-2">
+              {trackable && driver && (
+                <span
+                  className="ride-detail-live-dot"
+                  aria-label="Live driver location"
+                  title={
+                    driverLoc?.lastUpdatedAt
+                      ? `Updated ${new Date(driverLoc.lastUpdatedAt).toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit" })}`
+                      : "Live"
+                  }
+                />
+              )}
+              {booking.isAirport && (
+                <span className="ds-tag tag-airport inline-flex items-center gap-1">
+                  <IconPlane className="h-3 w-3" />
+                  AIRPORT
+                </span>
+              )}
+              <span className={`status-pill ${statusColor(booking.status)}`}>
+                {statusLabel(booking.status)}
+              </span>
+            </div>
+          </div>
+
+          {/* Hero: eyebrow + two-line route block (P/D markers mirror the
+              map pins) + scheduled meta. */}
+          <div className="ride-detail-hero">
+            <p className="page-eyebrow">/ Ride #{booking.id}</p>
+            <div className="ride-detail-route">
+              <div className="ride-detail-route-row">
+                <span
+                  className="ride-detail-route-marker is-pickup"
+                  aria-hidden="true"
                 >
-                  <div
-                    className={`flex h-8 w-8 items-center justify-center rounded-full text-sm transition-all ${
-                      isCurrent
-                        ? "bg-[var(--color-green)] text-white scale-110 shadow-md"
-                        : isPast
-                          ? "bg-[var(--color-forest)] text-white"
-                          : "bg-[var(--color-surface)] text-[var(--color-muted)] border border-[var(--color-border)]"
-                    }`}
-                  >
-                    {isPast ? "✓" : STATUS_ICONS[s]}
+                  P
+                </span>
+                <h1 className="ride-detail-route-text">
+                  {shortName(booking.pickupAddress)}
+                </h1>
+              </div>
+              <div
+                className="ride-detail-route-spine"
+                aria-hidden="true"
+              />
+              <div className="ride-detail-route-row">
+                <span
+                  className="ride-detail-route-marker is-dropoff"
+                  aria-hidden="true"
+                >
+                  D
+                </span>
+                <h2 className="ride-detail-route-text">
+                  {shortName(booking.dropoffAddress)}
+                </h2>
+              </div>
+            </div>
+            <div className="ride-detail-meta">
+              <IconClock className="h-3.5 w-3.5" />
+              {formatDate(booking.scheduledAt)}
+            </div>
+          </div>
+
+          {/* Driver */}
+          <section>
+            <p className="section-label">Driver</p>
+            {primaryAssignment ? (
+              <div className="ride-detail-driver">
+                <span className="ride-detail-driver-chip">
+                  <IconUser className="h-5 w-5" />
+                </span>
+                <div className="min-w-0 flex-1">
+                  <div className="ride-detail-driver-name">
+                    {primaryAssignment.driverName}
                   </div>
-                  <span
-                    className={`mono-label text-[10px] text-center ${
-                      isCurrent
-                        ? "text-[var(--color-dark)] font-bold"
-                        : isFuture
-                          ? "text-[var(--color-muted)]"
-                          : ""
-                    }`}
-                  >
-                    {statusLabel(s)}
-                  </span>
-                  {i < STATUS_FLOW.length - 1 && (
-                    <div
-                      className={`hidden ${isPast ? "bg-[var(--color-forest)]" : "bg-[var(--color-border)]"}`}
-                    />
+                  {detail.vehicle && (
+                    <div className="caption-copy">
+                      {detail.vehicle.name} · {detail.vehicle.passengerCapacity}{" "}
+                      pax
+                    </div>
                   )}
                 </div>
-              );
-            })}
-          </div>
-        </div>
-      )}
-
-      {/* Live Map or Static Map */}
-      {showLiveMap && (
-        <LiveDriverMap
-          bookingId={booking.id}
-          pickup={{ lat: booking.pickupLat!, lon: booking.pickupLon! }}
-          dropoff={{ lat: booking.dropoffLat!, lon: booking.dropoffLon! }}
-        />
-      )}
-      {showStaticMap && (
-        <RouteMap
-          pickup={{ lat: booking.pickupLat!, lon: booking.pickupLon! }}
-          dropoff={{ lat: booking.dropoffLat!, lon: booking.dropoffLon! }}
-        />
-      )}
-
-      {/* Driver Card */}
-      {primaryDriver && isActive && (
-        <div className="glass-card p-4">
-          <h3 className="field-label mb-3">Your Driver</h3>
-          <div className="flex items-center gap-4">
-            <div className="flex h-14 w-14 items-center justify-center rounded-full bg-[var(--color-forest)] text-xl font-bold text-white shrink-0">
-              {primaryDriver.driverName
-                .split(" ")
-                .map((n) => n[0])
-                .join("")
-                .toUpperCase()
-                .slice(0, 2)}
-            </div>
-            <div className="flex-1 min-w-0">
-              <div className="text-base font-bold text-[var(--color-dark)]">
-                {primaryDriver.driverName}
+                {primaryAssignment.driverPhone && (
+                  <a
+                    href={`tel:${primaryAssignment.driverPhone}`}
+                    className="ride-detail-driver-call"
+                    aria-label={`Call ${primaryAssignment.driverName}`}
+                  >
+                    <IconPhone className="h-4 w-4" />
+                  </a>
+                )}
               </div>
-              {primaryDriver.driverPhone && (
-                <div className="mono-label mt-0.5">
-                  {primaryDriver.driverPhone}
-                </div>
-              )}
-            </div>
-            {primaryDriver.driverPhone && (
-              <a
-                href={`tel:${primaryDriver.driverPhone}`}
-                className="btn-secondary shrink-0 flex items-center gap-1.5"
+            ) : (
+              <div className="caption-copy inline-flex items-center gap-2 py-1">
+                <IconCar className="h-4 w-4" />
+                Awaiting driver assignment.
+              </div>
+            )}
+          </section>
+
+          {/* Horizontal timeline. Per-step labels collapse into one shared
+              label below that swaps to the active step. */}
+          <section>
+            <p className="section-label">Progress</p>
+            <ol className="ride-detail-timeline" aria-label="Ride progress">
+              {TIMELINE.map(({ key }, i) => {
+                const isComplete = i < tIdx;
+                const isActive = i === tIdx;
+                const isLast = i === TIMELINE.length - 1;
+                return (
+                  <li key={key} className="ride-detail-timeline-step">
+                    <div
+                      className={`ride-detail-timeline-dot ${
+                        isComplete
+                          ? "is-complete"
+                          : isActive
+                            ? "is-active"
+                            : ""
+                      }`}
+                      aria-current={isActive ? "step" : undefined}
+                    >
+                      {isComplete ? <IconCheck className="h-3 w-3" /> : i + 1}
+                    </div>
+                    {!isLast && (
+                      <div
+                        className={`ride-detail-timeline-line ${
+                          isComplete ? "is-complete" : ""
+                        }`}
+                        aria-hidden="true"
+                      />
+                    )}
+                  </li>
+                );
+              })}
+            </ol>
+            {tIdx >= 0 && (
+              <div
+                key={TIMELINE[tIdx]?.key}
+                className="ride-detail-timeline-current animate-fade-in"
               >
-                <svg
-                  className="h-4 w-4"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth="2"
-                >
-                  <path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72c.127.96.361 1.903.7 2.81a2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45c.907.339 1.85.573 2.81.7A2 2 0 0 1 22 16.92z" />
-                </svg>
-                Call
-              </a>
+                {TIMELINE[tIdx]?.label}
+              </div>
             )}
-          </div>
-        </div>
-      )}
+            {isCancelled && (
+              <div className="alert alert-error mt-2 text-[13px]">
+                This booking was cancelled.
+              </div>
+            )}
+          </section>
 
-      {/* Vehicle Card */}
-      {vehicle && (
-        <div className="glass-card p-4">
-          <h3 className="field-label mb-3">Vehicle</h3>
-          <div className="flex items-center justify-between">
-            <div>
-              <div className="text-base font-bold text-[var(--color-dark)]">
-                {vehicle.name}
+          {/* Details */}
+          <section>
+            <p className="section-label">Details</p>
+            <dl className="ride-detail-grid">
+              <div className="ride-detail-grid-cell">
+                <dt>VEHICLE</dt>
+                <dd className="capitalize">{booking.vehicleClass}</dd>
               </div>
-              {vehicle.description && (
-                <p className="caption-copy text-sm mt-0.5">
-                  {vehicle.description}
-                </p>
-              )}
-              <div className="flex items-center gap-4 mt-2">
-                <span className="mono-label flex items-center gap-1">
-                  <svg
-                    className="h-3.5 w-3.5"
-                    viewBox="0 0 24 24"
-                    fill="none"
-                    stroke="currentColor"
-                    strokeWidth="2"
-                  >
-                    <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" />
-                    <circle cx="9" cy="7" r="4" />
-                  </svg>
-                  {vehicle.passengerCapacity} seats
-                </span>
-                <span className="mono-label flex items-center gap-1">
-                  <svg
-                    className="h-3.5 w-3.5"
-                    viewBox="0 0 24 24"
-                    fill="none"
-                    stroke="currentColor"
-                    strokeWidth="2"
-                  >
-                    <rect x="2" y="7" width="20" height="14" rx="2" />
-                    <path d="M16 7V4a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v3" />
-                  </svg>
-                  {vehicle.baggageCapacity} bags
-                </span>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Booking Details */}
-      <div className="glass-card p-4 space-y-3">
-        <h3 className="field-label">Journey Details</h3>
-        <div className="flex items-start gap-2">
-          <IconMapPin className="mt-0.5 h-4 w-4 shrink-0 text-[var(--color-forest)]" />
-          <div>
-            <span className="mono-label text-[10px]">PICKUP</span>
-            <div className="body-copy text-sm">{booking.pickupAddress}</div>
-          </div>
-        </div>
-        <div className="flex items-start gap-2">
-          <IconMapPin className="mt-0.5 h-4 w-4 shrink-0 text-[var(--color-dark)]" />
-          <div>
-            <span className="mono-label text-[10px]">DROP-OFF</span>
-            <div className="body-copy text-sm">{booking.dropoffAddress}</div>
-          </div>
-        </div>
-        <div className="card-divider" />
-        <div className="data-pair">
-          <span>Date & Time</span>
-          <span>{formatDate(booking.scheduledAt)}</span>
-        </div>
-        {booking.distanceMiles != null && (
-          <div className="data-pair">
-            <span>Distance</span>
-            <span>{booking.distanceMiles.toFixed(1)} miles</span>
-          </div>
-        )}
-        <div className="card-divider" />
-        <div className="data-pair">
-          <span>Price</span>
-          <span className="font-bold">{formatPrice(booking.pricePence)}</span>
-        </div>
-        {booking.discountPence > 0 && (
-          <div className="data-pair">
-            <span>Discount</span>
-            <span className="text-[var(--color-forest)]">
-              -{formatPrice(booking.discountPence)}
-            </span>
-          </div>
-        )}
-        {booking.isAirport && (
-          <div className="space-y-1">
-            <span className="ds-tag tag-airport">AIRPORT TRANSFER</span>
-            {booking.pickupFlightNumber && (
-              <div className="mono-label text-xs">
-                ✈ Arriving: {booking.pickupFlightNumber}
-              </div>
-            )}
-            {booking.dropoffFlightNumber && (
-              <div className="mono-label text-xs">
-                ✈ Departing: {booking.dropoffFlightNumber}
-              </div>
-            )}
-            {!booking.pickupFlightNumber &&
-              !booking.dropoffFlightNumber &&
-              booking.flightNumber && (
-                <div className="mono-label text-xs">
-                  ✈ {booking.flightNumber}
+              {booking.distanceMiles != null && (
+                <div className="ride-detail-grid-cell">
+                  <dt>DISTANCE</dt>
+                  <dd>{booking.distanceMiles.toFixed(1)} mi</dd>
                 </div>
               )}
-          </div>
-        )}
-      </div>
+              {booking.pickupFlightNumber && (
+                <div className="ride-detail-grid-cell">
+                  <dt className="inline-flex items-center gap-1">
+                    <IconPlane className="h-3 w-3" />
+                    ARRIVING
+                  </dt>
+                  <dd>{booking.pickupFlightNumber}</dd>
+                </div>
+              )}
+              {booking.dropoffFlightNumber && (
+                <div className="ride-detail-grid-cell">
+                  <dt className="inline-flex items-center gap-1">
+                    <IconPlane className="h-3 w-3" />
+                    DEPARTING
+                  </dt>
+                  <dd>{booking.dropoffFlightNumber}</dd>
+                </div>
+              )}
+            </dl>
+          </section>
 
-      {/* Actions */}
-      <div className="flex gap-3">
-        {canCancel && (
-          <button
-            onClick={handleCancel}
-            className="btn-secondary flex-1 text-[var(--color-error)]"
-          >
-            Cancel
-          </button>
-        )}
-        {canCancel && (
-          <button
-            onClick={() => setEditOpen(true)}
-            className="btn-secondary flex-1"
-          >
-            Edit
-          </button>
-        )}
-        <button onClick={handleRebook} className="btn-secondary flex-1">
-          Rebook
-        </button>
-        {booking.status === "completed" && !(booking as any).hasReview && (
-          <button
-            onClick={() => setReviewBookingId(booking.id)}
-            className="btn-primary flex-1"
-          >
-            Leave Review
-          </button>
-        )}
+          {/* Total: flat row, hairline above */}
+          <div className="ride-detail-total">
+            <div>
+              <div className="mono-label">Total</div>
+              {booking.discountPence > 0 && (
+                <div className="caption-copy text-[12px]">
+                  Saved {formatPrice(booking.discountPence)}
+                </div>
+              )}
+            </div>
+            <div className="ride-detail-total-amount tabular-nums">
+              {formatPrice(booking.pricePence)}
+            </div>
+          </div>
+
+          {/* Actions */}
+          <div className="ride-detail-actions">
+            {canReview && (
+              <button
+                onClick={() => setReviewOpen(true)}
+                className="btn-green w-full"
+              >
+                <span className="inline-flex items-center gap-2">
+                  <IconStar className="h-4 w-4" />
+                  Leave a review
+                </span>
+                <span className="btn-icon" aria-hidden="true">
+                  <span className="btn-icon-glyph">↗</span>
+                </span>
+              </button>
+            )}
+            {canEdit && (
+              <div className="flex gap-2">
+                <button
+                  onClick={() => toast.info("Edit coming soon")}
+                  className="btn-secondary flex-1"
+                >
+                  <span className="inline-flex items-center gap-2">
+                    <IconEdit className="h-4 w-4" />
+                    Edit
+                  </span>
+                </button>
+                <button onClick={handleCancel} className="btn-ghost flex-1">
+                  <span className="inline-flex items-center gap-2 text-[var(--color-error)]">
+                    <IconX className="h-4 w-4" />
+                    Cancel
+                  </span>
+                </button>
+              </div>
+            )}
+          </div>
+        </div>
+        </div>
       </div>
 
       <ReviewForm
-        bookingId={reviewBookingId}
-        onClose={() => setReviewBookingId(null)}
-        onSubmitted={fetchData}
+        bookingId={reviewOpen ? booking.id : null}
+        onClose={() => {
+          setReviewOpen(false);
+          load();
+        }}
       />
       {dialogProps && <ConfirmDialog {...dialogProps} />}
-      {editOpen && booking && (
-        <EditBookingModal
-          booking={booking}
-          onClose={() => setEditOpen(false)}
-          onSaved={fetchData}
-        />
-      )}
     </div>
   );
 }

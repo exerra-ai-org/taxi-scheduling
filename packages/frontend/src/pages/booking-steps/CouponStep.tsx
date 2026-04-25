@@ -64,12 +64,9 @@ export default function CouponStep({ pricePence, onNext, onBack }: Props) {
 
   return (
     <div className="space-y-4">
-      <div>
-        <p className="section-label">Step 04</p>
-        <h2 className="mt-4 text-[32px] font-bold leading-[1.1] tracking-[-0.04em] text-[var(--color-dark)]">
-          Have a coupon?
-        </h2>
-      </div>
+      <h2 className="text-[22px] font-bold leading-none tracking-[-0.03em] text-[var(--color-dark)]">
+        Have a code?
+      </h2>
 
       <div className="flex gap-2">
         <input

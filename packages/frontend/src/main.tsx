@@ -8,7 +8,6 @@ import { AuthProvider } from "./context/AuthContext";
 import { ToastProvider } from "./context/ToastContext";
 import Layout from "./components/Layout";
 import ProtectedRoute from "./components/ProtectedRoute";
-import ActiveBookingRedirect from "./components/ActiveBookingRedirect";
 
 import Login from "./pages/Login";
 import BookingFlow from "./pages/BookingFlow";
@@ -18,11 +17,9 @@ import CustomerRideDetail from "./pages/CustomerRideDetail";
 import RideTimeline from "./pages/admin/RideTimeline";
 import DriverManagement from "./pages/admin/DriverManagement";
 import CouponManagement from "./pages/admin/CouponManagement";
-import FixedRouteManagement from "./pages/admin/FixedRouteManagement";
 
 import MyRides from "./pages/driver/MyRides";
 
-// Register service worker
 if ("serviceWorker" in navigator) {
   navigator.serviceWorker.register("/sw.js").catch(() => {});
 }
@@ -35,16 +32,10 @@ ReactDOM.createRoot(document.getElementById("root")!).render(
           <Routes>
             <Route element={<Layout />}>
               <Route path="/login" element={<Login />} />
-              <Route
-                path="/"
-                element={
-                  <ActiveBookingRedirect>
-                    <BookingFlow />
-                  </ActiveBookingRedirect>
-                }
-              />
+              <Route path="/" element={<BookingFlow />} />
+              <Route path="/book" element={<BookingFlow />} />
 
-              {/* Customer — requires login */}
+              {/* Customer */}
               <Route element={<ProtectedRoute roles={["customer"]} />}>
                 <Route path="/bookings" element={<BookingHistory />} />
                 <Route path="/bookings/:id" element={<CustomerRideDetail />} />
@@ -55,10 +46,6 @@ ReactDOM.createRoot(document.getElementById("root")!).render(
                 <Route path="/admin" element={<RideTimeline />} />
                 <Route path="/admin/drivers" element={<DriverManagement />} />
                 <Route path="/admin/coupons" element={<CouponManagement />} />
-                <Route
-                  path="/admin/routes"
-                  element={<FixedRouteManagement />}
-                />
               </Route>
 
               {/* Driver */}

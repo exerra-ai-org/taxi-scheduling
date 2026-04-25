@@ -1,0 +1,240 @@
+{
+  "schemaVersion": 2,
+  "generatedAt": "2026-04-25T00:00:00.000Z",
+  "title": "Design System: Taxi Concierge",
+  "extensions": {
+    "colorMeta": {
+      "bg": {
+        "role": "neutral",
+        "displayName": "Off-White Canvas",
+        "canonical": "#f9f9f9",
+        "tonalRamp": ["#131313", "#3a3a3a", "#5a5d5f", "#7d8082", "#a4a6a8", "#c8caca", "#e5e5e5", "#f9f9f9"]
+      },
+      "surface": {
+        "role": "neutral",
+        "displayName": "Surface White",
+        "canonical": "#ffffff",
+        "tonalRamp": ["#1a1a1a", "#3a3a3a", "#7d8082", "#b4b6b8", "#d3d3d3", "#e5e5e5", "#f3f3f3", "#ffffff"]
+      },
+      "surface-alt": {
+        "role": "neutral",
+        "displayName": "Surface Alt",
+        "canonical": "#f3f3f3",
+        "tonalRamp": ["#1f1f1f", "#3a3a3a", "#7d8082", "#b4b6b8", "#d3d3d3", "#e5e5e5", "#f3f3f3", "#fafafa"]
+      },
+      "dark": {
+        "role": "primary",
+        "displayName": "Concierge Black",
+        "canonical": "#131313",
+        "tonalRamp": ["#000000", "#0a0a0a", "#131313", "#222222", "#3a3a3a", "#5a5d5f", "#7d8082", "#a4a6a8"]
+      },
+      "mid": {
+        "role": "neutral",
+        "displayName": "Mid Grey",
+        "canonical": "#3a3a3a",
+        "tonalRamp": ["#0a0a0a", "#131313", "#222222", "#3a3a3a", "#5a5d5f", "#7d8082", "#a4a6a8", "#c8caca"]
+      },
+      "muted": {
+        "role": "neutral",
+        "displayName": "Muted Grey",
+        "canonical": "#7d8082",
+        "tonalRamp": ["#131313", "#3a3a3a", "#5a5d5f", "#7d8082", "#a4a6a8", "#c8caca", "#e5e5e5", "#f3f3f3"]
+      },
+      "border": {
+        "role": "neutral",
+        "displayName": "Hairline Border",
+        "canonical": "#e5e5e5",
+        "tonalRamp": ["#3a3a3a", "#7d8082", "#a4a6a8", "#c8caca", "#d3d3d3", "#e5e5e5", "#f0f0f0", "#fafafa"]
+      },
+      "border-light": {
+        "role": "neutral",
+        "displayName": "Control Outline",
+        "canonical": "#d3d3d3",
+        "tonalRamp": ["#3a3a3a", "#7d8082", "#a4a6a8", "#c8caca", "#d3d3d3", "#e0e0e0", "#ededed", "#f9f9f9"]
+      },
+      "green": {
+        "role": "primary",
+        "displayName": "Console Green",
+        "canonical": "#98fe00",
+        "tonalRamp": ["#1f3300", "#365800", "#4d7d00", "#6ba800", "#86d100", "#98fe00", "#bcff5e", "#e3ffb3"]
+      },
+      "blue-light": {
+        "role": "tertiary",
+        "displayName": "Scheduled Blue (tint)",
+        "canonical": "#d2e9fe",
+        "tonalRamp": ["#0e2a44", "#1a4673", "#2868a3", "#3a8bd1", "#5fa6e0", "#8fc5f2", "#b6dafa", "#d2e9fe"]
+      },
+      "blue-mid": {
+        "role": "tertiary",
+        "displayName": "Scheduled Blue (border)",
+        "canonical": "#8fc5f2",
+        "tonalRamp": ["#0e2a44", "#1a4673", "#2868a3", "#3a8bd1", "#5fa6e0", "#8fc5f2", "#b6dafa", "#d2e9fe"]
+      },
+      "orange": {
+        "role": "tertiary",
+        "displayName": "Assigned Orange",
+        "canonical": "#ff9500",
+        "tonalRamp": ["#3a2200", "#664000", "#8f5800", "#b87000", "#e08600", "#ff9500", "#ffb24d", "#ffd699"]
+      },
+      "navy": {
+        "role": "tertiary",
+        "displayName": "En-route Navy",
+        "canonical": "#2f3d4a",
+        "tonalRamp": ["#0a1018", "#141d28", "#1f2c39", "#2f3d4a", "#475a6c", "#6a7d90", "#9aa9b8", "#cbd4dd"]
+      },
+      "forest": {
+        "role": "tertiary",
+        "displayName": "Arrived Forest",
+        "canonical": "#233802",
+        "tonalRamp": ["#0c1300", "#162200", "#1c2d01", "#233802", "#3b5904", "#5d8208", "#86b323", "#bce06a"]
+      },
+      "error": {
+        "role": "tertiary",
+        "displayName": "Error Red",
+        "canonical": "#d14b4b",
+        "tonalRamp": ["#330d0d", "#591818", "#7d2424", "#9c2f2f", "#b73a3a", "#d14b4b", "#e07a7a", "#f0b3b3"]
+      }
+    },
+    "typographyMeta": {
+      "metric": { "displayName": "Metric", "purpose": "Hero number on summary screens — fares, totals, distances. One per surface." },
+      "display": { "displayName": "Display", "purpose": "Page title. One per page, top-of-page." },
+      "body-large": { "displayName": "Body Large", "purpose": "Lead paragraph; primary copy on confirmation screens." },
+      "body": { "displayName": "Body", "purpose": "All running text, form values, list rows." },
+      "caption": { "displayName": "Caption", "purpose": "Supporting copy, meta lines under cards." },
+      "label": { "displayName": "Mono Label", "purpose": "Section labels, field labels, table headers, status pills, eyebrows. Always uppercase." }
+    },
+    "shadows": [
+      { "name": "card-rest", "value": "0 14px 40px rgb(19 19 19 / 0.06)", "purpose": "Default soft shadow on .page-card and .ds-card." },
+      { "name": "card-hover", "value": "0 18px 36px rgb(19 19 19 / 0.08)", "purpose": "Activated by .hover-lift modifier together with -2px translate." },
+      { "name": "btn-primary-hover", "value": "0 16px 30px rgb(19 19 19 / 0.12)", "purpose": "Concierge Black CTA hover glow." },
+      { "name": "btn-green-hover", "value": "0 16px 30px rgb(152 254 0 / 0.16)", "purpose": "Console Green CTA hover glow." },
+      { "name": "overlay", "value": "0 28px 80px rgb(19 19 19 / 0.2)", "purpose": "Toasts, modals, floating panel — the only lifted tier." }
+    ],
+    "motion": [
+      { "name": "ease-out-quint", "value": "cubic-bezier(0.2, 1, 0.3, 1)", "purpose": "The system's only easing curve. Use for every transition." },
+      { "name": "duration-fast", "value": "0.3s", "purpose": "Form focus, nav hover, color/border state changes." },
+      { "name": "duration-default", "value": "0.4s", "purpose": "Button hover, transform, shadow transitions." },
+      { "name": "duration-card", "value": "0.55s", "purpose": "Card transforms — slow enough to feel deliberate." },
+      { "name": "fade-in", "value": "0.5s ease-out-quint", "purpose": "Mount fades for screens and overlays." },
+      { "name": "slide-up", "value": "0.7s ease-out-quint", "purpose": "Section entrances; staggered with .animate-stagger-in." },
+      { "name": "scale-in", "value": "0.7s ease-out-quint", "purpose": "Modal/floating-panel entrances." },
+      { "name": "status-sheen", "value": "0.75s ease-out-quint", "purpose": "Left-to-right gloss across status pills on hover. One-off, not looping." },
+      { "name": "pulse-ring", "value": "1.5s ease-out infinite", "purpose": "Live-state indicator. The one infinite animation, only for system-live cues." }
+    ],
+    "breakpoints": [
+      { "name": "mobile-max", "value": "809px" },
+      { "name": "content-max", "value": "1240px" }
+    ]
+  },
+  "components": [
+    {
+      "name": "Primary Button",
+      "kind": "button",
+      "refersTo": "button-primary",
+      "description": "The default dark CTA with an inset Console Green icon chip on the right.",
+      "html": "<button class=\"ds-btn-primary\"><span class=\"ds-btn-text\">CONFIRM BOOKING</span><span class=\"ds-btn-icon\"><svg width=\"16\" height=\"16\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2.4\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><path d=\"M5 12h14M13 5l7 7-7 7\"/></svg></span></button>",
+      "css": ".ds-btn-primary { display: inline-flex; align-items: center; justify-content: center; gap: 10px; min-height: 52px; padding: 6px 6px 6px 16px; background: #131313; color: #ffffff; border: 1px solid transparent; border-radius: 4px; font-family: 'Satoshi', sans-serif; font-size: 18px; font-weight: 500; letter-spacing: -0.02em; line-height: 1; cursor: pointer; transition: transform 0.4s cubic-bezier(0.2, 1, 0.3, 1), box-shadow 0.4s cubic-bezier(0.2, 1, 0.3, 1); } .ds-btn-primary:hover { transform: translateY(-1px); box-shadow: 0 16px 30px rgb(19 19 19 / 0.12); } .ds-btn-primary:active { transform: translateY(1px); } .ds-btn-primary:focus-visible { outline: 2px solid #98fe00; outline-offset: 2px; } .ds-btn-icon { width: 40px; height: 40px; display: inline-flex; align-items: center; justify-content: center; background: #98fe00; color: #131313; border-radius: 2px; transition: background-color 0.35s ease; }"
+    },
+    {
+      "name": "Green Button",
+      "kind": "button",
+      "refersTo": "button-green",
+      "description": "The 'primary primary'. One per surface; outshouts the dark variant.",
+      "html": "<button class=\"ds-btn-green\"><span>BOOK NOW</span><span class=\"ds-btn-green-icon\"><svg width=\"16\" height=\"16\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2.4\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><path d=\"M5 12h14M13 5l7 7-7 7\"/></svg></span></button>",
+      "css": ".ds-btn-green { display: inline-flex; align-items: center; justify-content: center; gap: 10px; min-height: 52px; padding: 6px 6px 6px 16px; background: #98fe00; color: #131313; border: 1px solid transparent; border-radius: 4px; font-family: 'Satoshi', sans-serif; font-size: 18px; font-weight: 500; letter-spacing: -0.02em; line-height: 1; cursor: pointer; transition: transform 0.4s cubic-bezier(0.2, 1, 0.3, 1), box-shadow 0.4s cubic-bezier(0.2, 1, 0.3, 1); } .ds-btn-green:hover { transform: translateY(-1px); box-shadow: 0 16px 30px rgb(152 254 0 / 0.16); } .ds-btn-green:active { transform: translateY(1px); } .ds-btn-green:focus-visible { outline: 2px solid #131313; outline-offset: 2px; } .ds-btn-green-icon { width: 40px; height: 40px; display: inline-flex; align-items: center; justify-content: center; background: #131313; color: #98fe00; border-radius: 2px; }"
+    },
+    {
+      "name": "Secondary Button",
+      "kind": "button",
+      "refersTo": "button-secondary",
+      "description": "Outlined alternative for paired actions.",
+      "html": "<button class=\"ds-btn-secondary\"><span>GO BACK</span></button>",
+      "css": ".ds-btn-secondary { display: inline-flex; align-items: center; justify-content: center; gap: 10px; min-height: 52px; padding: 6px 16px; background: transparent; color: #131313; border: 1px solid #d3d3d3; border-radius: 4px; font-family: 'Satoshi', sans-serif; font-size: 18px; font-weight: 500; letter-spacing: -0.02em; line-height: 1; cursor: pointer; transition: transform 0.4s cubic-bezier(0.2, 1, 0.3, 1), border-color 0.4s cubic-bezier(0.2, 1, 0.3, 1), background-color 0.4s cubic-bezier(0.2, 1, 0.3, 1); } .ds-btn-secondary:hover { transform: translateY(-1px); background: #f3f3f3; border-color: #131313; } .ds-btn-secondary:focus-visible { outline: 2px solid #131313; outline-offset: 2px; }"
+    },
+    {
+      "name": "Text Input",
+      "kind": "input",
+      "refersTo": "input",
+      "description": "Calm field, focus expressed as elevation rather than coloured ring.",
+      "html": "<label class=\"ds-field\"><span class=\"ds-field-label\">/ EMAIL</span><input class=\"ds-input\" type=\"email\" placeholder=\"you@domain.com\" /></label>",
+      "css": ".ds-field { display: flex; flex-direction: column; gap: 8px; } .ds-field-label { font-family: 'Roboto Mono', monospace; font-size: 11px; line-height: 1.4; letter-spacing: 0.08em; text-transform: uppercase; color: #7d8082; } .ds-input { width: 100%; min-height: 48px; padding: 12px 16px; background: #ffffff; color: #131313; border: 1px solid #d3d3d3; border-radius: 4px; font-family: 'Satoshi', sans-serif; font-size: 16px; line-height: 1.5; font-weight: 500; letter-spacing: -0.01em; transition: border-color 0.3s ease, box-shadow 0.3s ease, transform 0.3s ease; } .ds-input::placeholder { color: #7d8082; } .ds-input:focus { outline: none; border-color: #131313; box-shadow: 0 0 0 3px rgb(19 19 19 / 0.06); transform: translateY(-1px); }"
+    },
+    {
+      "name": "Page Card",
+      "kind": "card",
+      "refersTo": "card",
+      "description": "The default container. One step of tonal lift, one hairline, very soft shadow.",
+      "html": "<article class=\"ds-card\"><header class=\"ds-card-head\"><span class=\"ds-section-label\">RIDE</span></header><div class=\"ds-data-pair\"><span>PICKUP</span><span>Heathrow T5</span></div><div class=\"ds-data-pair\"><span>DROPOFF</span><span>Mayfair, W1</span></div><div class=\"ds-data-pair\"><span>FARE</span><span>£62.40</span></div></article>",
+      "css": ".ds-card { display: flex; flex-direction: column; gap: 16px; padding: 24px; background: #ffffff; border: 1px solid #e5e5e5; border-radius: 4px; box-shadow: 0 14px 40px rgb(19 19 19 / 0.06); transition: transform 0.55s cubic-bezier(0.2, 1, 0.3, 1), box-shadow 0.45s cubic-bezier(0.2, 1, 0.3, 1); } .ds-card-head { display: flex; align-items: center; gap: 8px; } .ds-section-label { display: flex; align-items: center; gap: 8px; font-family: 'Roboto Mono', monospace; font-size: 11px; letter-spacing: 0.08em; text-transform: uppercase; color: #7d8082; flex: 1; } .ds-section-label::before { content: '/'; } .ds-section-label::after { content: ''; flex: 1; height: 1px; background: #e5e5e5; } .ds-data-pair { display: flex; justify-content: space-between; gap: 16px; } .ds-data-pair > span:first-child { font-family: 'Roboto Mono', monospace; font-size: 11px; letter-spacing: 0.08em; text-transform: uppercase; color: #7d8082; } .ds-data-pair > span:last-child { font-family: 'Satoshi', sans-serif; font-size: 16px; font-weight: 500; letter-spacing: -0.01em; color: #131313; text-align: right; }"
+    },
+    {
+      "name": "Status Pill — Completed",
+      "kind": "chip",
+      "refersTo": "status-pill",
+      "description": "One status hue per booking lifecycle state. Mono-typed, sheen on hover.",
+      "html": "<span class=\"ds-status-pill ds-status-completed\">COMPLETED</span>",
+      "css": ".ds-status-pill { display: inline-flex; align-items: center; justify-content: center; gap: 6px; min-height: 28px; padding: 6px 10px; border-radius: 4px; border: 1px solid #d3d3d3; background: #ffffff; color: #131313; font-family: 'Roboto Mono', monospace; font-size: 11px; line-height: 1; letter-spacing: 0.06em; text-transform: uppercase; position: relative; overflow: hidden; transition: transform 0.3s ease, border-color 0.3s ease; } .ds-status-pill:hover { transform: translateY(-1px); } .ds-status-completed { background: rgb(152 254 0 / 0.2); color: #131313; border-color: rgb(152 254 0 / 0.45); }"
+    },
+    {
+      "name": "Nav Link",
+      "kind": "nav",
+      "refersTo": "nav-link",
+      "description": "Top-bar link. Mono uppercase voice; lift on hover.",
+      "html": "<a href=\"#\" class=\"ds-nav-link ds-nav-link-active\">BOOKINGS</a>",
+      "css": ".ds-nav-link { display: inline-flex; align-items: center; min-height: 44px; padding: 10px 16px; border-radius: 4px; border: 1px solid transparent; background: transparent; font-family: 'Satoshi', sans-serif; font-size: 11px; font-weight: 500; line-height: 1.5; letter-spacing: 0.01em; text-transform: uppercase; color: #7d8082; text-decoration: none; transition: color 0.3s ease, border-color 0.3s ease, background-color 0.3s ease, transform 0.3s ease; } .ds-nav-link:hover, .ds-nav-link-active { color: #131313; border-color: #d3d3d3; background: #ffffff; } .ds-nav-link:hover { transform: translateY(-1px); } .ds-nav-link:focus-visible { outline: 2px solid #131313; outline-offset: 2px; }"
+    },
+    {
+      "name": "Stepper Dot — Complete",
+      "kind": "custom",
+      "refersTo": null,
+      "description": "Booking-flow step indicator; the licensed home of Console Green as a leader.",
+      "html": "<div class=\"ds-step-row\"><span class=\"ds-step-dot ds-step-dot-complete\">1</span><span class=\"ds-step-label\">JOURNEY</span></div>",
+      "css": ".ds-step-row { display: flex; align-items: center; gap: 12px; } .ds-step-dot { width: 36px; height: 36px; display: inline-flex; align-items: center; justify-content: center; border-radius: 4px; border: 1px solid #d3d3d3; background: #ffffff; font-family: 'Roboto Mono', monospace; font-size: 12px; color: #7d8082; transition: transform 0.35s cubic-bezier(0.2, 1, 0.3, 1), background-color 0.35s ease, color 0.35s ease, border-color 0.35s ease; } .ds-step-dot-complete { background: #98fe00; border-color: #98fe00; color: #131313; transform: scale(1.02); } .ds-step-label { font-family: 'Roboto Mono', monospace; font-size: 11px; letter-spacing: 0.08em; text-transform: uppercase; color: #131313; }"
+    }
+  ],
+  "narrative": {
+    "northStar": "The Concierge Console",
+    "overview": "A near-monochrome console with a single charged accent. The system reads like a well-built dispatch tool worn into a consumer surface: light off-white background, near-black for everything that matters, lime-green when the system needs to shout. Mono labels precede content like channel markers, so a glance lands the eye on the right field before the body type is even read. Information density is high; ornament is low. The surface is pre-committed: light, calm, untextured. Decoration belongs to the data, not the chrome.",
+    "keyCharacteristics": [
+      "Light surface (#f9f9f9) as the immutable canvas; near-black (#131313) does the heavy lifting.",
+      "One accent: lime green #98fe00. Used on ≤10% of any screen, never decoratively.",
+      "Sharp default radius: 4px. Larger radii (14px / 20px) are reserved for floating panels and modals only.",
+      "Mono labels (Roboto Mono, 11px, uppercase, letter-spaced) precede every section, field, and metric.",
+      "Dual-band sizing: cards and inputs at 28-52px heights; display type at 32-80px.",
+      "Motion is exclusively cubic-bezier(0.2, 1, 0.3, 1) (ease-out-quint). State only, no choreography."
+    ],
+    "rules": [
+      { "name": "The One Voice Rule", "body": "Console Green appears on no more than 10% of any given screen. It marks one thing per surface — the active CTA, the completed step, the live status — never two simultaneously.", "section": "colors" },
+      { "name": "The No-Black-On-White Rule", "body": "Pure #000 is forbidden. Every dark surface uses Concierge Black #131313, paired with off-white canvas #f9f9f9.", "section": "colors" },
+      { "name": "The Status-Hue Lockbox Rule", "body": "Each status hue maps to exactly one booking lifecycle state. They are not borrowed for other UI roles.", "section": "colors" },
+      { "name": "The Mono Label Rule", "body": "Every section heading, field label, table header, and data key is set in Roboto Mono 11px uppercase with 0.08em tracking. Satoshi is never used at small sizes uppercase; mono is never used at body sizes.", "section": "typography" },
+      { "name": "The Slash Marker Rule", "body": "Section labels render with a leading / glyph and a trailing flex-fill hairline. This is the system's signature; do not strip it.", "section": "typography" },
+      { "name": "The Negative Tracking Rule", "body": "All Satoshi sizes use slightly negative letter-spacing. Positive tracking on Satoshi is forbidden.", "section": "typography" },
+      { "name": "The Flat-By-Default Rule", "body": "Surfaces are flat. Shadow is a response to state — hover, focus, overlay — not a default treatment.", "section": "elevation" },
+      { "name": "The 4px Radius Rule", "body": "The default radius is 4px. Use 14px and 20px only for floating overlays. Do not introduce a new radius value mid-system.", "section": "elevation" }
+    ],
+    "dos": [
+      "Do read packages/frontend/src/styles/theme.css before writing any new component. Use the existing utility classes (.page-card, .ds-input, .btn-primary, .section-label, .data-pair, .status-pill) before introducing new ones.",
+      "Do use Console Green (#98fe00) for exactly one 'loudest thing' per screen — confirmed status, completed step, the single primary CTA when it needs to outshout black. Never two greens visible at once.",
+      "Do prefix every section, field, and table header with a Roboto Mono 11px uppercase label, letter-spaced 0.08em. Use .section-label so the leading / and trailing hairline come for free.",
+      "Do use Concierge Black #131313 for the dark anchor and Off-White Canvas #f9f9f9 for the light anchor — these are paired, not interchangeable with #000 / #fff.",
+      "Do keep the default radius at 4px. Reserve 14px / 20px for floating overlays.",
+      "Do use cubic-bezier(0.2, 1, 0.3, 1) (ease-out-quint) for every transition.",
+      "Do keep mobile primary: design the booking flow at 360–414px first, adapt up.",
+      "Do lean into the existing motion library (fade-in, slide-up, scale-in, pulse-ring, status-sheen, icon-diagonal-shift)."
+    ],
+    "donts": [
+      "Don't introduce a parallel design system — new buttons, new cards, new pills with different paddings or radii. Extend theme.css; never compete with it.",
+      "Don't use Console Green for body text, large fills, decorative borders, or any role beyond signalling completion / activation.",
+      "Don't use pure #000 or pure #fff anywhere. Always Concierge Black #131313 and Surface White #ffffff.",
+      "Don't use border-left greater than 1px as a coloured side-stripe on cards, alerts, or list items.",
+      "Don't use background-clip: text with a gradient. There are no gradient texts in this system.",
+      "Don't use glassmorphism outside .floating-panel, .app-topbar, and .modal-panel.",
+      "Don't build hero sections from a giant number, small label, and three supporting metrics in cards — the SaaS hero-metric template.",
+      "Don't repeat identical icon-and-text card grids.",
+      "Don't use modals as the first thought. Reach for .modal-panel only for confirms and edits that genuinely block.",
+      "Don't narrate steps with marketing copy. Mono labels carry the structure.",
+      "Don't use em dashes in UI copy."
+    ]
+  }
+}

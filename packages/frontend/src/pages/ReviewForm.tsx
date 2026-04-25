@@ -9,10 +9,9 @@ import { useToast } from "../context/ToastContext";
 interface Props {
   bookingId: number | null;
   onClose: () => void;
-  onSubmitted?: () => void;
 }
 
-export default function ReviewForm({ bookingId, onClose, onSubmitted }: Props) {
+export default function ReviewForm({ bookingId, onClose }: Props) {
   const [rating, setRating] = useState(0);
   const [comment, setComment] = useState("");
   const [driverId, setDriverId] = useState<number | null>(null);
@@ -25,24 +24,11 @@ export default function ReviewForm({ bookingId, onClose, onSubmitted }: Props) {
     setRating(0);
     setComment("");
     setError("");
-    setDriverId(null);
     // Fetch booking to get driver ID
-    getBooking(bookingId)
-      .then((data) => {
-        const primaryActive = data.assignments.find(
-          (a) => a.isActive && a.role === "primary",
-        );
-        const fallbackActive = data.assignments.find((a) => a.isActive);
-        const selected = primaryActive || fallbackActive;
-        if (selected) {
-          setDriverId(selected.driverId);
-        } else {
-          setError("No active driver assignment found for this booking");
-        }
-      })
-      .catch(() => {
-        setError("Unable to load booking details");
-      });
+    getBooking(bookingId).then((data) => {
+      const activeDriver = data.assignments.find((a) => a.isActive);
+      if (activeDriver) setDriverId(activeDriver.driverId);
+    });
   }, [bookingId]);
 
   async function handleSubmit(e: React.FormEvent) {
@@ -58,7 +44,6 @@ export default function ReviewForm({ bookingId, onClose, onSubmitted }: Props) {
         comment: comment || undefined,
       });
       toast.success("Review submitted — thank you!");
-      onSubmitted?.();
       onClose();
     } catch (err) {
       setError(err instanceof ApiError ? err.message : "Failed to submit");
@@ -93,7 +78,7 @@ export default function ReviewForm({ bookingId, onClose, onSubmitted }: Props) {
         </div>
         <button
           type="submit"
-          disabled={loading || !rating || !driverId}
+          disabled={loading || !rating}
           className="btn-primary w-full"
         >
           {loading ? "Submitting..." : "Submit Review"}

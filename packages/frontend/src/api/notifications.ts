@@ -1,28 +1,34 @@
 import { api } from "./client";
 
-export async function getNotificationPublicKey() {
+export function getPublicKey() {
   return api.get<{ publicKey: string }>("/api/notifications/public-key");
 }
 
-export async function subscribeNotifications(data: {
+export interface PushSubscriptionRow {
+  id: number;
+  endpoint: string;
+  createdAt: string;
+}
+
+export function listSubscriptions() {
+  return api.get<{ subscriptions: PushSubscriptionRow[] }>(
+    "/api/notifications/subscriptions",
+  );
+}
+
+export function subscribe(input: {
   endpoint: string;
   p256dh: string;
   auth: string;
 }) {
-  return api.post<{ subscription: { id: number; endpoint: string } }>(
+  return api.post<{ subscription: PushSubscriptionRow }>(
     "/api/notifications/subscribe",
-    data,
+    input,
   );
 }
 
-export async function unsubscribeNotifications(endpoint: string) {
+export function unsubscribe(endpoint: string) {
   return api.post<{ message: string }>("/api/notifications/unsubscribe", {
     endpoint,
   });
-}
-
-export async function listNotificationSubscriptions() {
-  return api.get<{
-    subscriptions: Array<{ id: number; endpoint: string; createdAt: string }>;
-  }>("/api/notifications/subscriptions");
 }

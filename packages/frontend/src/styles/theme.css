@@ -92,6 +92,34 @@
   }
 }
 
+/* Direction-aware panel-step transitions: the new card slides in from the
+   advancing side with a slight scale-up. Ease-out-quint reads as a snappy
+   "settle" — no elastic overshoot, no bounce; the directional slide carries
+   the kinetic energy. */
+@keyframes step-enter-forward {
+  from {
+    opacity: 0;
+    transform: translate3d(28px, 0, 0) scale(0.97);
+  }
+
+  to {
+    opacity: 1;
+    transform: translate3d(0, 0, 0) scale(1);
+  }
+}
+
+@keyframes step-enter-back {
+  from {
+    opacity: 0;
+    transform: translate3d(-28px, 0, 0) scale(0.97);
+  }
+
+  to {
+    opacity: 1;
+    transform: translate3d(0, 0, 0) scale(1);
+  }
+}
+
 @keyframes pulse-ring {
   0% {
     box-shadow: 0 0 0 0 currentColor;
@@ -162,6 +190,21 @@
   animation: slide-up 0.8s cubic-bezier(0.2, 1, 0.3, 1) both;
 }
 
+.animate-step-forward {
+  animation: step-enter-forward 0.45s cubic-bezier(0.2, 1, 0.3, 1) both;
+}
+
+.animate-step-back {
+  animation: step-enter-back 0.45s cubic-bezier(0.2, 1, 0.3, 1) both;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .animate-step-forward,
+  .animate-step-back {
+    animation: fade-in 0.2s ease-out both;
+  }
+}
+
 .skeleton {
   background: linear-gradient(
     90deg,
@@ -196,6 +239,13 @@
   background: var(--color-bg);
 }
 
+/* Real safe-area bottom padding utility (was being referenced as a class on
+   the mobile bottom nav but never defined). Adds enough padding for the iOS
+   home indicator without doubling normal padding on devices without one. */
+.safe-area-inset-bottom {
+  padding-bottom: max(0.5rem, env(safe-area-inset-bottom));
+}
+
 .app-topbar {
   position: sticky;
   top: 0;
@@ -212,20 +262,156 @@
   padding: 32px 20px 40px;
 }
 
-.app-brand {
+/* Brand: dark monogram chip ("TC", Roboto Mono, lime-on-dark) + display
+   wordmark. The chip mirrors the route block's P/D markers so the brand
+   reads as a native part of the same visual system. */
+.brand-link {
   display: inline-flex;
   align-items: center;
-  gap: 12px;
-  color: var(--color-dark);
-  font-family: var(--font-display);
-  font-size: 18px;
-  font-weight: 700;
-  letter-spacing: -0.03em;
-  transition: opacity 0.3s ease;
+  gap: 10px;
+  text-decoration: none;
+  transition:
+    transform 0.3s cubic-bezier(0.2, 1, 0.3, 1),
+    opacity 0.3s ease;
 }
 
-.app-brand:hover {
-  opacity: 0.82;
+.brand-link:hover {
+  opacity: 0.88;
+}
+
+.brand-link:active {
+  transform: translateY(1px);
+}
+
+.brand-link:focus-visible {
+  outline: 2px solid var(--color-dark);
+  outline-offset: 4px;
+  border-radius: 2px;
+}
+
+.brand-mark {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  flex: none;
+  background: var(--color-dark);
+  color: var(--color-green);
+  border-radius: var(--radius-default);
+  font-family: var(--font-mono);
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  line-height: 1;
+  transition:
+    box-shadow 0.4s cubic-bezier(0.2, 1, 0.3, 1);
+}
+
+.brand-link:hover .brand-mark {
+  box-shadow: 0 8px 18px rgb(19 19 19 / 0.18);
+}
+
+.brand-wordmark {
+  font-family: var(--font-display);
+  font-size: 17px;
+  font-weight: 700;
+  line-height: 1;
+  letter-spacing: -0.03em;
+  color: var(--color-dark);
+}
+
+/* Compact user chip in the topbar: mono initial avatar + name + role label.
+   Replaces the "Signed In" eyebrow + name combo. */
+.user-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  padding: 4px 10px 4px 4px;
+  border-radius: var(--radius-default);
+  border: 1px solid transparent;
+  transition:
+    background-color 0.3s ease,
+    border-color 0.3s ease;
+}
+
+.user-chip:hover {
+  background: var(--color-surface);
+  border-color: var(--color-border-light);
+}
+
+.user-chip-initial {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  flex: none;
+  border-radius: var(--radius-default);
+  background: var(--color-dark);
+  color: var(--color-green);
+  font-family: var(--font-mono);
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+}
+
+.user-chip-text {
+  display: flex;
+  flex-direction: column;
+  text-align: right;
+  line-height: 1.1;
+}
+
+.user-chip-name {
+  font-family: var(--font-body);
+  font-size: 13px;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  color: var(--color-dark);
+  max-width: 14ch;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.user-chip-role {
+  font-family: var(--font-mono);
+  font-size: 9px;
+  letter-spacing: 0.08em;
+  color: var(--color-muted);
+  margin-top: 2px;
+}
+
+/* Square icon button that lives in the topbar. Used for the sign-out
+   action: visually quieter than .btn-ghost so it doesn't compete with the
+   brand or nav. */
+.topbar-icon-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 40px;
+  height: 40px;
+  border-radius: var(--radius-default);
+  border: 1px solid var(--color-border-light);
+  background: transparent;
+  color: var(--color-dark);
+  cursor: pointer;
+  transition:
+    background-color 0.3s ease,
+    border-color 0.3s ease,
+    transform 0.3s cubic-bezier(0.2, 1, 0.3, 1);
+}
+
+.topbar-icon-btn:hover {
+  background: var(--color-surface);
+  border-color: var(--color-dark);
+  transform: translateY(-1px);
+}
+
+.topbar-icon-btn:focus-visible {
+  outline: 2px solid var(--color-dark);
+  outline-offset: 2px;
 }
 
 .mono-label,
@@ -701,6 +887,7 @@
   height: 4px;
   border-radius: var(--radius-default);
   background: var(--color-border);
+  transition: background-color 0.45s cubic-bezier(0.2, 1, 0.3, 1);
 }
 
 .progress-rail-active,
@@ -1084,10 +1271,540 @@
     box-shadow 0.45s cubic-bezier(0.2, 1, 0.3, 1);
 }
 
+/* Booking-flow floating panel: slides from screen center to right edge as the
+   user moves past step 1, freeing the map to show the live route.
+   Padding + inner card padding scale with viewport height via clamp() so the
+   content tightens automatically on shorter screens, avoiding scroll. */
+.booking-flow-panel {
+  position: absolute;
+  top: 50%;
+  z-index: 1001;
+  width: min(calc(100% - 2rem), 32rem);
+  max-height: calc(100vh - 100px);
+  /* visible so child popovers (autocomplete dropdown, etc.) can escape the
+     panel box. Inner wrapper handles content overflow with its own scroll. */
+  overflow: visible;
+  pointer-events: auto;
+  transition:
+    left 0.7s cubic-bezier(0.2, 1, 0.3, 1),
+    transform 0.7s cubic-bezier(0.2, 1, 0.3, 1),
+    width 0.55s cubic-bezier(0.2, 1, 0.3, 1),
+    height 0.55s cubic-bezier(0.2, 1, 0.3, 1),
+    box-shadow 0.45s cubic-bezier(0.2, 1, 0.3, 1);
+}
+
+/* Inner wrapper carries the padding so we can measure its offsetHeight cleanly
+   and apply it to the panel. The panel then morphs height between steps.
+   border-radius mirrors the panel so scrolling content respects rounded corners. */
+.booking-flow-panel-inner {
+  padding: clamp(16px, 2.4vh, 24px);
+  max-height: calc(100vh - 100px);
+  overflow-y: auto;
+  border-radius: var(--radius-xl);
+}
+
+/* Density cascade: when the panel contains nested cards (.page-card,
+   .page-card-muted), tighten their padding so the panel doesn't double-pad.
+   Vertical rhythm between blocks also tightens on shorter viewports. */
+.booking-flow-panel .page-card,
+.booking-flow-panel .page-card-muted {
+  padding: clamp(12px, 2vh, 20px);
+}
+
+.booking-flow-panel-inner > * + * {
+  margin-top: clamp(12px, 1.8vh, 20px);
+}
+
+/* Inside the keyed step content wrapper, nested children also tighten. */
+.booking-flow-panel [data-step-content] > * + * {
+  margin-top: clamp(10px, 1.6vh, 16px);
+}
+
+.booking-flow-panel[data-anchor="center"] {
+  left: 50%;
+  transform: translate(-50%, -50%);
+}
+
+.booking-flow-panel[data-anchor="right"] {
+  left: calc(100% - 32rem - 2rem);
+  transform: translate(0, -50%);
+}
+
+@media (max-width: 809px) {
+  .booking-flow-panel,
+  .booking-flow-panel[data-anchor="center"],
+  .booking-flow-panel[data-anchor="right"] {
+    top: auto;
+    /* respects iOS home-indicator safe area */
+    bottom: max(0.75rem, env(safe-area-inset-bottom));
+    left: 0.75rem;
+    right: 0.75rem;
+    width: auto;
+    max-height: calc(100dvh - 140px);
+    transform: none;
+  }
+
+  /* Inner wrapper mirrors the panel's mobile cap so its scroll boundary
+     matches the visible panel, not a desktop-sized cap. */
+  .booking-flow-panel-inner {
+    max-height: calc(100dvh - 140px);
+  }
+}
+
+/* Vehicle picker row: list-shaped (no card wrapper around the icon, no
+   per-row card chrome competing with the panel). The whole row is the
+   affordance; selection is signalled by a tinted background, dark border,
+   and a check disc on the right. Stays inside the floating panel without
+   reading as nested cards. */
+.vehicle-row {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  width: 100%;
+  padding: 14px 16px;
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-default);
+  text-align: left;
+  cursor: pointer;
+  position: relative;
+  transition:
+    background-color 0.4s cubic-bezier(0.2, 1, 0.3, 1),
+    border-color 0.4s cubic-bezier(0.2, 1, 0.3, 1),
+    transform 0.45s cubic-bezier(0.2, 1, 0.3, 1);
+}
+
+.vehicle-row:hover {
+  border-color: var(--color-border-light);
+  transform: translateY(-1px);
+}
+
+.vehicle-row:focus-visible {
+  outline: 2px solid var(--color-dark);
+  outline-offset: 2px;
+}
+
+.vehicle-row.is-selected {
+  background: rgb(152 254 0 / 0.08);
+  border-color: var(--color-dark);
+}
+
+.vehicle-row-glyph {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 44px;
+  height: 44px;
+  color: var(--color-dark);
+  transition: color 0.4s cubic-bezier(0.2, 1, 0.3, 1);
+}
+
+.vehicle-row-body {
+  flex: 1;
+  min-width: 0;
+}
+
+.vehicle-row-name {
+  font-family: var(--font-display);
+  font-size: 18px;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  line-height: 1.15;
+  color: var(--color-dark);
+}
+
+.vehicle-row-meta {
+  margin-top: 4px;
+}
+
+.vehicle-row-price {
+  flex: none;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 4px;
+}
+
+.vehicle-row-amount {
+  font-family: var(--font-display);
+  font-size: 20px;
+  font-weight: 700;
+  letter-spacing: -0.03em;
+  line-height: 1;
+  color: var(--color-dark);
+}
+
+/* Check disc: lives on the right side of the row, off when unselected
+   (transparent ring), filled green with dark check when selected. */
+.vehicle-row-tick {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  border-radius: 999px;
+  border: 1.5px solid var(--color-border-light);
+  background: transparent;
+  color: transparent;
+  transition:
+    background-color 0.35s cubic-bezier(0.2, 1, 0.3, 1),
+    border-color 0.35s cubic-bezier(0.2, 1, 0.3, 1),
+    color 0.35s cubic-bezier(0.2, 1, 0.3, 1),
+    transform 0.35s cubic-bezier(0.2, 1, 0.3, 1);
+}
+
+.vehicle-row.is-selected .vehicle-row-tick {
+  background: var(--color-green);
+  border-color: var(--color-green);
+  color: var(--color-dark);
+  transform: scale(1.05);
+}
+
+.vehicle-row .vehicle-row-tick svg {
+  opacity: 0;
+  transition: opacity 0.3s cubic-bezier(0.2, 1, 0.3, 1);
+}
+
+.vehicle-row.is-selected .vehicle-row-tick svg {
+  opacity: 1;
+}
+
+/* Customer ride detail panel layout: dense, icon-led, no nested cards. */
+
+.ride-detail {
+  display: flex;
+  flex-direction: column;
+  gap: clamp(16px, 2.2vh, 22px);
+}
+
+.ride-detail-topbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  min-height: 28px;
+  flex-wrap: wrap;
+}
+
+/* Right-side cluster (live dot + airport chip + status pill) wraps as a
+   group, so on narrow screens the back link stays alone on top and the
+   pills move to the next row instead of overlapping. */
+.ride-detail-topbar > div {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+
+.ride-detail-hero {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding-bottom: clamp(12px, 1.8vh, 18px);
+  border-bottom: 1px solid var(--color-border);
+}
+
+/* Route block: pickup + dropoff stacked, each with a leading P/D chip that
+   mirrors the leaflet map markers (forest/dark, mono letter, sharp 4px). A
+   thin spine line connects the two markers vertically. */
+.ride-detail-route {
+  display: flex;
+  flex-direction: column;
+  margin-top: 2px;
+  position: relative;
+}
+
+.ride-detail-route-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-width: 0;
+}
+
+.ride-detail-route-marker {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  flex: none;
+  border-radius: var(--radius-default);
+  font-family: var(--font-mono);
+  font-size: 11px;
+  font-weight: 700;
+  line-height: 1;
+  border: 1px solid var(--color-dark);
+  z-index: 1;
+}
+
+.ride-detail-route-marker.is-pickup {
+  background: var(--color-green);
+  color: var(--color-dark);
+}
+
+.ride-detail-route-marker.is-dropoff {
+  background: var(--color-dark);
+  color: var(--color-green);
+  border-color: var(--color-green);
+}
+
+.ride-detail-route-spine {
+  width: 1px;
+  height: 14px;
+  margin-left: 11px; /* center under marker */
+  background: var(--color-border);
+  margin-top: 2px;
+  margin-bottom: 2px;
+}
+
+.ride-detail-route-text {
+  font-family: var(--font-display);
+  font-size: clamp(18px, 2.4vh, 22px);
+  font-weight: 700;
+  line-height: 1.15;
+  letter-spacing: -0.03em;
+  color: var(--color-dark);
+  min-width: 0;
+  flex: 1;
+  margin: 0;
+  /* allow wrap to a second line if a long name needs it */
+  overflow-wrap: anywhere;
+  word-break: normal;
+}
+
+.ride-detail-meta {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-family: var(--font-body);
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--color-muted);
+}
+
+.ride-detail-live-dot {
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  border-radius: 999px;
+  background: var(--color-green);
+  color: rgb(152 254 0 / 0.6);
+  animation: pulse-ring 1.6s ease-out infinite;
+}
+
+.ride-detail-driver {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  margin-top: 6px;
+}
+
+.ride-detail-driver-chip {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 44px;
+  height: 44px;
+  flex: none;
+  border-radius: var(--radius-default);
+  background: var(--color-surface-alt);
+  color: var(--color-dark);
+  border: 1px solid var(--color-border-light);
+}
+
+.ride-detail-driver-name {
+  font-family: var(--font-body);
+  font-size: 16px;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+  color: var(--color-dark);
+  line-height: 1.2;
+  margin-bottom: 2px;
+}
+
+.ride-detail-driver-call {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 44px;
+  height: 44px;
+  flex: none;
+  border-radius: var(--radius-default);
+  background: var(--color-green);
+  color: var(--color-dark);
+  transition:
+    transform 0.3s cubic-bezier(0.2, 1, 0.3, 1),
+    box-shadow 0.3s cubic-bezier(0.2, 1, 0.3, 1);
+}
+
+.ride-detail-driver-call:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 8px 18px rgb(152 254 0 / 0.22);
+}
+
+.ride-detail-timeline {
+  display: flex;
+  align-items: flex-start;
+  gap: 0;
+  margin-top: 6px;
+  list-style: none;
+  padding: 0;
+}
+
+.ride-detail-timeline-step {
+  flex: 1 1 0;
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  min-width: 0;
+}
+
+.ride-detail-timeline-dot {
+  width: 26px;
+  height: 26px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 999px;
+  border: 1px solid var(--color-border-light);
+  background: var(--color-surface);
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--color-muted);
+  position: relative;
+  z-index: 1;
+  transition:
+    background-color 0.4s cubic-bezier(0.2, 1, 0.3, 1),
+    border-color 0.4s cubic-bezier(0.2, 1, 0.3, 1),
+    color 0.4s cubic-bezier(0.2, 1, 0.3, 1),
+    transform 0.4s cubic-bezier(0.2, 1, 0.3, 1);
+}
+
+.ride-detail-timeline-dot.is-active {
+  background: var(--color-dark);
+  border-color: var(--color-dark);
+  color: var(--color-surface);
+  transform: scale(1.08);
+}
+
+.ride-detail-timeline-dot.is-complete {
+  background: var(--color-green);
+  border-color: var(--color-green);
+  color: var(--color-dark);
+}
+
+.ride-detail-timeline-line {
+  position: absolute;
+  top: 13px;
+  left: 50%;
+  width: 100%;
+  height: 1px;
+  background: var(--color-border);
+  z-index: 0;
+  transition: background-color 0.4s cubic-bezier(0.2, 1, 0.3, 1);
+}
+
+.ride-detail-timeline-line.is-complete {
+  background: var(--color-green);
+}
+
+.ride-detail-timeline-current {
+  margin-top: 10px;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--color-dark);
+  font-weight: 700;
+  text-align: center;
+}
+
+.ride-detail-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px 16px;
+  margin: 8px 0 0;
+}
+
+.ride-detail-grid-cell {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.ride-detail-grid-cell dt {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--color-muted);
+}
+
+.ride-detail-grid-cell dd {
+  font-family: var(--font-body);
+  font-size: 14px;
+  font-weight: 500;
+  letter-spacing: -0.01em;
+  color: var(--color-dark);
+  margin: 0;
+}
+
+.ride-detail-total {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 12px;
+  padding-top: clamp(10px, 1.4vh, 14px);
+  border-top: 1px solid var(--color-border);
+}
+
+.ride-detail-total-amount {
+  font-family: var(--font-display);
+  font-size: 24px;
+  font-weight: 700;
+  letter-spacing: -0.03em;
+  color: var(--color-dark);
+  line-height: 1;
+}
+
+.ride-detail-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding-top: 2px;
+}
+
+.ride-detail .section-label {
+  margin-bottom: 8px;
+}
+
+/* The eyebrow (`/ Ride #N`) sits just above the route block; pull it close. */
+.ride-detail-hero .page-eyebrow {
+  margin-bottom: 2px;
+}
+
+/* Total row: baseline align so the mono "Total" label aligns to the bottom
+   of the big numeric amount. */
+.ride-detail-total {
+  align-items: baseline;
+}
+
+.ride-detail-total > div:first-child {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
 @media (max-width: 809px) {
   .app-main {
     padding-top: 24px;
-    padding-bottom: 96px;
+    /* clears the mobile bottom nav (~64px) plus iOS home-indicator */
+    padding-bottom: calc(96px + env(safe-area-inset-bottom));
   }
 
   .page-header {

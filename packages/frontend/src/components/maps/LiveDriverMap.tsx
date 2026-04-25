@@ -1,21 +1,18 @@
-import { useEffect, useState, useRef } from "react";
-import {
-  MapContainer,
-  TileLayer,
-  Polyline,
-  Marker,
-  useMap,
-} from "react-leaflet";
+import { useEffect, useRef, useState } from "react";
+import { MapContainer, TileLayer, Marker, Polyline, useMap } from "react-leaflet";
 import L from "leaflet";
 import { getDriverLocation } from "../../api/bookings";
+import type { DriverLocation } from "shared/types";
 
 interface Coords {
   lat: number;
   lon: number;
 }
 
-const DARK_TILES =
+const TILES =
   "https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png";
+const TILE_ATTR =
+  '&copy; <a href="https://www.openstreetmap.org/copyright">OSM</a> &copy; <a href="https://carto.com/">CARTO</a>';
 
 function pickupIcon() {
   return L.divIcon({
@@ -25,7 +22,6 @@ function pickupIcon() {
     iconAnchor: [12, 12],
   });
 }
-
 function dropoffIcon() {
   return L.divIcon({
     html: '<div style="background:#131313;width:24px;height:24px;border-radius:4px;display:flex;align-items:center;justify-content:center;color:#98fe00;font-family:Roboto Mono,monospace;font-weight:700;font-size:10px;border:1px solid #98fe00;box-shadow:0 6px 14px rgba(19,19,19,.16)">D</div>',
@@ -34,39 +30,22 @@ function dropoffIcon() {
     iconAnchor: [12, 12],
   });
 }
-
 function driverIcon() {
   return L.divIcon({
-    html: '<div style="background:#3b82f6;width:28px;height:28px;border-radius:50%;display:flex;align-items:center;justify-content:center;color:#fff;font-size:14px;border:2px solid #fff;box-shadow:0 4px 12px rgba(59,130,246,.4)">🚗</div>',
+    html: `<div style="position:relative;width:36px;height:36px;display:flex;align-items:center;justify-content:center"><span style="position:absolute;inset:0;border-radius:50%;background:rgba(152,254,0,0.45);animation:pulse-ring 1.5s ease-out infinite"></span><div style="position:relative;background:#131313;width:22px;height:22px;border-radius:50%;display:flex;align-items:center;justify-content:center;color:#98fe00;font-family:Roboto Mono,monospace;font-weight:700;font-size:10px;border:2px solid #98fe00;box-shadow:0 6px 14px rgba(19,19,19,.2)">·</div></div>`,
     className: "",
-    iconSize: [28, 28],
-    iconAnchor: [14, 14],
+    iconSize: [36, 36],
+    iconAnchor: [18, 18],
   });
 }
 
-function FitBounds({
-  pickup,
-  dropoff,
-  driverPos,
-}: {
-  pickup: Coords;
-  dropoff: Coords;
-  driverPos: Coords | null;
-}) {
+function FitBounds({ points }: { points: Coords[] }) {
   const map = useMap();
-  const hasFit = useRef(false);
-
   useEffect(() => {
-    if (hasFit.current) return;
-    const points: L.LatLngExpression[] = [
-      [pickup.lat, pickup.lon],
-      [dropoff.lat, dropoff.lon],
-    ];
-    if (driverPos) points.push([driverPos.lat, driverPos.lon]);
-    map.fitBounds(L.latLngBounds(points), { padding: [30, 30] });
-    hasFit.current = true;
-  }, [map, pickup, dropoff, driverPos]);
-
+    if (!points.length) return;
+    const bounds = L.latLngBounds(points.map((p) => [p.lat, p.lon]));
+    map.fitBounds(bounds, { padding: [40, 40], maxZoom: 14 });
+  }, [map, points.map((p) => `${p.lat},${p.lon}`).join("|")]); // eslint-disable-line react-hooks/exhaustive-deps
   return null;
 }
 
@@ -74,24 +53,35 @@ interface Props {
   bookingId: number;
   pickup: Coords;
   dropoff: Coords;
+  trackable: boolean;
+  onUpdate?: (loc: DriverLocation) => void;
 }
 
-export default function LiveDriverMap({ bookingId, pickup, dropoff }: Props) {
-  const [route, setRoute] = useState<L.LatLngExpression[]>([]);
-  const [driverPos, setDriverPos] = useState<Coords | null>(null);
-  const [lastUpdated, setLastUpdated] = useState<string | null>(null);
+const POLL_MS = 8000;
 
-  // Fetch driving route
+export default function LiveDriverMap({
+  bookingId,
+  pickup,
+  dropoff,
+  trackable,
+  onUpdate,
+}: Props) {
+  const [driver, setDriver] = useState<DriverLocation | null>(null);
+  const [route, setRoute] = useState<L.LatLngExpression[]>([]);
+  const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  // Static OSRM route between pickup and dropoff for the polyline.
   useEffect(() => {
     const url = `https://router.project-osrm.org/route/v1/driving/${pickup.lon},${pickup.lat};${dropoff.lon},${dropoff.lat}?overview=full&geometries=geojson`;
     fetch(url)
       .then((res) => res.json())
       .then((data) => {
         if (data.routes?.[0]) {
-          const coords = data.routes[0].geometry.coordinates.map(
-            (c: [number, number]) => [c[1], c[0]] as L.LatLngExpression,
+          setRoute(
+            data.routes[0].geometry.coordinates.map(
+              (c: [number, number]) => [c[1], c[0]] as L.LatLngExpression,
+            ),
           );
-          setRoute(coords);
         }
       })
       .catch(() => {
@@ -102,83 +92,68 @@ export default function LiveDriverMap({ bookingId, pickup, dropoff }: Props) {
       });
   }, [pickup.lat, pickup.lon, dropoff.lat, dropoff.lon]);
 
-  // Poll driver location every 10s
+  // Poll driver location while trackable and the tab is visible.
   useEffect(() => {
-    let active = true;
-
-    async function poll() {
-      try {
-        const loc = await getDriverLocation(bookingId);
-        if (!active) return;
-        if (loc.lat != null && loc.lon != null) {
-          setDriverPos({ lat: loc.lat, lon: loc.lon });
-          setLastUpdated(loc.lastUpdatedAt);
+    if (!trackable) return;
+    let cancelled = false;
+    async function tick() {
+      if (cancelled) return;
+      if (document.visibilityState === "visible") {
+        try {
+          const loc = await getDriverLocation(bookingId);
+          if (!cancelled) {
+            setDriver(loc);
+            onUpdate?.(loc);
+          }
+        } catch {
+          /* swallow — show last-known on transient error */
         }
-      } catch {
-        // ignore
       }
+      timerRef.current = setTimeout(tick, POLL_MS);
     }
-
-    poll();
-    const interval = setInterval(poll, 10000);
-
+    tick();
     return () => {
-      active = false;
-      clearInterval(interval);
+      cancelled = true;
+      if (timerRef.current) clearTimeout(timerRef.current);
     };
-  }, [bookingId]);
+  }, [bookingId, trackable, onUpdate]);
+
+  const driverCoords =
+    driver && driver.lat != null && driver.lon != null
+      ? { lat: driver.lat, lon: driver.lon }
+      : null;
+  const fitPoints = [pickup, dropoff, ...(driverCoords ? [driverCoords] : [])];
 
   const center: L.LatLngExpression = [
     (pickup.lat + dropoff.lat) / 2,
     (pickup.lon + dropoff.lon) / 2,
   ];
 
-  const timeSince = lastUpdated
-    ? Math.round((Date.now() - new Date(lastUpdated).getTime()) / 1000)
-    : null;
-
   return (
-    <div className="space-y-2">
-      <div className="map-shell h-64 w-full">
-        <MapContainer
-          center={center}
-          zoom={12}
-          className="w-full h-full"
-          zoomControl={false}
-          scrollWheelZoom={false}
-          attributionControl={false}
-        >
-          <TileLayer url={DARK_TILES} />
-          <FitBounds pickup={pickup} dropoff={dropoff} driverPos={driverPos} />
-          <Marker position={[pickup.lat, pickup.lon]} icon={pickupIcon()} />
-          <Marker position={[dropoff.lat, dropoff.lon]} icon={dropoffIcon()} />
-          {driverPos && (
-            <Marker
-              position={[driverPos.lat, driverPos.lon]}
-              icon={driverIcon()}
-            />
-          )}
-          {route.length > 0 && (
-            <Polyline
-              positions={route}
-              pathOptions={{ color: "#131313", weight: 4, opacity: 0.8 }}
-            />
-          )}
-        </MapContainer>
-      </div>
-      {driverPos && timeSince != null && (
-        <p className="mono-label text-center text-xs">
-          Driver location updated{" "}
-          {timeSince < 60
-            ? `${timeSince}s ago`
-            : `${Math.round(timeSince / 60)}m ago`}
-        </p>
-      )}
-      {!driverPos && (
-        <p className="caption-copy text-center text-xs">
-          Waiting for driver location...
-        </p>
-      )}
+    <div className="map-shell h-[320px] w-full">
+      <MapContainer
+        center={center}
+        zoom={12}
+        scrollWheelZoom={false}
+        style={{ height: "100%", width: "100%" }}
+      >
+        <TileLayer url={TILES} attribution={TILE_ATTR} />
+        <FitBounds points={fitPoints} />
+        <Marker position={[pickup.lat, pickup.lon]} icon={pickupIcon()} />
+        <Marker position={[dropoff.lat, dropoff.lon]} icon={dropoffIcon()} />
+        {driverCoords && (
+          <Marker
+            position={[driverCoords.lat, driverCoords.lon]}
+            icon={driverIcon()}
+          />
+        )}
+        {route.length > 0 && (
+          <Polyline
+            positions={route}
+            pathOptions={{ color: "#131313", weight: 4, opacity: 0.75 }}
+          />
+        )}
+      </MapContainer>
     </div>
   );
 }

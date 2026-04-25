@@ -1,9 +1,11 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import type { BookingData } from "../BookingFlow";
+import { clearBookingDraft } from "../BookingFlow";
 import { createBooking } from "../../api/bookings";
 import { formatPrice, formatDate } from "../../lib/format";
 import { ApiError } from "../../api/client";
+import { useToast } from "../../context/ToastContext";
 
 interface Props {
   data: BookingData;
@@ -11,234 +13,164 @@ interface Props {
   onReset: () => void;
 }
 
+/**
+ * Compact a Nominatim-style address ("Heathrow Airport, London Borough of
+ * Hillingdon, London, TW6 1QG, United Kingdom") down to its identifying
+ * head ("Heathrow Airport, London") so the row fits on one line. Full address
+ * is preserved in the title attribute for users who want it.
+ */
+function shortAddress(addr: string): string {
+  if (!addr) return "";
+  const parts = addr
+    .split(",")
+    .map((p) => p.trim())
+    .filter(Boolean);
+  if (parts.length <= 2) return addr;
+  // Drop the country at the end if it's the last segment, then take the first
+  // two segments (place + city/area).
+  const trimmed =
+    parts[parts.length - 1].length <= 14 ? parts.slice(0, -1) : parts;
+  return trimmed.slice(0, 2).join(", ");
+}
+
 export default function Confirmation({ data, onBack, onReset }: Props) {
   const navigate = useNavigate();
-  const [loading, setLoading] = useState(false);
+  const toast = useToast();
+  const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState("");
-  const [success, setSuccess] = useState(false);
-  const [pickupFlightNumber, setPickupFlightNumber] = useState(
-    data.flightNumber || "",
-  );
-  const [dropoffFlightNumber, setDropoffFlightNumber] = useState("");
+
+  const scheduledDate = new Date(`${data.date}T${data.time}`);
 
   async function handleConfirm() {
-    setLoading(true);
+    setSubmitting(true);
     setError("");
     try {
-      const scheduledAt = new Date(`${data.date}T${data.time}`).toISOString();
-      await createBooking({
+      const { booking } = await createBooking({
         pickupAddress: data.pickupAddress,
         dropoffAddress: data.dropoffAddress,
-        scheduledAt,
-        couponCode: data.couponCode,
+        scheduledAt: scheduledDate.toISOString(),
+        vehicleClass: data.vehicleClass,
         pickupLat: data.pickupLat,
         pickupLon: data.pickupLon,
         dropoffLat: data.dropoffLat,
         dropoffLon: data.dropoffLon,
-        pickupFlightNumber: data.isPickupAirport
-          ? pickupFlightNumber || undefined
-          : undefined,
-        dropoffFlightNumber: data.isDropoffAirport
-          ? dropoffFlightNumber || undefined
-          : undefined,
-        vehicleClass: data.vehicleClass,
+        couponCode: data.couponCode,
+        pickupFlightNumber: data.pickupFlightNumber || undefined,
+        dropoffFlightNumber: data.dropoffFlightNumber || undefined,
       });
-      setSuccess(true);
+      clearBookingDraft();
+      toast.success("Booking confirmed");
+      navigate(`/bookings/${booking.id}`, { replace: true });
     } catch (err) {
       setError(err instanceof ApiError ? err.message : "Booking failed");
-    } finally {
-      setLoading(false);
+      setSubmitting(false);
     }
   }
 
-  if (success) {
-    return (
-      <div className="text-center space-y-4 animate-fade-in">
-        <div className="flex justify-center">
-          <svg
-            viewBox="0 0 52 52"
-            className="h-20 w-20 text-[var(--color-green)]"
-            fill="none"
-          >
-            <circle
-              cx="26"
-              cy="26"
-              r="25"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="2"
-            />
-            <path
-              d="M14 27l8 8 16-16"
-              stroke="currentColor"
-              strokeWidth="2.5"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              strokeDasharray="40"
-              strokeDashoffset="40"
-              style={{ animation: "check-stroke 0.4s 0.2s ease forwards" }}
-            />
-          </svg>
-        </div>
-        <h2 className="text-[32px] font-bold leading-[1.1] tracking-[-0.04em] text-[var(--color-dark)]">
-          Booking confirmed
-        </h2>
-        <p className="caption-copy">
-          Your ride from {data.pickupAddress} to {data.dropoffAddress} is
-          scheduled.
-        </p>
-        <div className="flex gap-3 justify-center">
-          <button
-            onClick={() => navigate("/bookings")}
-            className="btn-primary px-4"
-          >
-            View My Bookings
-          </button>
-          <button onClick={onReset} className="btn-secondary px-4">
-            Book Another
-          </button>
-        </div>
-      </div>
-    );
-  }
-
-  const scheduledDate = new Date(`${data.date}T${data.time}`);
-
   return (
-    <div className="space-y-4">
-      <div>
-        <p className="section-label">Step 06</p>
-        <h2 className="mt-4 text-[32px] font-bold leading-[1.1] tracking-[-0.04em] text-[var(--color-dark)]">
-          Confirm booking
-        </h2>
-      </div>
+    <div className="space-y-4 animate-fade-in">
+      <h2 className="text-[22px] font-bold leading-none tracking-[-0.03em] text-[var(--color-dark)]">
+        Review and book
+      </h2>
 
-      <div className="glass-card space-y-3 p-4">
+      <div className="page-card p-5 space-y-3">
         <div className="data-pair">
-          <span>Pickup</span>
-          <span className="max-w-[60%]">{data.pickupAddress}</span>
+          <span>PICKUP</span>
+          <span
+            className="max-w-[65%] truncate text-right"
+            title={data.pickupAddress}
+          >
+            {shortAddress(data.pickupAddress)}
+          </span>
         </div>
         <div className="data-pair">
-          <span>Drop-off</span>
-          <span className="max-w-[60%]">{data.dropoffAddress}</span>
-        </div>
-        <div className="data-pair">
-          <span>Date & Time</span>
-          <span>{formatDate(scheduledDate)}</span>
+          <span>DROPOFF</span>
+          <span
+            className="max-w-[65%] truncate text-right"
+            title={data.dropoffAddress}
+          >
+            {shortAddress(data.dropoffAddress)}
+          </span>
         </div>
         <div className="card-divider" />
         <div className="data-pair">
-          <span>Price</span>
+          <span>WHEN</span>
+          <span>{formatDate(scheduledDate)}</span>
+        </div>
+        <div className="data-pair">
+          <span>VEHICLE</span>
+          <span className="uppercase">{data.vehicleClass}</span>
+        </div>
+        {data.pickupFlightNumber && (
+          <div className="data-pair">
+            <span>ARRIVING FLIGHT</span>
+            <span>{data.pickupFlightNumber}</span>
+          </div>
+        )}
+        {data.dropoffFlightNumber && (
+          <div className="data-pair">
+            <span>DEPARTING FLIGHT</span>
+            <span>{data.dropoffFlightNumber}</span>
+          </div>
+        )}
+        <div className="card-divider" />
+        <div className="data-pair">
+          <span>FARE</span>
           <span>{formatPrice(data.pricePence)}</span>
         </div>
         {data.discountPence > 0 && (
-          <>
-            <div className="data-pair">
-              <span>Discount ({data.couponCode})</span>
-              <span>-{formatPrice(data.discountPence)}</span>
-            </div>
-            <div className="card-divider" />
-          </>
-        )}
-        <div className="data-pair">
-          <span>Total</span>
-          <span>{formatPrice(data.finalPricePence)}</span>
-        </div>
-        {data.distanceMiles != null && (
           <div className="data-pair">
-            <span>Distance</span>
-            <span>{data.distanceMiles.toFixed(1)} miles</span>
+            <span>DISCOUNT ({data.couponCode})</span>
+            <span>-{formatPrice(data.discountPence)}</span>
           </div>
         )}
+        <div className="card-divider" />
+        <div className="data-pair">
+          <span>TOTAL</span>
+          <span className="text-[22px] font-bold tracking-[-0.02em]">
+            {formatPrice(data.finalPricePence)}
+          </span>
+        </div>
         {data.isAirport && (
-          <div className="text-center">
+          <div className="pt-2">
             <span className="ds-tag tag-airport">AIRPORT TRANSFER</span>
           </div>
         )}
-        {data.isPickupAirport && (
-          <div className="space-y-2 pt-2 border-t border-[var(--color-border)]">
-            <label className="field-label block">
-              Arriving flight number{" "}
-              <span className="text-[var(--color-muted)]">(optional)</span>
-            </label>
-            <input
-              type="text"
-              value={pickupFlightNumber}
-              onChange={(e) =>
-                setPickupFlightNumber(e.target.value.toUpperCase())
-              }
-              placeholder="e.g. BA123"
-              maxLength={10}
-              className="input-glass w-full"
-            />
-            <p className="caption-copy">
-              We'll track your arrival flight and adjust pickup timing
-            </p>
-          </div>
-        )}
-        {data.isDropoffAirport && (
-          <div className="space-y-2 pt-2 border-t border-[var(--color-border)]">
-            <label className="field-label block">
-              Departing flight number{" "}
-              <span className="text-[var(--color-muted)]">(optional)</span>
-            </label>
-            <input
-              type="text"
-              value={dropoffFlightNumber}
-              onChange={(e) =>
-                setDropoffFlightNumber(e.target.value.toUpperCase())
-              }
-              placeholder="e.g. BA456"
-              maxLength={10}
-              className="input-glass w-full"
-            />
-            <p className="caption-copy">
-              We'll factor in check-in time for your departure
-            </p>
-          </div>
-        )}
       </div>
 
-      {error && <div className="alert alert-error">{error}</div>}
+      {error && (
+        <div className="alert alert-error" role="alert">
+          {error}
+        </div>
+      )}
 
-      <div className="flex gap-3">
-        <button onClick={onBack} className="btn-secondary w-full flex-1">
-          Back
+      <div className="flex gap-3 pt-2">
+        <button
+          onClick={onBack}
+          disabled={submitting}
+          className="btn-secondary flex-1"
+        >
+          <span>Back</span>
         </button>
         <button
           onClick={handleConfirm}
-          disabled={loading}
-          className="btn-primary w-full flex-1 disabled:opacity-50"
+          disabled={submitting}
+          className="btn-green flex-1"
         >
-          {loading ? (
-            <span className="flex items-center justify-center gap-2">
-              <svg
-                className="animate-spin w-4 h-4"
-                viewBox="0 0 24 24"
-                fill="none"
-              >
-                <circle
-                  cx="12"
-                  cy="12"
-                  r="10"
-                  stroke="currentColor"
-                  strokeWidth="3"
-                  opacity="0.25"
-                />
-                <path
-                  d="M12 2a10 10 0 0 1 10 10"
-                  stroke="currentColor"
-                  strokeWidth="3"
-                  strokeLinecap="round"
-                />
-              </svg>
-              Booking...
-            </span>
-          ) : (
-            "Confirm Booking"
-          )}
+          <span>{submitting ? "Booking..." : "Confirm booking"}</span>
+          <span className="btn-icon" aria-hidden="true">
+            <span className="btn-icon-glyph">↗</span>
+          </span>
         </button>
       </div>
+
+      <button
+        type="button"
+        onClick={onReset}
+        className="subtle-link mx-auto block pt-2"
+      >
+        Start over
+      </button>
     </div>
   );
 }
