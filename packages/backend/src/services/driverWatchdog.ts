@@ -43,7 +43,14 @@ export async function runDriverWatchdog(
   const activeBookings = await db
     .select({ id: bookings.id })
     .from(bookings)
-    .where(inArray(bookings.status, ["assigned", "en_route"]));
+    .where(
+      inArray(bookings.status, [
+        "assigned",
+        "en_route",
+        "arrived",
+        "in_progress",
+      ]),
+    );
 
   const warnings: DriverWatchdogWarning[] = [];
   const fallbacks: DriverWatchdogFallback[] = [];

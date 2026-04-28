@@ -1,11 +1,21 @@
 import { Hono } from "hono";
-import { eq, and, desc, inArray, sql, getTableColumns } from "drizzle-orm";
+import {
+  eq,
+  and,
+  desc,
+  inArray,
+  sql,
+  getTableColumns,
+  avg,
+  count,
+} from "drizzle-orm";
 import type { BookingStatus } from "shared/types";
 import {
   createBookingSchema,
   updateBookingSchema,
   updateBookingStatusSchema,
   assignDriversSchema,
+  reportIncidentSchema,
   BOOKING_MIN_HOURS_STANDARD,
   BOOKING_MIN_HOURS_LONDON,
   BOOKING_MAX_DAYS,
@@ -17,6 +27,9 @@ import {
   users,
   driverHeartbeats,
   vehicles,
+  driverProfiles,
+  reviews,
+  incidents,
 } from "../db/schema";
 import { authMiddleware, type JwtPayload } from "../middleware/auth";
 import { requireRole } from "../middleware/auth";
@@ -38,15 +51,34 @@ import {
   notifyBookingStatusChanged,
   notifyDriverFallbackActivated,
   notifyDriversAssigned,
+  notifyIncident,
 } from "../services/notifications";
 
 export const bookingRoutes = new Hono();
+
+function haversineMiles(
+  lat1: number,
+  lon1: number,
+  lat2: number,
+  lon2: number,
+): number {
+  const R = 3958.8; // Earth radius in miles
+  const dLat = ((lat2 - lat1) * Math.PI) / 180;
+  const dLon = ((lon2 - lon1) * Math.PI) / 180;
+  const a =
+    Math.sin(dLat / 2) ** 2 +
+    Math.cos((lat1 * Math.PI) / 180) *
+      Math.cos((lat2 * Math.PI) / 180) *
+      Math.sin(dLon / 2) ** 2;
+  return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+}
 
 const STATUS_TRANSITIONS: Record<BookingStatus, BookingStatus[]> = {
   scheduled: ["assigned", "cancelled"],
   assigned: ["en_route", "cancelled"],
   en_route: ["arrived"],
-  arrived: ["completed"],
+  arrived: ["in_progress"],
+  in_progress: ["completed"],
   completed: [],
   cancelled: [],
 };
@@ -237,11 +269,17 @@ bookingRoutes.get("/", async (c) => {
     results = await db
       .select({
         ...bookingCols,
-        hasReview: sql<boolean>`EXISTS (
+        hasReview: sql<boolean>`(EXISTS (
           SELECT 1 FROM reviews r
           WHERE r.booking_id = bookings.id
             AND r.customer_id = ${payload.sub}
-        )`,
+        ))::boolean`,
+        reviewRating: sql<number | null>`(
+          SELECT r.rating FROM reviews r
+          WHERE r.booking_id = bookings.id
+            AND r.customer_id = ${payload.sub}
+          LIMIT 1
+        )::integer`,
         primaryDriverName: sql<string | null>`(
           SELECT u.name FROM driver_assignments da
           JOIN users u ON u.id = da.driver_id
@@ -346,10 +384,69 @@ bookingRoutes.get("/:id", async (c) => {
       assignedAt: driverAssignments.assignedAt,
       driverName: users.name,
       driverPhone: users.phone,
+      driverProfilePicture: users.profilePictureUrl,
     })
     .from(driverAssignments)
     .innerJoin(users, eq(driverAssignments.driverId, users.id))
     .where(eq(driverAssignments.bookingId, id));
+
+  // Enrich assignments with profile + rating
+  const driverIds = [...new Set(assignments.map((a) => a.driverId))];
+  const profiles = driverIds.length
+    ? await db
+        .select()
+        .from(driverProfiles)
+        .where(inArray(driverProfiles.driverId, driverIds))
+    : [];
+  const ratingsRows = driverIds.length
+    ? await db
+        .select({
+          driverId: reviews.driverId,
+          avg: avg(reviews.rating),
+          total: count(reviews.id),
+        })
+        .from(reviews)
+        .where(inArray(reviews.driverId, driverIds))
+        .groupBy(reviews.driverId)
+    : [];
+
+  const profileMap = new Map(profiles.map((p) => [p.driverId, p]));
+  const ratingMap = new Map(ratingsRows.map((r) => [r.driverId, r]));
+
+  const enrichedAssignments = assignments.map((a) => {
+    const profile = profileMap.get(a.driverId) ?? null;
+    const rating = ratingMap.get(a.driverId);
+    return {
+      ...a,
+      driverProfile: profile,
+      avgRating: rating?.avg ? Number(Number(rating.avg).toFixed(1)) : null,
+      totalReviews: rating?.total ?? 0,
+    };
+  });
+
+  // Check if customer has reviewed this booking
+  let hasReview = false;
+  let existingReviewData: {
+    rating: number;
+    comment: string | null;
+    createdAt: Date;
+  } | null = null;
+  if (payload.role === "customer" && booking.status === "completed") {
+    const existingReview = await db
+      .select({
+        id: reviews.id,
+        rating: reviews.rating,
+        comment: reviews.comment,
+        createdAt: reviews.createdAt,
+      })
+      .from(reviews)
+      .where(
+        and(eq(reviews.bookingId, id), eq(reviews.customerId, payload.sub)),
+      )
+      .limit(1);
+    hasReview = existingReview.length > 0;
+    existingReviewData = existingReview[0] ?? null;
+  }
 
   // Fetch vehicle info for this booking's class
   const vehicleResult = await db
@@ -359,9 +456,10 @@ bookingRoutes.get("/:id", async (c) => {
     .limit(1);
 
   return ok(c, {
-    booking,
-    assignments,
+    booking: { ...booking, hasReview },
+    assignments: enrichedAssignments,
     vehicle: vehicleResult[0] ?? null,
+    review: existingReviewData,
   });
 });
 
@@ -560,11 +658,12 @@ bookingRoutes.patch(
       );
     }
 
-    // Driver can only set en_route, arrived, completed and must be active primary.
+    // Driver can only set en_route, arrived, in_progress, completed and must be active primary.
     if (payload.role === "driver") {
       const allowedByDriver: BookingStatus[] = [
         "en_route",
         "arrived",
+        "in_progress",
         "completed",
       ];
       if (!allowedByDriver.includes(nextStatus)) {
@@ -780,7 +879,12 @@ bookingRoutes.post("/:id/fallback", requireRole("admin"), async (c) => {
   }
 
   const booking = bookingResult[0];
-  const allowedStatuses: BookingStatus[] = ["assigned", "en_route"];
+  const allowedStatuses: BookingStatus[] = [
+    "assigned",
+    "en_route",
+    "arrived",
+    "in_progress",
+  ];
   if (!allowedStatuses.includes(booking.status)) {
     return err(
       c,
@@ -850,7 +954,7 @@ bookingRoutes.post("/:id/fallback", requireRole("admin"), async (c) => {
 
 bookingRoutes.get(
   "/:id/driver-location",
-  requireRole("customer"),
+  requireRole("customer", "admin"),
   async (c) => {
     const payload = c.get("jwtPayload") as JwtPayload;
     const id = parseRouteId(c.req.param("id"));
@@ -865,11 +969,22 @@ bookingRoutes.get(
     if (result.length === 0) return err(c, "Booking not found", 404);
 
     const booking = result[0];
-    if (booking.customerId !== payload.sub) return err(c, "Forbidden", 403);
+    if (payload.role === "customer" && booking.customerId !== payload.sub)
+      return err(c, "Forbidden", 403);
 
-    const trackable: BookingStatus[] = ["assigned", "en_route", "arrived"];
+    const trackable: BookingStatus[] = [
+      "assigned",
+      "en_route",
+      "arrived",
+      "in_progress",
+    ];
     if (!trackable.includes(booking.status)) {
-      return ok(c, { lat: null, lon: null, lastUpdatedAt: null });
+      return ok(c, {
+        lat: null,
+        lon: null,
+        lastUpdatedAt: null,
+        distanceMiles: null,
+      });
     }
 
     // Find active primary driver
@@ -886,7 +1001,12 @@ bookingRoutes.get(
       .limit(1);
 
     if (primary.length === 0) {
-      return ok(c, { lat: null, lon: null, lastUpdatedAt: null });
+      return ok(c, {
+        lat: null,
+        lon: null,
+        lastUpdatedAt: null,
+        distanceMiles: null,
+      });
     }
 
     const heartbeat = await db
@@ -901,13 +1021,77 @@ bookingRoutes.get(
       .limit(1);
 
     if (heartbeat.length === 0 || heartbeat[0].lat == null) {
-      return ok(c, { lat: null, lon: null, lastUpdatedAt: null });
+      return ok(c, {
+        lat: null,
+        lon: null,
+        lastUpdatedAt: null,
+        distanceMiles: null,
+      });
+    }
+
+    let distanceMiles: number | null = null;
+    if (booking.pickupLat != null && booking.pickupLon != null) {
+      distanceMiles = haversineMiles(
+        heartbeat[0].lat!,
+        heartbeat[0].lon!,
+        booking.pickupLat,
+        booking.pickupLon,
+      );
     }
 
     return ok(c, {
       lat: heartbeat[0].lat,
       lon: heartbeat[0].lon,
       lastUpdatedAt: heartbeat[0].lastHeartbeatAt.toISOString(),
+      distanceMiles,
     });
   },
 );
+
+// ── Report Incident / Contact Admin ───────────────────
+
+bookingRoutes.post("/:id/incident", requireRole("customer"), async (c) => {
+  const payload = c.get("jwtPayload") as JwtPayload;
+  const id = parseRouteId(c.req.param("id"));
+  if (!id) return err(c, "Invalid booking ID", 400);
+
+  const body = await c.req.json();
+  const parsed = reportIncidentSchema.safeParse(body);
+  if (!parsed.success)
+    return err(c, "Invalid input", 400, parsed.error.flatten());
+
+  const [booking] = await db
+    .select()
+    .from(bookings)
+    .where(eq(bookings.id, id))
+    .limit(1);
+  if (!booking) return err(c, "Booking not found", 404);
+  if (booking.customerId !== payload.sub) return err(c, "Forbidden", 403);
+
+  const activeStatuses: BookingStatus[] = [
+    "assigned",
+    "en_route",
+    "arrived",
+    "in_progress",
+  ];
+  if (!activeStatuses.includes(booking.status)) {
+    return err(c, "Incidents can only be reported on active bookings", 400);
+  }
+
+  const [incident] = await db
+    .insert(incidents)
+    .values({
+      bookingId: id,
+      reporterId: payload.sub,
+      type: parsed.data.type,
+      message: parsed.data.message ?? null,
+    })
+    .returning();
+
+  runAsyncSideEffect(
+    "notifyIncident",
+    notifyIncident(id, parsed.data.type, parsed.data.message),
+  );
+
+  return ok(c, { incident }, 201);
+});

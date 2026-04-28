@@ -592,6 +592,31 @@ export async function processDueRideReminders(
   return sentCount;
 }
 
+export async function notifyIncident(
+  bookingId: number,
+  type: string,
+  message?: string,
+): Promise<void> {
+  const ctx = await getBookingContext(bookingId);
+  if (!ctx) return;
+
+  const isEmergency = type === "emergency";
+  const title = isEmergency
+    ? `${APP_NAME}: EMERGENCY — Booking #${bookingId}`
+    : `${APP_NAME}: Customer Contact Request — Booking #${bookingId}`;
+  const body = message
+    ? `${ctx.customerName}: "${message}"`
+    : `${ctx.customerName} has ${isEmergency ? "triggered an emergency alert" : "requested admin contact"} for booking #${bookingId} (${rideLabel(ctx)}).`;
+
+  await sendRideMessage(ctx.adminIds, {
+    title,
+    emailSubject: title,
+    body,
+    url: "/admin",
+    tag: `incident-${bookingId}-${Date.now()}`,
+  });
+}
+
 export function getPublicVapidKey(): string | null {
   return VAPID_PUBLIC_KEY || null;
 }
