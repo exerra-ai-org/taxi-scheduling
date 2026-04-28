@@ -1,0 +1,17 @@
+node_modules
+dist
+.vite
+.git
+.gitignore
+.env
+.env.*
+!.env.example
+*.log
+.DS_Store
+notes/
+.claude/
+.planning/
+.agents/
+packages/frontend/dist
+packages/backend/uploads/*
+!packages/backend/uploads/.gitkeep

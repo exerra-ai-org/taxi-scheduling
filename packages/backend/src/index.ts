@@ -19,10 +19,11 @@ import { startBackgroundJobs } from "./services/jobs";
 const app = new Hono();
 
 app.use("*", logger());
+const CORS_ORIGIN = process.env.CORS_ORIGIN || "http://localhost:5173";
 app.use(
   "/api/*",
   cors({
-    origin: "http://localhost:5173",
+    origin: CORS_ORIGIN.split(",").map((s) => s.trim()),
     credentials: true,
   }),
 );
@@ -65,6 +66,6 @@ app.get("/uploads/:filename", async (c) => {
 startBackgroundJobs();
 
 export default {
-  port: 3000,
+  port: Number(process.env.PORT) || 3000,
   fetch: app.fetch,
 };

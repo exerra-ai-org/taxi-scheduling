@@ -10,6 +10,9 @@
     "dev:frontend": "bun run --filter frontend dev",
     "db:push": "bun run --filter backend db:push",
     "db:seed": "bun run --filter backend db:seed",
+    "build:frontend": "bun run --filter frontend build",
+    "build:backend:docker": "docker build -t taxi-backend .",
+    "db:migrate": "bun run --filter backend db:push",
     "format": "treefmt",
     "lint": "prettier --check ."
   },
