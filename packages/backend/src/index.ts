@@ -77,6 +77,19 @@ app.get("/uploads/:filename", async (c) => {
 
 startBackgroundJobs();
 
+// Startup diagnostics — make missing config visible immediately
+console.log(
+  "[Config] Email:",
+  config.email.resendApiKey
+    ? "Resend ✓"
+    : "NOT CONFIGURED (set RESEND_API_KEY)",
+);
+console.log(
+  "[Config] Push:",
+  config.push.publicKey ? "VAPID ✓" : "NOT CONFIGURED (set VAPID keys)",
+);
+console.log("[Config] CORS origins:", config.cors.origins.join(", "));
+
 export default {
   port: config.server.port,
   fetch: app.fetch,

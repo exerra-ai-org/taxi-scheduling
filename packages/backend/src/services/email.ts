@@ -9,6 +9,23 @@ const resend = config.email.resendApiKey
   ? new Resend(config.email.resendApiKey)
   : null;
 
+if (!resend) {
+  console.warn(
+    "[Email] RESEND_API_KEY not set — emails will be logged to console only",
+  );
+}
+
+// Resend SDK returns { data, error } instead of throwing — this wrapper
+// surfaces API errors so callers see them rather than silently succeeding.
+async function sendViaResend(
+  params: Parameters<Resend["emails"]["send"]>[0],
+): Promise<void> {
+  const { error } = await resend!.emails.send(params);
+  if (error) {
+    throw new Error(`[Email] Resend error (${error.name}): ${error.message}`);
+  }
+}
+
 // ── Design tokens (matched to frontend theme.css) ─────────────────────────────
 const t = {
   bg: "#f9f9f9",
@@ -150,7 +167,7 @@ export async function sendMagicLinkEmail(
     </p>
   `;
 
-  await resend.emails.send({
+  await sendViaResend({
     from: EMAIL_FROM,
     to,
     subject: `${APP_NAME} — Sign in to your account`,
@@ -196,7 +213,7 @@ export async function sendInvitationEmail(
     </p>
   `;
 
-  await resend.emails.send({
+  await sendViaResend({
     from: EMAIL_FROM,
     to,
     subject: `You've been invited to ${APP_NAME}`,
@@ -239,7 +256,7 @@ export async function sendPasswordResetEmail(
     </p>
   `;
 
-  await resend.emails.send({
+  await sendViaResend({
     from: EMAIL_FROM,
     to,
     subject: `${APP_NAME} — Reset your password`,
