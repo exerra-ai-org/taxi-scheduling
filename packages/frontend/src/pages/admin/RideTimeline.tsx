@@ -1,6 +1,7 @@
 import { useEffect, useState, useCallback, useMemo } from "react";
 import type { Booking } from "shared/types";
 import { listAllBookings } from "../../api/admin";
+import { useRealtimeEvent } from "../../context/RealtimeContext";
 import { formatPrice, formatDate, statusLabel } from "../../lib/format";
 import { SkeletonCard } from "../../components/Skeleton";
 import AlertsBanner from "./AlertsBanner";
@@ -80,9 +81,11 @@ export default function RideTimeline() {
 
   useEffect(() => {
     fetchBookings();
-    const interval = setInterval(fetchBookings, 30000);
-    return () => clearInterval(interval);
   }, [fetchBookings]);
+
+  useRealtimeEvent("booking_updated", fetchBookings);
+  useRealtimeEvent("drivers_assigned", fetchBookings);
+  useRealtimeEvent("booking_cancelled", fetchBookings);
 
   useEffect(() => {
     const media = window.matchMedia("(min-width: 768px)");

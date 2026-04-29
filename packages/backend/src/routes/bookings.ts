@@ -53,6 +53,7 @@ import {
   notifyDriversAssigned,
   notifyIncident,
 } from "../services/notifications";
+import { broadcastBookingEvent } from "../services/broadcaster";
 
 export const bookingRoutes = new Hono();
 
@@ -707,6 +708,12 @@ bookingRoutes.patch(
       notifyBookingStatusChanged(id, nextStatus),
     );
 
+    broadcastBookingEvent([booking.customerId], {
+      type: "booking_updated",
+      bookingId: id,
+      status: nextStatus,
+    });
+
     return ok(c, { booking: updated });
   },
 );
@@ -749,6 +756,11 @@ bookingRoutes.patch(
       .returning();
 
     runAsyncSideEffect("notifyBookingCancelled", notifyBookingCancelled(id));
+
+    broadcastBookingEvent([booking.customerId], {
+      type: "booking_cancelled",
+      bookingId: id,
+    });
 
     return ok(c, { booking: updated });
   },
@@ -859,6 +871,11 @@ bookingRoutes.post("/:id/assign", requireRole("admin"), async (c) => {
     notifyDriversAssigned(id, primaryDriverId, backupDriverId),
   );
 
+  broadcastBookingEvent([booking.customerId, primaryDriverId, backupDriverId], {
+    type: "drivers_assigned",
+    bookingId: id,
+  });
+
   return ok(c, { booking: updatedBooking, assignments });
 });
 
@@ -931,6 +948,11 @@ bookingRoutes.post("/:id/fallback", requireRole("admin"), async (c) => {
     "notifyDriverFallbackActivated",
     notifyDriverFallbackActivated(id, primary.driverId, backup.driverId),
   );
+
+  broadcastBookingEvent([booking.customerId, backup.driverId], {
+    type: "drivers_assigned",
+    bookingId: id,
+  });
 
   const updatedAssignments = await db
     .select({

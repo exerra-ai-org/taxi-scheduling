@@ -1,10 +1,10 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
+import { useRealtimeEvent } from "../context/RealtimeContext";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import type { Booking, BookingStatus, DriverLocation } from "shared/types";
 import {
   cancelBooking,
   getBooking,
-  getDriverLocation,
   reportIncident,
   type BookingDetail,
 } from "../api/bookings";
@@ -40,8 +40,6 @@ const TRACKABLE: BookingStatus[] = [
   "arrived",
   "in_progress",
 ];
-const POLL_MS = 8000;
-
 const TIMELINE: { key: BookingStatus; label: string }[] = [
   { key: "scheduled", label: "Your ride has been booked" },
   { key: "assigned", label: "Driver has been assigned" },
@@ -222,17 +220,15 @@ export default function CustomerRideDetail() {
     load();
   }, [load]);
 
-  useEffect(() => {
-    function onFocus() {
-      load();
-    }
-    window.addEventListener("focus", onFocus);
-    document.addEventListener("visibilitychange", onFocus);
-    return () => {
-      window.removeEventListener("focus", onFocus);
-      document.removeEventListener("visibilitychange", onFocus);
-    };
-  }, [load]);
+  useRealtimeEvent("booking_updated", (e) => {
+    if (e.bookingId === bookingId) load();
+  });
+  useRealtimeEvent("drivers_assigned", (e) => {
+    if (e.bookingId === bookingId) load();
+  });
+  useRealtimeEvent("booking_cancelled", (e) => {
+    if (e.bookingId === bookingId) load();
+  });
 
   const booking = detail?.booking as CustomerBookingExtra | undefined;
   const primaryAssignment = useMemo(
@@ -265,29 +261,11 @@ export default function CustomerRideDetail() {
       ? { lat: driverLoc.lat, lon: driverLoc.lon }
       : null;
 
-  // Poll driver location while trackable
-  const pollRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  useEffect(() => {
-    if (!trackable || !Number.isFinite(bookingId)) return;
-    let cancelled = false;
-    async function tick() {
-      if (cancelled) return;
-      if (document.visibilityState === "visible") {
-        try {
-          const loc = await getDriverLocation(bookingId);
-          if (!cancelled) setDriverLoc(loc);
-        } catch {
-          /* keep last-known on transient error */
-        }
-      }
-      pollRef.current = setTimeout(tick, POLL_MS);
+  useRealtimeEvent("driver_location", (e) => {
+    if (e.bookingId === bookingId) {
+      setDriverLoc({ lat: e.lat, lon: e.lon, updatedAt: e.updatedAt });
     }
-    tick();
-    return () => {
-      cancelled = true;
-      if (pollRef.current) clearTimeout(pollRef.current);
-    };
-  }, [bookingId, trackable]);
+  });
 
   // Panel measurement for map obstruct padding
   const panelRef = useRef<HTMLDivElement>(null);

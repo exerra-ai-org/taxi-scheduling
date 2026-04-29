@@ -2,6 +2,7 @@ import { useEffect, useState, useCallback } from "react";
 import { Link } from "react-router-dom";
 import type { Booking } from "shared/types";
 import { listBookings } from "../../api/bookings";
+import { useRealtimeEvent } from "../../context/RealtimeContext";
 import RideCard from "./RideCard";
 import { SkeletonCard } from "../../components/Skeleton";
 import {
@@ -46,9 +47,11 @@ export default function MyRides() {
 
   useEffect(() => {
     fetchBookings();
-    const interval = setInterval(fetchBookings, 30000);
-    return () => clearInterval(interval);
   }, [fetchBookings]);
+
+  useRealtimeEvent("booking_updated", fetchBookings);
+  useRealtimeEvent("drivers_assigned", fetchBookings);
+  useRealtimeEvent("booking_cancelled", fetchBookings);
 
   const active = bookings.filter(
     (b) => !["completed", "cancelled"].includes(b.status),

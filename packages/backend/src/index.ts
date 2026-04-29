@@ -15,6 +15,7 @@ import { notificationRoutes } from "./routes/notifications";
 import { vehicleRoutes } from "./routes/vehicles";
 import { adminRoutes } from "./routes/admin";
 import { uploadRoutes } from "./routes/upload";
+import { eventsRoutes } from "./routes/events";
 import { startBackgroundJobs } from "./services/jobs";
 
 const app = new Hono();
@@ -48,6 +49,7 @@ app.route("/notifications", notificationRoutes);
 app.route("/vehicles", vehicleRoutes);
 app.route("/admin", adminRoutes);
 app.route("/upload", uploadRoutes);
+app.route("/events", eventsRoutes);
 
 // Serve uploaded files
 const UPLOAD_DIR = join(import.meta.dir, "../uploads");
