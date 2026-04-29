@@ -10,8 +10,7 @@ FROM oven/bun:1.2 AS install
   FROM oven/bun:1.2-slim AS production
   WORKDIR /app                                                                                
                                                                                               
-  RUN groupadd --system app && useradd --system --gid app app
-                                                                                              
+  RUN groupadd --system app && useradd --system --gid app --create-home --home-dir /home/app app                                                                                                
   # Bun hoists workspace deps to the root node_modules — that's all we need.                  
   COPY --from=install /app/node_modules ./node_modules
                                                                                               
