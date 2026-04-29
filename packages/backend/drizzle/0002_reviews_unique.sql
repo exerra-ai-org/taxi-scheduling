@@ -1,1 +1,0 @@
-CREATE UNIQUE INDEX IF NOT EXISTS "reviews_booking_customer_unique" ON "reviews" USING btree ("booking_id","customer_id");

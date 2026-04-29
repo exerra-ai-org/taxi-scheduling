@@ -1,5 +1,5 @@
 {
-  "id": "d79cdab1-84fb-40d1-a266-723b994256f6",
+  "id": "4e737248-1eca-4ff8-b9ea-704a04a9aef3",
   "prevId": "00000000-0000-0000-0000-000000000000",
   "version": "7",
   "dialect": "postgresql",
@@ -31,6 +31,30 @@
           "type": "text",
           "primaryKey": false,
           "notNull": true
+        },
+        "pickup_lat": {
+          "name": "pickup_lat",
+          "type": "double precision",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "pickup_lon": {
+          "name": "pickup_lon",
+          "type": "double precision",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "dropoff_lat": {
+          "name": "dropoff_lat",
+          "type": "double precision",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "dropoff_lon": {
+          "name": "dropoff_lon",
+          "type": "double precision",
+          "primaryKey": false,
+          "notNull": false
         },
         "pickup_zone_id": {
           "name": "pickup_zone_id",
@@ -90,6 +114,50 @@
           "notNull": true,
           "default": false
         },
+        "flight_number": {
+          "name": "flight_number",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "pickup_flight_number": {
+          "name": "pickup_flight_number",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "dropoff_flight_number": {
+          "name": "dropoff_flight_number",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "vehicle_class": {
+          "name": "vehicle_class",
+          "type": "vehicle_class",
+          "typeSchema": "public",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'regular'"
+        },
+        "distance_miles": {
+          "name": "distance_miles",
+          "type": "double precision",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "rate_per_mile_pence": {
+          "name": "rate_per_mile_pence",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "base_fare_pence": {
+          "name": "base_fare_pence",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false
+        },
         "created_at": {
           "name": "created_at",
           "type": "timestamp",
@@ -104,8 +172,12 @@
           "name": "bookings_customer_id_users_id_fk",
           "tableFrom": "bookings",
           "tableTo": "users",
-          "columnsFrom": ["customer_id"],
-          "columnsTo": ["id"],
+          "columnsFrom": [
+            "customer_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
           "onDelete": "no action",
           "onUpdate": "no action"
         },
@@ -113,8 +185,12 @@
           "name": "bookings_pickup_zone_id_zones_id_fk",
           "tableFrom": "bookings",
           "tableTo": "zones",
-          "columnsFrom": ["pickup_zone_id"],
-          "columnsTo": ["id"],
+          "columnsFrom": [
+            "pickup_zone_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
           "onDelete": "no action",
           "onUpdate": "no action"
         },
@@ -122,8 +198,12 @@
           "name": "bookings_dropoff_zone_id_zones_id_fk",
           "tableFrom": "bookings",
           "tableTo": "zones",
-          "columnsFrom": ["dropoff_zone_id"],
-          "columnsTo": ["id"],
+          "columnsFrom": [
+            "dropoff_zone_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
           "onDelete": "no action",
           "onUpdate": "no action"
         },
@@ -131,8 +211,12 @@
           "name": "bookings_fixed_route_id_fixed_routes_id_fk",
           "tableFrom": "bookings",
           "tableTo": "fixed_routes",
-          "columnsFrom": ["fixed_route_id"],
-          "columnsTo": ["id"],
+          "columnsFrom": [
+            "fixed_route_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
           "onDelete": "no action",
           "onUpdate": "no action"
         },
@@ -140,8 +224,12 @@
           "name": "bookings_coupon_id_coupons_id_fk",
           "tableFrom": "bookings",
           "tableTo": "coupons",
-          "columnsFrom": ["coupon_id"],
-          "columnsTo": ["id"],
+          "columnsFrom": [
+            "coupon_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
           "onDelete": "no action",
           "onUpdate": "no action"
         }
@@ -208,7 +296,9 @@
         "coupons_code_unique": {
           "name": "coupons_code_unique",
           "nullsNotDistinct": false,
-          "columns": ["code"]
+          "columns": [
+            "code"
+          ]
         }
       },
       "policies": {},
@@ -265,8 +355,12 @@
           "name": "driver_assignments_booking_id_bookings_id_fk",
           "tableFrom": "driver_assignments",
           "tableTo": "bookings",
-          "columnsFrom": ["booking_id"],
-          "columnsTo": ["id"],
+          "columnsFrom": [
+            "booking_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
           "onDelete": "no action",
           "onUpdate": "no action"
         },
@@ -274,8 +368,194 @@
           "name": "driver_assignments_driver_id_users_id_fk",
           "tableFrom": "driver_assignments",
           "tableTo": "users",
-          "columnsFrom": ["driver_id"],
-          "columnsTo": ["id"],
+          "columnsFrom": [
+            "driver_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.driver_heartbeats": {
+      "name": "driver_heartbeats",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "serial",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "booking_id": {
+          "name": "booking_id",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "driver_id": {
+          "name": "driver_id",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "last_heartbeat_at": {
+          "name": "last_heartbeat_at",
+          "type": "timestamp",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        },
+        "missed_windows": {
+          "name": "missed_windows",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "default": 0
+        },
+        "lat": {
+          "name": "lat",
+          "type": "double precision",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "lon": {
+          "name": "lon",
+          "type": "double precision",
+          "primaryKey": false,
+          "notNull": false
+        }
+      },
+      "indexes": {
+        "driver_heartbeats_booking_driver_unique": {
+          "name": "driver_heartbeats_booking_driver_unique",
+          "columns": [
+            {
+              "expression": "booking_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "driver_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": true,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "driver_heartbeats_booking_id_bookings_id_fk": {
+          "name": "driver_heartbeats_booking_id_bookings_id_fk",
+          "tableFrom": "driver_heartbeats",
+          "tableTo": "bookings",
+          "columnsFrom": [
+            "booking_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        },
+        "driver_heartbeats_driver_id_users_id_fk": {
+          "name": "driver_heartbeats_driver_id_users_id_fk",
+          "tableFrom": "driver_heartbeats",
+          "tableTo": "users",
+          "columnsFrom": [
+            "driver_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.driver_profiles": {
+      "name": "driver_profiles",
+      "schema": "",
+      "columns": {
+        "driver_id": {
+          "name": "driver_id",
+          "type": "integer",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "vehicle_make": {
+          "name": "vehicle_make",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "vehicle_model": {
+          "name": "vehicle_model",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "vehicle_year": {
+          "name": "vehicle_year",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "vehicle_color": {
+          "name": "vehicle_color",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "license_plate": {
+          "name": "license_plate",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "vehicle_class": {
+          "name": "vehicle_class",
+          "type": "vehicle_class",
+          "typeSchema": "public",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "bio": {
+          "name": "bio",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {
+        "driver_profiles_driver_id_users_id_fk": {
+          "name": "driver_profiles_driver_id_users_id_fk",
+          "tableFrom": "driver_profiles",
+          "tableTo": "users",
+          "columnsFrom": [
+            "driver_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
           "onDelete": "no action",
           "onUpdate": "no action"
         }
@@ -343,6 +623,288 @@
       "checkConstraints": {},
       "isRLSEnabled": false
     },
+    "public.incidents": {
+      "name": "incidents",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "serial",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "booking_id": {
+          "name": "booking_id",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "reporter_id": {
+          "name": "reporter_id",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "type": {
+          "name": "type",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'contact_admin'"
+        },
+        "message": {
+          "name": "message",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "resolved": {
+          "name": "resolved",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": true,
+          "default": false
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {
+        "incidents_booking_id_bookings_id_fk": {
+          "name": "incidents_booking_id_bookings_id_fk",
+          "tableFrom": "incidents",
+          "tableTo": "bookings",
+          "columnsFrom": [
+            "booking_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        },
+        "incidents_reporter_id_users_id_fk": {
+          "name": "incidents_reporter_id_users_id_fk",
+          "tableFrom": "incidents",
+          "tableTo": "users",
+          "columnsFrom": [
+            "reporter_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.mile_rates": {
+      "name": "mile_rates",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "serial",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "vehicle_class": {
+          "name": "vehicle_class",
+          "type": "vehicle_class",
+          "typeSchema": "public",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "base_fare_pence": {
+          "name": "base_fare_pence",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "rate_per_mile_pence": {
+          "name": "rate_per_mile_pence",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {},
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {
+        "mile_rates_vehicle_class_unique": {
+          "name": "mile_rates_vehicle_class_unique",
+          "nullsNotDistinct": false,
+          "columns": [
+            "vehicle_class"
+          ]
+        }
+      },
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.notification_events": {
+      "name": "notification_events",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "serial",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "event_key": {
+          "name": "event_key",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "booking_id": {
+          "name": "booking_id",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "user_id": {
+          "name": "user_id",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {
+        "notification_events_booking_id_bookings_id_fk": {
+          "name": "notification_events_booking_id_bookings_id_fk",
+          "tableFrom": "notification_events",
+          "tableTo": "bookings",
+          "columnsFrom": [
+            "booking_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        },
+        "notification_events_user_id_users_id_fk": {
+          "name": "notification_events_user_id_users_id_fk",
+          "tableFrom": "notification_events",
+          "tableTo": "users",
+          "columnsFrom": [
+            "user_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {
+        "notification_events_event_key_unique": {
+          "name": "notification_events_event_key_unique",
+          "nullsNotDistinct": false,
+          "columns": [
+            "event_key"
+          ]
+        }
+      },
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.notification_subscriptions": {
+      "name": "notification_subscriptions",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "serial",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "user_id": {
+          "name": "user_id",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "endpoint": {
+          "name": "endpoint",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "p256dh": {
+          "name": "p256dh",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "auth": {
+          "name": "auth",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {
+        "notification_subscriptions_user_id_users_id_fk": {
+          "name": "notification_subscriptions_user_id_users_id_fk",
+          "tableFrom": "notification_subscriptions",
+          "tableTo": "users",
+          "columnsFrom": [
+            "user_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {
+        "notification_subscriptions_endpoint_unique": {
+          "name": "notification_subscriptions_endpoint_unique",
+          "nullsNotDistinct": false,
+          "columns": [
+            "endpoint"
+          ]
+        }
+      },
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
     "public.reviews": {
       "name": "reviews",
       "schema": "",
@@ -391,14 +953,40 @@
           "default": "now()"
         }
       },
-      "indexes": {},
+      "indexes": {
+        "reviews_booking_customer_unique": {
+          "name": "reviews_booking_customer_unique",
+          "columns": [
+            {
+              "expression": "booking_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "customer_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": true,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
       "foreignKeys": {
         "reviews_booking_id_bookings_id_fk": {
           "name": "reviews_booking_id_bookings_id_fk",
           "tableFrom": "reviews",
           "tableTo": "bookings",
-          "columnsFrom": ["booking_id"],
-          "columnsTo": ["id"],
+          "columnsFrom": [
+            "booking_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
           "onDelete": "no action",
           "onUpdate": "no action"
         },
@@ -406,8 +994,12 @@
           "name": "reviews_customer_id_users_id_fk",
           "tableFrom": "reviews",
           "tableTo": "users",
-          "columnsFrom": ["customer_id"],
-          "columnsTo": ["id"],
+          "columnsFrom": [
+            "customer_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
           "onDelete": "no action",
           "onUpdate": "no action"
         },
@@ -415,8 +1007,12 @@
           "name": "reviews_driver_id_users_id_fk",
           "tableFrom": "reviews",
           "tableTo": "users",
-          "columnsFrom": ["driver_id"],
-          "columnsTo": ["id"],
+          "columnsFrom": [
+            "driver_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
           "onDelete": "no action",
           "onUpdate": "no action"
         }
@@ -469,6 +1065,48 @@
           "primaryKey": false,
           "notNull": false
         },
+        "magic_link_token": {
+          "name": "magic_link_token",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "magic_link_expires_at": {
+          "name": "magic_link_expires_at",
+          "type": "timestamp",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "reset_password_token": {
+          "name": "reset_password_token",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "reset_password_expires_at": {
+          "name": "reset_password_expires_at",
+          "type": "timestamp",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "invitation_token": {
+          "name": "invitation_token",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "invitation_token_expires_at": {
+          "name": "invitation_token_expires_at",
+          "type": "timestamp",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "profile_picture_url": {
+          "name": "profile_picture_url",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
         "created_at": {
           "name": "created_at",
           "type": "timestamp",
@@ -484,7 +1122,73 @@
         "users_email_unique": {
           "name": "users_email_unique",
           "nullsNotDistinct": false,
-          "columns": ["email"]
+          "columns": [
+            "email"
+          ]
+        }
+      },
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.vehicles": {
+      "name": "vehicles",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "serial",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "class": {
+          "name": "class",
+          "type": "vehicle_class",
+          "typeSchema": "public",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "name": {
+          "name": "name",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "passenger_capacity": {
+          "name": "passenger_capacity",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "baggage_capacity": {
+          "name": "baggage_capacity",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "description": {
+          "name": "description",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "image_url": {
+          "name": "image_url",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {},
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {
+        "vehicles_class_unique": {
+          "name": "vehicles_class_unique",
+          "nullsNotDistinct": false,
+          "columns": [
+            "class"
+          ]
         }
       },
       "policies": {},
@@ -561,8 +1265,12 @@
           "name": "zone_pricing_from_zone_id_zones_id_fk",
           "tableFrom": "zone_pricing",
           "tableTo": "zones",
-          "columnsFrom": ["from_zone_id"],
-          "columnsTo": ["id"],
+          "columnsFrom": [
+            "from_zone_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
           "onDelete": "no action",
           "onUpdate": "no action"
         },
@@ -570,8 +1278,12 @@
           "name": "zone_pricing_to_zone_id_zones_id_fk",
           "tableFrom": "zone_pricing",
           "tableTo": "zones",
-          "columnsFrom": ["to_zone_id"],
-          "columnsTo": ["id"],
+          "columnsFrom": [
+            "to_zone_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
           "onDelete": "no action",
           "onUpdate": "no action"
         }
@@ -603,6 +1315,24 @@
           "type": "text",
           "primaryKey": false,
           "notNull": true
+        },
+        "boundary": {
+          "name": "boundary",
+          "type": "jsonb",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "center_lat": {
+          "name": "center_lat",
+          "type": "double precision",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "center_lon": {
+          "name": "center_lon",
+          "type": "double precision",
+          "primaryKey": false,
+          "notNull": false
         }
       },
       "indexes": {},
@@ -612,7 +1342,9 @@
         "zones_name_unique": {
           "name": "zones_name_unique",
           "nullsNotDistinct": false,
-          "columns": ["name"]
+          "columns": [
+            "name"
+          ]
         }
       },
       "policies": {},
@@ -629,6 +1361,7 @@
         "assigned",
         "en_route",
         "arrived",
+        "in_progress",
         "completed",
         "cancelled"
       ]
@@ -636,17 +1369,36 @@
     "public.discount_type": {
       "name": "discount_type",
       "schema": "public",
-      "values": ["fixed", "percentage"]
+      "values": [
+        "fixed",
+        "percentage"
+      ]
     },
     "public.driver_assignment_role": {
       "name": "driver_assignment_role",
       "schema": "public",
-      "values": ["primary", "backup"]
+      "values": [
+        "primary",
+        "backup"
+      ]
     },
     "public.user_role": {
       "name": "user_role",
       "schema": "public",
-      "values": ["customer", "admin", "driver"]
+      "values": [
+        "customer",
+        "admin",
+        "driver"
+      ]
+    },
+    "public.vehicle_class": {
+      "name": "vehicle_class",
+      "schema": "public",
+      "values": [
+        "regular",
+        "comfort",
+        "max"
+      ]
     }
   },
   "schemas": {},

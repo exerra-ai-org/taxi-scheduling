@@ -5,78 +5,8 @@
     {
       "idx": 0,
       "version": "7",
-      "when": 1774808583862,
-      "tag": "0000_ambitious_wong",
-      "breakpoints": true
-    },
-    {
-      "idx": 1,
-      "version": "7",
-      "when": 1775397450196,
-      "tag": "0001_wakeful_morlun",
-      "breakpoints": true
-    },
-    {
-      "idx": 2,
-      "version": "7",
-      "when": 1775499194416,
-      "tag": "0002_reviews_unique",
-      "breakpoints": true
-    },
-    {
-      "idx": 3,
-      "version": "7",
-      "when": 1775501680559,
-      "tag": "0003_blue_cerebro",
-      "breakpoints": true
-    },
-    {
-      "idx": 4,
-      "version": "7",
-      "when": 1775502605108,
-      "tag": "0004_keen_greymalkin",
-      "breakpoints": true
-    },
-    {
-      "idx": 5,
-      "version": "7",
-      "when": 1777038587449,
-      "tag": "0005_add_pickup_dropoff_flight_numbers",
-      "breakpoints": true
-    },
-    {
-      "idx": 6,
-      "version": "7",
-      "when": 1777444672378,
-      "tag": "0006_add_magic_link_columns",
-      "breakpoints": true
-    },
-    {
-      "idx": 7,
-      "version": "7",
-      "when": 1777444673378,
-      "tag": "0007_add_reset_password_columns",
-      "breakpoints": true
-    },
-    {
-      "idx": 8,
-      "version": "7",
-      "when": 1777444674378,
-      "tag": "0008_driver_profiles_invitations",
-      "breakpoints": true
-    },
-    {
-      "idx": 9,
-      "version": "7",
-      "when": 1777444675378,
-      "tag": "0009_incidents",
-      "breakpoints": true
-    },
-    {
-      "idx": 10,
-      "version": "7",
-      "when": 1777444676378,
-      "tag": "0010_add_in_progress_status",
+      "when": 1777445168411,
+      "tag": "0000_tricky_starhawk",
       "breakpoints": true
     }
   ]
