@@ -44,7 +44,6 @@ export default function Modal({
         {title && (
           <div className="flex items-center justify-between border-b border-[var(--color-border)] px-5 py-4">
             <div>
-              <div className="page-eyebrow">Modal</div>
               <h2 className="text-[26px] font-bold tracking-[-0.04em] text-[var(--color-dark)]">
                 {title}
               </h2>

@@ -8,7 +8,7 @@ import {
   useDriverHeartbeat,
   type GpsStatus,
 } from "../../hooks/useDriverHeartbeat";
-import { IconGps } from "../../components/icons";
+import { IconGps, IconUser, IconRefresh } from "../../components/icons";
 
 const GPS_LABEL: Record<GpsStatus, string> = {
   idle: "",
@@ -86,20 +86,16 @@ export default function MyRides() {
       <div className="page-header">
         <div>
           <p className="section-label">Driver</p>
-          <h1 className="page-title mt-4 text-[40px]">My rides</h1>
+          <h1 className="page-title">My rides</h1>
         </div>
         <div className="flex gap-2">
-          <Link
-            to="/driver/profile"
-            className="btn-secondary button-text-compact"
-          >
-            Profile
+          <Link to="/driver/profile" className="page-header-btn">
+            <IconUser className="h-4 w-4" />
+            <span className="page-header-btn-label">Profile</span>
           </Link>
-          <button
-            onClick={fetchBookings}
-            className="btn-secondary button-text-compact"
-          >
-            Refresh
+          <button onClick={fetchBookings} className="page-header-btn">
+            <IconRefresh className="h-4 w-4" />
+            <span className="page-header-btn-label">Refresh</span>
           </button>
         </div>
       </div>

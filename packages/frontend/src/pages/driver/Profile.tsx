@@ -140,7 +140,7 @@ export default function DriverProfile() {
       <div className="page-header">
         <div>
           <p className="section-label">Driver</p>
-          <h1 className="page-title mt-4 text-[40px]">My profile</h1>
+          <h1 className="page-title">My profile</h1>
         </div>
       </div>
 

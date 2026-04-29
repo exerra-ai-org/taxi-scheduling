@@ -5,7 +5,7 @@ import {
   type AdminDriverRow,
 } from "../../api/drivers";
 import { SkeletonCard } from "../../components/Skeleton";
-import { IconUser, IconStar, IconCar } from "../../components/icons";
+import { IconUser, IconStar, IconCar, IconPlus, IconX } from "../../components/icons";
 import { ApiError } from "../../api/client";
 
 export default function DriverManagement() {
@@ -65,17 +65,24 @@ export default function DriverManagement() {
       <div className="page-header">
         <div>
           <p className="section-label">Admin</p>
-          <h1 className="page-title mt-4 text-[40px]">Drivers</h1>
+          <h1 className="page-title">Drivers</h1>
         </div>
         <button
-          className="btn-primary"
+          className="page-header-btn page-header-btn-primary"
           onClick={() => {
             setShowInvite((v) => !v);
             setInviteDone("");
             setInviteError("");
           }}
         >
-          {showInvite ? "Cancel" : "Invite"}
+          {showInvite ? (
+            <IconX className="h-4 w-4" />
+          ) : (
+            <IconPlus className="h-4 w-4" />
+          )}
+          <span className="page-header-btn-label">
+            {showInvite ? "Cancel" : "Invite driver"}
+          </span>
         </button>
       </div>
 

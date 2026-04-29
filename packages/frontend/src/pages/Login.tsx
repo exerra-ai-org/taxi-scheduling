@@ -170,7 +170,7 @@ export default function Login() {
     <div className="mx-auto mt-12 w-full max-w-[480px] animate-fade-in">
       <div className="mb-8">
         <p className="section-label">Account</p>
-        <h1 className="page-title mt-4 text-[40px]">
+        <h1 className="page-title">
           {mode.kind === "register"
             ? "Create your account"
             : mode.kind === "magic-link-sent"

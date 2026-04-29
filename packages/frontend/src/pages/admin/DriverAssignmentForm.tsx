@@ -1,12 +1,7 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { listDrivers, assignDrivers } from "../../api/admin";
+import type { AdminDriverRow } from "../../api/drivers";
 import { ApiError } from "../../api/client";
-
-interface Driver {
-  id: number;
-  name: string;
-  upcomingAssignments: number;
-}
 
 interface Props {
   bookingId: number;
@@ -14,15 +9,88 @@ interface Props {
 }
 
 export default function DriverAssignmentForm({ bookingId, onAssigned }: Props) {
-  const [drivers, setDrivers] = useState<Driver[]>([]);
+  const [drivers, setDrivers] = useState<AdminDriverRow[]>([]);
   const [primaryId, setPrimaryId] = useState<number>(0);
   const [backupId, setBackupId] = useState<number>(0);
+  const [search, setSearch] = useState("");
   const [loading, setLoading] = useState(false);
+  const [driversLoading, setDriversLoading] = useState(true);
   const [error, setError] = useState("");
 
   useEffect(() => {
-    listDrivers().then((d) => setDrivers(d.drivers));
+    setDriversLoading(true);
+    listDrivers()
+      .then((d) => setDrivers(d.drivers))
+      .finally(() => setDriversLoading(false));
   }, []);
+
+  useEffect(() => {
+    setPrimaryId(0);
+    setBackupId(0);
+    setSearch("");
+    setError("");
+  }, [bookingId]);
+
+  const visibleDrivers = useMemo(() => {
+    const term = search.trim().toLowerCase();
+    return [...drivers]
+      .filter((driver) => {
+        if (!term) return true;
+        return [
+          driver.name,
+          driver.email,
+          driver.phone ?? "",
+          driver.profile?.licensePlate ?? "",
+          driver.profile?.vehicleMake ?? "",
+          driver.profile?.vehicleModel ?? "",
+          driver.profile?.vehicleClass ?? "",
+        ]
+          .join(" ")
+          .toLowerCase()
+          .includes(term);
+      })
+      .sort(
+        (a, b) =>
+          a.upcomingAssignments - b.upcomingAssignments ||
+          (b.avgRating ?? 0) - (a.avgRating ?? 0) ||
+          a.name.localeCompare(b.name),
+      );
+  }, [drivers, search]);
+
+  function selectDriver(driverId: number) {
+    setError("");
+    if (primaryId === driverId) {
+      setPrimaryId(0);
+      return;
+    }
+    if (backupId === driverId) {
+      setBackupId(0);
+      return;
+    }
+    if (!primaryId) {
+      setPrimaryId(driverId);
+      return;
+    }
+    if (!backupId) {
+      setBackupId(driverId);
+      return;
+    }
+    setBackupId(driverId);
+  }
+
+  function vehicleSummary(driver: AdminDriverRow) {
+    if (!driver.profile) return "No vehicle profile";
+    const vehicle = [
+      driver.profile.vehicleYear,
+      driver.profile.vehicleMake,
+      driver.profile.vehicleModel,
+    ]
+      .filter(Boolean)
+      .join(" ");
+    return [vehicle || "Vehicle on file", driver.profile.licensePlate]
+      .filter(Boolean)
+      .join(" · ");
+  }
 
   async function handleAssign() {
     if (!primaryId || !backupId) {
@@ -46,45 +114,101 @@ export default function DriverAssignmentForm({ bookingId, onAssigned }: Props) {
   }
 
   return (
-    <div className="space-y-3">
-      <h3 className="section-label">Assign Drivers</h3>
+    <div className="admin-driver-picker">
+      <div>
+        <h3 className="section-label">Assign drivers</h3>
+        <p className="caption-copy mt-1">
+          Pick a primary driver first, then a backup. Lowest workload is ranked
+          first.
+        </p>
+      </div>
       {error && <div className="alert alert-error">{error}</div>}
-      <div>
-        <label className="field-label mb-2 block">Primary Driver</label>
-        <select
-          value={primaryId}
-          onChange={(e) => setPrimaryId(Number(e.target.value))}
-          className="input-glass w-full"
-        >
-          <option value={0}>Select driver...</option>
-          {drivers.map((d) => (
-            <option key={d.id} value={d.id}>
-              {d.name} ({d.upcomingAssignments} upcoming)
-            </option>
-          ))}
-        </select>
+
+      <label className="admin-driver-search">
+        <span className="sr-only">Search drivers</span>
+        <input
+          value={search}
+          onChange={(event) => setSearch(event.target.value)}
+          className="input-glass"
+          placeholder="Search driver, vehicle, plate"
+        />
+      </label>
+
+      <div className="admin-selected-drivers" aria-live="polite">
+        <div className={primaryId ? "is-filled" : ""}>
+          <span>Primary</span>
+          <strong>
+            {drivers.find((driver) => driver.id === primaryId)?.name ||
+              "Not selected"}
+          </strong>
+        </div>
+        <div className={backupId ? "is-filled" : ""}>
+          <span>Backup</span>
+          <strong>
+            {drivers.find((driver) => driver.id === backupId)?.name ||
+              "Not selected"}
+          </strong>
+        </div>
       </div>
-      <div>
-        <label className="field-label mb-2 block">Backup Driver</label>
-        <select
-          value={backupId}
-          onChange={(e) => setBackupId(Number(e.target.value))}
-          className="input-glass w-full"
+
+      {driversLoading ? (
+        <div className="caption-copy">Loading drivers...</div>
+      ) : visibleDrivers.length === 0 ? (
+        <div className="empty-state admin-driver-empty">
+          <p className="caption-copy">No drivers match that search.</p>
+        </div>
+      ) : (
+        <div
+          className="admin-driver-list"
+          role="listbox"
+          aria-label="Available drivers"
         >
-          <option value={0}>Select driver...</option>
-          {drivers.map((d) => (
-            <option key={d.id} value={d.id}>
-              {d.name} ({d.upcomingAssignments} upcoming)
-            </option>
-          ))}
-        </select>
-      </div>
+          {visibleDrivers.map((driver) => {
+            const role =
+              driver.id === primaryId
+                ? "Primary"
+                : driver.id === backupId
+                  ? "Backup"
+                  : "Choose";
+            return (
+              <button
+                key={driver.id}
+                type="button"
+                onClick={() => selectDriver(driver.id)}
+                className={`admin-driver-option ${driver.id === primaryId || driver.id === backupId ? "is-selected" : ""}`}
+                aria-selected={
+                  driver.id === primaryId || driver.id === backupId
+                }
+                role="option"
+              >
+                <span className="admin-driver-avatar" aria-hidden="true">
+                  {driver.name.charAt(0).toUpperCase()}
+                </span>
+                <span className="admin-driver-body">
+                  <span className="admin-driver-name">{driver.name}</span>
+                  <span className="admin-driver-meta">
+                    {vehicleSummary(driver)}
+                  </span>
+                  <span className="admin-driver-meta">
+                    {driver.upcomingAssignments} upcoming
+                    {driver.avgRating != null
+                      ? ` · ${driver.avgRating} rating (${driver.totalReviews})`
+                      : " · no rating"}
+                  </span>
+                </span>
+                <span className="admin-driver-role">{role}</span>
+              </button>
+            );
+          })}
+        </div>
+      )}
+
       <button
         onClick={handleAssign}
         disabled={loading}
         className="btn-primary w-full"
       >
-        {loading ? "Assigning..." : "Assign Drivers"}
+        {loading ? "Assigning..." : "Assign drivers"}
       </button>
     </div>
   );

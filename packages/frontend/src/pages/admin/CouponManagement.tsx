@@ -4,7 +4,7 @@ import { listCoupons, createCoupon } from "../../api/admin";
 import { formatPrice, formatDate } from "../../lib/format";
 import { ApiError } from "../../api/client";
 import { SkeletonCard } from "../../components/Skeleton";
-import { IconTicket } from "../../components/icons";
+import { IconTicket, IconPlus, IconX } from "../../components/icons";
 
 export default function CouponManagement() {
   const [coupons, setCoupons] = useState<Coupon[]>([]);
@@ -75,13 +75,20 @@ export default function CouponManagement() {
       <div className="page-header">
         <div>
           <p className="section-label">Admin</p>
-          <h1 className="page-title mt-4 text-[40px]">Coupons</h1>
+          <h1 className="page-title">Coupons</h1>
         </div>
         <button
           onClick={() => setShowForm(!showForm)}
-          className="btn-primary button-text-compact"
+          className="page-header-btn page-header-btn-primary"
         >
-          {showForm ? "Cancel" : "New Coupon"}
+          {showForm ? (
+            <IconX className="h-4 w-4" />
+          ) : (
+            <IconPlus className="h-4 w-4" />
+          )}
+          <span className="page-header-btn-label">
+            {showForm ? "Cancel" : "New coupon"}
+          </span>
         </button>
       </div>
 

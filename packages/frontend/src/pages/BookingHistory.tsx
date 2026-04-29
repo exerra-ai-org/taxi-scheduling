@@ -79,7 +79,7 @@ export default function BookingHistory() {
       <div className="page-header">
         <div>
           <p className="section-label">Customer</p>
-          <h1 className="page-title mt-3 text-[40px]">Bookings</h1>
+          <h1 className="page-title">Bookings</h1>
         </div>
       </div>
 

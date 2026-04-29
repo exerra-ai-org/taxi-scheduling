@@ -1270,6 +1270,585 @@
     box-shadow 0.45s cubic-bezier(0.2, 1, 0.3, 1);
 }
 
+/* ── Admin dispatch ────────────────────────────────────────────── */
+
+.admin-dispatch-page {
+  gap: 24px;
+}
+
+/* Command bar: search on the left, filter strip to the right above 768px */
+.admin-command-bar {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.admin-search-field,
+.admin-driver-search {
+  display: block;
+}
+
+.admin-filter-strip button {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.admin-filter-count {
+  min-width: 20px;
+  height: 20px;
+  padding: 0 5px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: var(--radius-default);
+  background: var(--color-border);
+  color: var(--color-mid);
+  font-family: var(--font-mono);
+  font-size: 10px;
+  letter-spacing: 0;
+}
+
+.segmented-filter .is-active .admin-filter-count {
+  background: var(--color-dark);
+  color: var(--color-surface);
+}
+
+/* Dispatch grid: single column mobile, two-panel desktop */
+.admin-dispatch-grid {
+  display: grid;
+  gap: 16px;
+}
+
+/* Both panels share one card treatment. overflow:hidden clips content at
+   the panel's rounded corners — prevents the hero tint from bleeding out. */
+.admin-queue-panel,
+.admin-detail-panel {
+  min-width: 0;
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-default);
+  box-shadow: var(--shadow-card);
+  overflow: hidden;
+}
+
+.admin-detail-panel {
+  display: none;
+}
+
+/* Queue header: tinted zone anchoring the list */
+.admin-queue-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 12px 16px;
+  border-bottom: 1px solid var(--color-border);
+  background: var(--color-surface-alt);
+}
+
+.admin-ride-list {
+  display: flex;
+  flex-direction: column;
+}
+
+/* Ride row: two columns only — time anchor left, content right.
+   Status is read from the label text and urgency color; no third badge column. */
+.admin-ride-row {
+  width: 100%;
+  display: grid;
+  grid-template-columns: 80px minmax(0, 1fr);
+  gap: 12px;
+  padding: 12px 16px;
+  text-align: left;
+  background: var(--color-surface);
+  border: 0;
+  border-bottom: 1px solid var(--color-border);
+  cursor: pointer;
+  transition: background-color 0.18s ease;
+}
+
+.admin-ride-row:last-child {
+  border-bottom: 0;
+}
+
+.admin-ride-row:hover,
+.admin-ride-row:focus-visible,
+.admin-ride-row.is-selected {
+  background: var(--color-surface-alt);
+}
+
+.admin-ride-row:focus-visible {
+  outline: 2px solid var(--color-dark);
+  outline-offset: -2px;
+}
+
+/* Selected: inset left accent instead of full outline — cleaner in a dense list */
+.admin-ride-row.is-selected {
+  box-shadow: inset 2px 0 0 var(--color-dark);
+}
+
+.admin-ride-time {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  padding-top: 1px;
+}
+
+.admin-ride-time-value {
+  font-family: var(--font-display);
+  font-size: 20px;
+  font-weight: 700;
+  line-height: 1;
+  letter-spacing: -0.04em;
+  color: var(--color-dark);
+}
+
+/* Urgency state: unassigned rides starting soon get an orange time signal */
+.admin-ride-row.is-urgent .admin-ride-time-value {
+  color: var(--color-orange);
+}
+
+.admin-ride-time-label {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  line-height: 1.3;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--color-muted);
+}
+
+.admin-ride-main {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+
+.admin-ride-route {
+  display: block;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-family: var(--font-body);
+  font-size: 13px;
+  font-weight: 600;
+  line-height: 1.35;
+  letter-spacing: -0.01em;
+  color: var(--color-dark);
+}
+
+.admin-ride-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0 8px;
+  font-family: var(--font-mono);
+  font-size: 10px;
+  line-height: 1.4;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: var(--color-muted);
+}
+
+.admin-ride-airport-flag {
+  color: var(--color-orange);
+}
+
+.admin-empty-state {
+  border: 0;
+  box-shadow: none;
+}
+
+/* ── Detail panel ──────────────────────────────────────────────── */
+
+.admin-detail-placeholder {
+  min-height: 400px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  padding: 32px;
+  text-align: center;
+}
+
+/* No outer padding — each zone handles its own spacing edge-to-edge */
+.admin-detail-panel-inner {
+  padding: 0;
+}
+
+.admin-detail-content {
+  display: flex;
+  flex-direction: column;
+}
+
+/* Hero zone: edge-to-edge tinted header. No nested card. */
+.admin-detail-hero {
+  display: grid;
+  gap: 14px;
+  padding: 16px;
+  background: var(--color-surface-alt);
+  border-bottom: 1px solid var(--color-border);
+}
+
+.admin-detail-hero h2 {
+  margin-top: 4px;
+  font-family: var(--font-display);
+  font-size: 26px;
+  font-weight: 700;
+  line-height: 1;
+  letter-spacing: -0.04em;
+  color: var(--color-dark);
+}
+
+.admin-detail-route {
+  display: grid;
+  gap: 8px;
+}
+
+.admin-detail-route div {
+  display: grid;
+  grid-template-columns: 26px minmax(0, 1fr);
+  align-items: start;
+  gap: 10px;
+}
+
+/* P / D marker chips — mirrors the monogram chip language */
+.admin-detail-route span {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  flex: none;
+  border-radius: var(--radius-default);
+  background: var(--color-dark);
+  color: var(--color-green);
+  font-family: var(--font-mono);
+  font-size: 10px;
+  font-weight: 700;
+  margin-top: 1px;
+}
+
+.admin-detail-route p {
+  margin: 0;
+  font-family: var(--font-body);
+  font-size: 14px;
+  font-weight: 600;
+  line-height: 1.4;
+  color: var(--color-dark);
+}
+
+.admin-detail-meta-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+}
+
+.admin-detail-meta-row > span:not(.ds-tag) {
+  min-height: 26px;
+  display: inline-flex;
+  align-items: center;
+  padding: 4px 8px;
+  border-radius: var(--radius-default);
+  background: var(--color-surface);
+  border: 1px solid var(--color-border-light);
+  font-family: var(--font-mono);
+  font-size: 10px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--color-dark);
+}
+
+/* Sections: consistent 16px padding, hairline top divider */
+.admin-detail-section {
+  display: grid;
+  gap: 10px;
+  padding: 16px;
+  border-bottom: 1px solid var(--color-border);
+}
+
+.admin-detail-section:last-child {
+  border-bottom: none;
+}
+
+/* Customer data: one bordered container, two cells divided by a vertical rule.
+   Not two separate mini-cards. */
+.admin-data-grid {
+  display: grid;
+  gap: 0;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-default);
+  overflow: hidden;
+}
+
+.admin-data-grid div {
+  display: grid;
+  gap: 3px;
+  padding: 10px 12px;
+}
+
+.admin-data-grid div + div {
+  border-left: 1px solid var(--color-border);
+}
+
+.admin-data-grid span,
+.admin-assignment-row span {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  line-height: 1.4;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--color-muted);
+}
+
+.admin-data-grid strong,
+.admin-assignment-row strong {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-family: var(--font-body);
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--color-dark);
+}
+
+.admin-assignment-list {
+  display: grid;
+  gap: 6px;
+}
+
+.admin-assignment-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 10px 12px;
+  border: 1px solid var(--color-border-light);
+  border-radius: var(--radius-default);
+  background: transparent;
+}
+
+.admin-assignment-row.is-active {
+  border-color: rgb(152 254 0 / 0.5);
+  background: rgb(152 254 0 / 0.08);
+}
+
+.admin-assignment-row div {
+  min-width: 0;
+  display: grid;
+  gap: 2px;
+}
+
+.admin-action-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+/* ── Driver assignment form ──────────────────────────────────── */
+
+.admin-driver-picker {
+  display: grid;
+  gap: 14px;
+  padding: 16px;
+}
+
+/* Slot summary: dashed when empty, solid dark border when filled */
+.admin-selected-drivers {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.admin-selected-drivers div {
+  min-width: 0;
+  display: grid;
+  gap: 3px;
+  padding: 10px 12px;
+  border: 1.5px dashed var(--color-border-light);
+  border-radius: var(--radius-default);
+  background: transparent;
+  transition:
+    border-color 0.2s ease,
+    background-color 0.2s ease;
+}
+
+.admin-selected-drivers div.is-filled {
+  border-style: solid;
+  border-color: var(--color-dark);
+  background: var(--color-surface);
+}
+
+.admin-selected-drivers span {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--color-muted);
+}
+
+.admin-selected-drivers strong {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-family: var(--font-body);
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--color-dark);
+}
+
+.admin-driver-list {
+  max-height: 300px;
+  overflow-y: auto;
+  display: grid;
+  gap: 6px;
+  padding-right: 2px;
+}
+
+.admin-driver-option {
+  width: 100%;
+  display: grid;
+  grid-template-columns: 32px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 12px;
+  text-align: left;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-default);
+  background: var(--color-surface);
+  cursor: pointer;
+  transition:
+    border-color 0.18s ease,
+    background-color 0.18s ease;
+}
+
+.admin-driver-option:hover,
+.admin-driver-option:focus-visible,
+.admin-driver-option.is-selected {
+  border-color: var(--color-dark);
+  background: var(--color-surface-alt);
+}
+
+.admin-driver-option:focus-visible {
+  outline: 2px solid var(--color-dark);
+  outline-offset: 2px;
+}
+
+.admin-driver-avatar {
+  width: 32px;
+  height: 32px;
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: var(--radius-default);
+  background: var(--color-dark);
+  color: var(--color-green);
+  font-family: var(--font-mono);
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.admin-driver-body {
+  min-width: 0;
+  display: grid;
+  gap: 2px;
+}
+
+.admin-driver-name {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-family: var(--font-body);
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--color-dark);
+}
+
+.admin-driver-meta {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  line-height: 1.4;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: var(--color-muted);
+}
+
+.admin-driver-role {
+  min-width: 52px;
+  display: inline-flex;
+  justify-content: center;
+  padding: 5px 8px;
+  border-radius: var(--radius-default);
+  border: 1px solid var(--color-border-light);
+  background: transparent;
+  font-family: var(--font-mono);
+  font-size: 10px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--color-muted);
+}
+
+.admin-driver-option.is-selected .admin-driver-role {
+  background: var(--color-dark);
+  border-color: var(--color-dark);
+  color: var(--color-green);
+}
+
+.admin-driver-empty {
+  padding: 16px;
+  border: 1px solid var(--color-border);
+  box-shadow: none;
+}
+
+/* ── Responsive ─────────────────────────────────────────────── */
+
+@media (min-width: 768px) {
+  .admin-command-bar {
+    flex-direction: row;
+    align-items: flex-start;
+    gap: 16px;
+  }
+
+  .admin-command-bar .admin-search-field {
+    flex: 0 0 280px;
+  }
+
+  .admin-command-bar .admin-filter-strip {
+    flex: 1;
+  }
+
+  .admin-dispatch-grid {
+    grid-template-columns: minmax(0, 1fr) minmax(360px, 0.72fr);
+    align-items: start;
+  }
+
+  .admin-detail-panel {
+    display: block;
+    position: sticky;
+    top: 92px;
+    max-height: calc(100vh - 112px);
+    overflow-y: auto;
+  }
+
+  .admin-ride-row {
+    grid-template-columns: 88px minmax(0, 1fr);
+  }
+}
+
+@media (min-width: 1100px) {
+  .admin-dispatch-grid {
+    grid-template-columns: minmax(0, 1.08fr) minmax(420px, 0.72fr);
+  }
+}
+
 /* Booking-flow floating panel: slides from screen center to right edge as the
    user moves past step 1, freeing the map to show the live route.
    Padding + inner card padding scale with viewport height via clamp() so the
@@ -1799,6 +2378,63 @@
   gap: 2px;
 }
 
+/* Page header action button: 40×40 icon-only on mobile, labeled on sm+ */
+.page-header-btn {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  width: 40px;
+  height: 40px;
+  border-radius: var(--radius-default);
+  border: 1px solid var(--color-border-light);
+  background: transparent;
+  color: var(--color-dark);
+  cursor: pointer;
+  font-family: var(--font-display);
+  font-size: 16px;
+  font-weight: 500;
+  letter-spacing: -0.02em;
+  text-decoration: none;
+  transition:
+    background-color 0.2s ease,
+    border-color 0.2s ease;
+}
+
+.page-header-btn:hover {
+  background: var(--color-surface-alt);
+  border-color: var(--color-dark);
+}
+
+.page-header-btn-primary {
+  background: var(--color-dark);
+  color: var(--color-surface);
+  border-color: var(--color-dark);
+}
+
+.page-header-btn-primary:hover {
+  background: var(--color-mid);
+  border-color: var(--color-mid);
+}
+
+.page-header-btn .page-header-btn-label {
+  display: none;
+}
+
+@media (min-width: 640px) {
+  .page-header-btn {
+    width: auto;
+    height: auto;
+    min-height: 44px;
+    padding: 10px 14px;
+  }
+
+  .page-header-btn .page-header-btn-label {
+    display: inline;
+  }
+}
+
 @media (max-width: 809px) {
   .app-main {
     padding-top: 24px;
@@ -1806,16 +2442,39 @@
     padding-bottom: calc(96px + env(safe-area-inset-bottom));
   }
 
+  /* Keep header as a row on mobile — title left, action right */
   .page-header {
-    flex-direction: column;
+    align-items: center;
+  }
+
+  /* Subtitle and eyebrow label are decorative on mobile — remove them */
+  .page-subtitle {
+    display: none;
+  }
+
+  .page-header .section-label {
+    display: none;
   }
 
   .page-title {
-    font-size: 40px;
+    font-size: 32px;
   }
 
   .metric-value {
     font-size: 56px;
+  }
+
+  /* Filter strip: single scrollable row instead of multi-line wrap */
+  .admin-filter-strip {
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: none;
+    padding-bottom: 2px;
+  }
+
+  .admin-filter-strip::-webkit-scrollbar {
+    display: none;
   }
 }
 

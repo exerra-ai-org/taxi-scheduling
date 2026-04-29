@@ -1,33 +1,72 @@
-import { useEffect, useState, useCallback } from "react";
-import type { Booking, BookingStatus } from "shared/types";
+import { useEffect, useState, useCallback, useMemo } from "react";
+import type { Booking } from "shared/types";
 import { listAllBookings } from "../../api/admin";
-import { formatPrice, formatDate } from "../../lib/format";
-import StatusBadge from "../../components/StatusBadge";
+import { formatPrice, formatDate, statusLabel } from "../../lib/format";
 import { SkeletonCard } from "../../components/Skeleton";
 import AlertsBanner from "./AlertsBanner";
 import RideDetail from "./RideDetail";
-import { IconCar } from "../../components/icons";
-import ZoneMap from "../../components/maps/ZoneMap";
+import { IconCar, IconRefresh } from "../../components/icons";
 
-const STATUS_OPTIONS: (BookingStatus | "all")[] = [
-  "all",
-  "scheduled",
+type QueueFilter = "attention" | "unassigned" | "soon" | "active" | "all";
+
+const ACTIVE_STATUSES = new Set([
   "assigned",
   "en_route",
   "arrived",
-  "completed",
-  "cancelled",
-];
+  "in_progress",
+]);
+const DONE_STATUSES = new Set(["completed", "cancelled"]);
+const SOON_MS = 2 * 60 * 60 * 1000;
+
+function rideTime(booking: Booking) {
+  return new Date(booking.scheduledAt).getTime();
+}
+
+function isStartingSoon(booking: Booking) {
+  const startsAt = rideTime(booking);
+  const now = Date.now();
+  return startsAt >= now && startsAt <= now + SOON_MS;
+}
+
+function urgencyRank(booking: Booking) {
+  if (booking.status === "scheduled" && isStartingSoon(booking)) return 0;
+  if (booking.status === "scheduled") return 1;
+  if (isStartingSoon(booking) && !DONE_STATUSES.has(booking.status)) return 2;
+  if (ACTIVE_STATUSES.has(booking.status)) return 3;
+  if (booking.status === "cancelled") return 6;
+  if (booking.status === "completed") return 7;
+  return 4;
+}
+
+function timeSignal(booking: Booking) {
+  const minutes = Math.round((rideTime(booking) - Date.now()) / 60000);
+  if (minutes < 0 && !DONE_STATUSES.has(booking.status)) return "Late";
+  if (minutes < 60 && minutes >= 0) return `${minutes}m`;
+  if (minutes < 24 * 60 && minutes >= 0) return `${Math.round(minutes / 60)}h`;
+  const d = new Date(booking.scheduledAt);
+  return `${d.getDate()} ${d.toLocaleString("en-GB", { month: "short" })}`;
+}
+
+function queueLabel(filter: QueueFilter) {
+  const labels: Record<QueueFilter, string> = {
+    attention: "Attention",
+    unassigned: "Unassigned",
+    soon: "Soon",
+    active: "Active",
+    all: "All",
+  };
+  return labels[filter];
+}
 
 export default function RideTimeline() {
   const [bookings, setBookings] = useState<Booking[]>([]);
   const [loading, setLoading] = useState(true);
-  const [statusFilter, setStatusFilter] = useState<BookingStatus | "all">(
-    "all",
-  );
+  const [filter, setFilter] = useState<QueueFilter>("attention");
+  const [search, setSearch] = useState("");
   const [selectedId, setSelectedId] = useState<number | null>(null);
-  const [showZoneMap, setShowZoneMap] = useState(false);
-
+  const [isDesktop, setIsDesktop] = useState(
+    () => window.matchMedia("(min-width: 768px)").matches,
+  );
   const fetchBookings = useCallback(async () => {
     try {
       const data = await listAllBookings();
@@ -45,10 +84,74 @@ export default function RideTimeline() {
     return () => clearInterval(interval);
   }, [fetchBookings]);
 
-  const filtered =
-    statusFilter === "all"
-      ? bookings
-      : bookings.filter((b) => b.status === statusFilter);
+  useEffect(() => {
+    const media = window.matchMedia("(min-width: 768px)");
+    const updateMedia = () => setIsDesktop(media.matches);
+    updateMedia();
+    media.addEventListener("change", updateMedia);
+    return () => media.removeEventListener("change", updateMedia);
+  }, []);
+
+  const counts = useMemo(() => {
+    const soon = bookings.filter(
+      (b) => isStartingSoon(b) && !DONE_STATUSES.has(b.status),
+    ).length;
+    const unassigned = bookings.filter((b) => b.status === "scheduled").length;
+    const active = bookings.filter((b) => ACTIVE_STATUSES.has(b.status)).length;
+    const attention = bookings.filter(
+      (b) =>
+        b.status === "scheduled" ||
+        (isStartingSoon(b) && !DONE_STATUSES.has(b.status)),
+    ).length;
+    return { attention, unassigned, soon, active, all: bookings.length };
+  }, [bookings]);
+
+  const filtered = useMemo(() => {
+    const term = search.trim().toLowerCase();
+    return bookings
+      .filter((booking) => {
+        if (filter === "unassigned") return booking.status === "scheduled";
+        if (filter === "soon") {
+          return isStartingSoon(booking) && !DONE_STATUSES.has(booking.status);
+        }
+        if (filter === "active") return ACTIVE_STATUSES.has(booking.status);
+        if (filter === "attention") {
+          return (
+            booking.status === "scheduled" ||
+            (isStartingSoon(booking) && !DONE_STATUSES.has(booking.status))
+          );
+        }
+        return true;
+      })
+      .filter((booking) => {
+        if (!term) return true;
+        return [
+          booking.pickupAddress,
+          booking.dropoffAddress,
+          booking.customerName ?? "",
+          booking.customerPhone ?? "",
+          statusLabel(booking.status),
+        ]
+          .join(" ")
+          .toLowerCase()
+          .includes(term);
+      })
+      .sort(
+        (a, b) => urgencyRank(a) - urgencyRank(b) || rideTime(a) - rideTime(b),
+      );
+  }, [bookings, filter, search]);
+
+  useEffect(() => {
+    const hasSelection = selectedId
+      ? filtered.some((booking) => booking.id === selectedId)
+      : false;
+    if (hasSelection) {
+      return;
+    }
+    setSelectedId(isDesktop ? (filtered[0]?.id ?? null) : null);
+  }, [filtered, isDesktop, selectedId]);
+
+  const selectedBooking = filtered.find((booking) => booking.id === selectedId);
 
   if (loading) {
     return (
@@ -61,137 +164,154 @@ export default function RideTimeline() {
   }
 
   return (
-    <div className="page-stack">
+    <div className="page-stack admin-dispatch-page">
       <div className="page-header">
         <div>
           <p className="section-label">Admin</p>
-          <h1 className="page-title mt-4 text-[40px]">Ride timeline</h1>
+          <h1 className="page-title">Dispatch</h1>
+          <p className="page-subtitle">
+            Assign drivers, monitor live rides, and keep the next operational
+            decision in view.
+          </p>
         </div>
-        <button
-          onClick={() => setShowZoneMap((v) => !v)}
-          className="btn-secondary button-text-compact"
-        >
-          {showZoneMap ? "Hide Zone Map" : "Show Zone Map"}
+        <button onClick={fetchBookings} className="page-header-btn">
+          <IconRefresh className="h-4 w-4" />
+          <span className="page-header-btn-label">Refresh</span>
         </button>
       </div>
 
-      {showZoneMap && (
-        <div className="mb-4">
-          <ZoneMap />
-        </div>
-      )}
-
       <AlertsBanner
         bookings={bookings}
-        onFilterUnassigned={() => setStatusFilter("scheduled")}
-        onFilterStartingSoon={() => setStatusFilter("all")}
+        onFilterUnassigned={() => setFilter("unassigned")}
+        onFilterStartingSoon={() => setFilter("soon")}
       />
 
-      <div className="segmented-filter overflow-x-auto pb-1">
-        {STATUS_OPTIONS.map((s) => (
-          <button
-            key={s}
-            onClick={() => setStatusFilter(s)}
-            className={`whitespace-nowrap ${statusFilter === s ? "is-active" : ""}`}
-          >
-            {s === "all" ? "All" : s.replace("_", " ").toUpperCase()}
-          </button>
-        ))}
+      <div className="admin-command-bar">
+        <label className="admin-search-field">
+          <span className="sr-only">Search rides</span>
+          <input
+            value={search}
+            onChange={(event) => setSearch(event.target.value)}
+            placeholder="Search route, customer, phone, status"
+            className="input-glass"
+          />
+        </label>
+        <div
+          className="segmented-filter admin-filter-strip"
+          aria-label="Ride queue filters"
+        >
+          {(
+            [
+              "attention",
+              "unassigned",
+              "soon",
+              "active",
+              "all",
+            ] as QueueFilter[]
+          ).map((option) => (
+            <button
+              key={option}
+              onClick={() => setFilter(option)}
+              className={filter === option ? "is-active" : ""}
+            >
+              {queueLabel(option)}
+              <span className="admin-filter-count">{counts[option]}</span>
+            </button>
+          ))}
+        </div>
       </div>
 
-      {/* Empty state */}
-      {filtered.length === 0 ? (
-        <div className="empty-state">
-          <div className="empty-state-icon">
-            <IconCar className="h-8 w-8" />
+      <div className="admin-dispatch-grid">
+        <section className="admin-queue-panel" aria-label="Ride queue">
+          <div className="admin-queue-header">
+            <div>
+              <p className="section-label">Queue</p>
+              <p className="caption-copy mt-1">
+                {filtered.length} {filtered.length === 1 ? "ride" : "rides"}{" "}
+                shown
+              </p>
+            </div>
+            <span className="mono-label">30s refresh</span>
           </div>
-          <p className="caption-copy">No rides found</p>
-        </div>
-      ) : (
-        <>
-          <div className="hidden md:block glass-table">
-            <table className="ds-table w-full text-sm">
-              <thead>
-                <tr className="text-left">
-                  <th className="px-4 py-3">Route</th>
-                  <th className="px-4 py-3">Scheduled</th>
-                  <th className="px-4 py-3">Price</th>
-                  <th className="px-4 py-3">Status</th>
-                </tr>
-              </thead>
-              <tbody>
-                {filtered.map((b) => (
-                  <tr
-                    key={b.id}
-                    onClick={() => setSelectedId(b.id)}
-                    className="cursor-pointer"
+
+          {filtered.length === 0 ? (
+            <div className="empty-state admin-empty-state">
+              <div className="empty-state-icon">
+                <IconCar className="h-8 w-8" />
+              </div>
+              <p className="body-copy mb-1 font-medium">
+                No rides match this view
+              </p>
+              <p className="caption-copy">Change the filter or search term.</p>
+            </div>
+          ) : (
+            <div className="admin-ride-list">
+              {filtered.map((booking) => {
+                const isSelected = booking.id === selectedId;
+                return (
+                  <button
+                    key={booking.id}
+                    type="button"
+                    onClick={() => setSelectedId(booking.id)}
+                    className={`admin-ride-row ${isSelected ? "is-selected" : ""} ${
+                      booking.status === "scheduled" && isStartingSoon(booking)
+                        ? "is-urgent"
+                        : ""
+                    }`}
+                    aria-pressed={isSelected}
                   >
-                    <td className="px-4 py-3">
-                      <div className="max-w-xs truncate font-medium text-[var(--color-dark)]">
-                        {b.pickupAddress}
-                      </div>
-                      <div className="mono-label max-w-xs truncate">
-                        → {b.dropoffAddress}
-                      </div>
-                      {b.isAirport && (
-                        <span className="ds-tag tag-airport mt-2 inline-flex">
-                          AIRPORT
-                        </span>
-                      )}
-                    </td>
-                    <td className="mono-label whitespace-nowrap px-4 py-3">
-                      {formatDate(b.scheduledAt)}
-                    </td>
-                    <td className="whitespace-nowrap px-4 py-3 font-medium text-[var(--color-dark)]">
-                      {formatPrice(b.pricePence)}
-                    </td>
-                    <td className="px-4 py-3">
-                      <StatusBadge status={b.status} />
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+                    <span className="admin-ride-time">
+                      <span className="admin-ride-time-value">
+                        {timeSignal(booking)}
+                      </span>
+                      <span className="admin-ride-time-label">
+                        {booking.status === "scheduled"
+                          ? "Needs driver"
+                          : statusLabel(booking.status)}
+                      </span>
+                    </span>
+                    <span className="admin-ride-main">
+                      <span className="admin-ride-route">
+                        {booking.pickupAddress} → {booking.dropoffAddress}
+                      </span>
+                      <span className="admin-ride-meta">
+                        <span>{formatDate(booking.scheduledAt)}</span>
+                        <span>{formatPrice(booking.pricePence)}</span>
+                        {booking.customerName && (
+                          <span>{booking.customerName}</span>
+                        )}
+                        {booking.isAirport && (
+                          <span className="admin-ride-airport-flag">
+                            Airport
+                          </span>
+                        )}
+                      </span>
+                    </span>
+                  </button>
+                );
+              })}
+            </div>
+          )}
+        </section>
 
-          <div className="md:hidden space-y-2">
-            {filtered.map((b) => (
-              <button
-                key={b.id}
-                onClick={() => setSelectedId(b.id)}
-                className="w-full text-left glass-card p-3"
-              >
-                <div className="flex items-start justify-between">
-                  <div className="space-y-0.5 min-w-0 flex-1 pr-2">
-                    <div className="truncate text-sm font-medium text-[var(--color-dark)]">
-                      {b.pickupAddress}
-                    </div>
-                    <div className="mono-label truncate">
-                      → {b.dropoffAddress}
-                    </div>
-                    <div className="mono-label">
-                      {formatDate(b.scheduledAt)} · {formatPrice(b.pricePence)}
-                    </div>
-                  </div>
-                  <div className="flex flex-col items-end gap-1 shrink-0">
-                    <StatusBadge status={b.status} />
-                    {b.isAirport && (
-                      <span className="ds-tag tag-airport">AIRPORT</span>
-                    )}
-                  </div>
-                </div>
-              </button>
-            ))}
-          </div>
-        </>
+        <aside className="admin-detail-panel" aria-label="Selected ride detail">
+          <RideDetail
+            bookingId={selectedBooking?.id ?? null}
+            onClose={() => setSelectedId(null)}
+            onUpdated={fetchBookings}
+            variant="panel"
+          />
+        </aside>
+      </div>
+
+      {!isDesktop && (
+        <RideDetail
+          bookingId={selectedId}
+          onClose={() => setSelectedId(null)}
+          onUpdated={fetchBookings}
+          variant="modal"
+        />
       )}
-
-      {/* Detail modal */}
-      <RideDetail
-        bookingId={selectedId}
-        onClose={() => setSelectedId(null)}
-        onUpdated={fetchBookings}
-      />
     </div>
   );
 }

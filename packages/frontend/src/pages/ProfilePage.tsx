@@ -87,7 +87,7 @@ export default function ProfilePage() {
       <div className="page-header">
         <div>
           <p className="section-label">Account</p>
-          <h1 className="page-title mt-4 text-[40px]">{user?.name}</h1>
+          <h1 className="page-title">{user?.name}</h1>
         </div>
       </div>
 
