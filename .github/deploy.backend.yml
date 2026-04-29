@@ -1,0 +1,58 @@
+name: Deploy backend                                                                        
+  on:                                                        
+    push:                                
+      branches: [main]
+      paths:
+        - 'packages/backend/**'
+        - 'packages/shared/**'                                                                
+        - 'package.json'
+        - 'bun.lock'                                                                          
+        - 'Dockerfile'                                       
+        - '.github/workflows/deploy-backend.yml'
+                                                                                              
+  permissions: { id-token: write, contents: read }                                            
+  env:                                                                                        
+    AWS_REGION: ${{ vars.AWS_REGION }}                                                        
+                                                             
+  jobs:                                  
+    deploy:
+      runs-on: ubuntu-latest                                                                  
+      timeout-minutes: 15
+      steps:                                                                                  
+        - uses: actions/checkout@v4                          
+        - uses: aws-actions/configure-aws-credentials@v4                                      
+          with:
+            role-to-assume: ${{ secrets.DEPLOY_ROLE_ARN }}                                    
+            aws-region: ${{ env.AWS_REGION }}                                                 
+        - uses: aws-actions/amazon-ecr-login@v2
+                                                                                              
+        - name: Build & push image                           
+          id: build                                                                           
+          env:                                               
+            IMAGE_URI: ${{ vars.ECR_REPOSITORY_URL }}:${{ github.sha }}
+          run: |                                                                              
+            docker build -t "$IMAGE_URI" .
+            docker push "$IMAGE_URI"                                                          
+            echo "image=$IMAGE_URI" >> $GITHUB_OUTPUT        
+                                                                                              
+        - name: Pull current task definition                 
+          run: |                                                                              
+            aws ecs describe-task-definition \               
+              --task-definition ${{ vars.ECS_SERVICE_NAME }} \                                
+              --query 'taskDefinition' > task-def.json
+                                                                                              
+        - name: Render new task definition                   
+          id: render                                                                          
+          uses: aws-actions/amazon-ecs-render-task-definition@v1
+          with:                                                                               
+            task-definition: task-def.json
+            container-name: ${{ vars.ECS_SERVICE_NAME }}                                      
+            image: ${{ steps.build.outputs.image }}                                           
+                                                                                              
+        - name: Deploy to ECS                                                                 
+          uses: aws-actions/amazon-ecs-deploy-task-definition@v2                              
+          with:                                              
+            task-definition: ${{ steps.render.outputs.task-definition }}
+            service: ${{ vars.ECS_SERVICE_NAME }}                                             
+            cluster: ${{ vars.ECS_CLUSTER }}
+            wait-for-service-stability: true
