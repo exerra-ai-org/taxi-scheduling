@@ -9,6 +9,7 @@ import {
   avg,
   count,
 } from "drizzle-orm";
+import { alias } from "drizzle-orm/pg-core";
 import type { BookingStatus } from "shared/types";
 import {
   createBookingSchema,
@@ -53,6 +54,7 @@ import {
   notifyDriversAssigned,
   notifyIncident,
 } from "../services/notifications";
+import { broadcastBookingEvent } from "../services/broadcaster";
 
 export const bookingRoutes = new Hono();
 
@@ -247,6 +249,14 @@ bookingRoutes.post("/", requireRole("customer"), async (c) => {
       notifyBookingCreated(booking.id),
     );
 
+    // Tell the customer's own open SSE connections (e.g., booking history
+    // tab) and any admin watching the dispatch board.
+    broadcastBookingEvent([booking.customerId], {
+      type: "booking_created",
+      bookingId: booking.id,
+      customerId: booking.customerId,
+    });
+
     return ok(c, { booking }, 201);
   } catch (cause) {
     if (cause instanceof BookingRequestError) {
@@ -266,36 +276,34 @@ bookingRoutes.get("/", async (c) => {
 
   if (payload.role === "customer") {
     const bookingCols = getTableColumns(bookings);
+    const activePrimary = alias(driverAssignments, "active_primary_da");
+    const primaryDriver = alias(users, "active_primary_user");
+
     results = await db
       .select({
         ...bookingCols,
-        hasReview: sql<boolean>`(EXISTS (
-          SELECT 1 FROM reviews r
-          WHERE r.booking_id = bookings.id
-            AND r.customer_id = ${payload.sub}
-        ))::boolean`,
-        reviewRating: sql<number | null>`(
-          SELECT r.rating FROM reviews r
-          WHERE r.booking_id = bookings.id
-            AND r.customer_id = ${payload.sub}
-          LIMIT 1
-        )::integer`,
-        primaryDriverName: sql<string | null>`(
-          SELECT u.name FROM driver_assignments da
-          JOIN users u ON u.id = da.driver_id
-          WHERE da.booking_id = bookings.id
-            AND da.is_active = true AND da.role = 'primary'
-          LIMIT 1
-        )`,
-        primaryDriverPhone: sql<string | null>`(
-          SELECT u.phone FROM driver_assignments da
-          JOIN users u ON u.id = da.driver_id
-          WHERE da.booking_id = bookings.id
-            AND da.is_active = true AND da.role = 'primary'
-          LIMIT 1
-        )`,
+        hasReview: sql<boolean>`${reviews.id} IS NOT NULL`,
+        reviewRating: reviews.rating,
+        primaryDriverName: primaryDriver.name,
+        primaryDriverPhone: primaryDriver.phone,
       })
       .from(bookings)
+      .leftJoin(
+        reviews,
+        and(
+          eq(reviews.bookingId, bookings.id),
+          eq(reviews.customerId, payload.sub),
+        ),
+      )
+      .leftJoin(
+        activePrimary,
+        and(
+          eq(activePrimary.bookingId, bookings.id),
+          eq(activePrimary.isActive, true),
+          eq(activePrimary.role, "primary"),
+        ),
+      )
+      .leftJoin(primaryDriver, eq(primaryDriver.id, activePrimary.driverId))
       .where(eq(bookings.customerId, payload.sub))
       .orderBy(desc(bookings.scheduledAt));
   } else if (payload.role === "admin") {
@@ -707,6 +715,12 @@ bookingRoutes.patch(
       notifyBookingStatusChanged(id, nextStatus),
     );
 
+    broadcastBookingEvent([booking.customerId], {
+      type: "booking_updated",
+      bookingId: id,
+      status: nextStatus,
+    });
+
     return ok(c, { booking: updated });
   },
 );
@@ -749,6 +763,11 @@ bookingRoutes.patch(
       .returning();
 
     runAsyncSideEffect("notifyBookingCancelled", notifyBookingCancelled(id));
+
+    broadcastBookingEvent([booking.customerId], {
+      type: "booking_cancelled",
+      bookingId: id,
+    });
 
     return ok(c, { booking: updated });
   },
@@ -859,6 +878,11 @@ bookingRoutes.post("/:id/assign", requireRole("admin"), async (c) => {
     notifyDriversAssigned(id, primaryDriverId, backupDriverId),
   );
 
+  broadcastBookingEvent([booking.customerId, primaryDriverId, backupDriverId], {
+    type: "drivers_assigned",
+    bookingId: id,
+  });
+
   return ok(c, { booking: updatedBooking, assignments });
 });
 
@@ -931,6 +955,11 @@ bookingRoutes.post("/:id/fallback", requireRole("admin"), async (c) => {
     "notifyDriverFallbackActivated",
     notifyDriverFallbackActivated(id, primary.driverId, backup.driverId),
   );
+
+  broadcastBookingEvent([booking.customerId, backup.driverId], {
+    type: "drivers_assigned",
+    bookingId: id,
+  });
 
   const updatedAssignments = await db
     .select({

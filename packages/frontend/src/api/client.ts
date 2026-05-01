@@ -1,3 +1,5 @@
+import { config } from "../config";
+
 export class ApiError extends Error {
   constructor(
     message: string,
@@ -8,7 +10,7 @@ export class ApiError extends Error {
   }
 }
 
-export const API_BASE = import.meta.env.VITE_API_BASE_URL ?? "/api";
+export const API_BASE = config.apiBase;
 const BASE = API_BASE;
 
 let unauthorizedHandler: (() => void) | null = null;

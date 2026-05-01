@@ -40,11 +40,14 @@ export function register(
   name: string,
   opts: { phone?: string; password?: string },
 ) {
-  return api.post<{ user: AuthUser }>("/auth/register", {
-    email,
-    name,
-    ...opts,
-  });
+  return api.post<{ user: AuthUser } | { magicLinkSent: true }>(
+    "/auth/register",
+    {
+      email,
+      name,
+      ...opts,
+    },
+  );
 }
 
 export function requestMagicLink(email: string) {

@@ -1,13 +1,30 @@
 import { Resend } from "resend";
+import { config } from "../config";
 
-const RESEND_API_KEY = process.env.RESEND_API_KEY;
-const APP_NAME = process.env.APP_NAME || "Taxi Concierge";
-const APP_BASE_URL = (
-  process.env.APP_BASE_URL || "http://localhost:5173"
-).replace(/\/$/, "");
-const EMAIL_FROM = process.env.EMAIL_FROM || `${APP_NAME} <noreply@taxi.local>`;
+const APP_NAME = config.app.name;
+const APP_BASE_URL = config.app.baseUrl;
+const EMAIL_FROM = config.email.from || `${APP_NAME} <noreply@taxi.local>`;
 
-const resend = RESEND_API_KEY ? new Resend(RESEND_API_KEY) : null;
+const resend = config.email.resendApiKey
+  ? new Resend(config.email.resendApiKey)
+  : null;
+
+if (!resend) {
+  console.warn(
+    "[Email] RESEND_API_KEY not set — emails will be logged to console only",
+  );
+}
+
+// Resend SDK returns { data, error } instead of throwing — this wrapper
+// surfaces API errors so callers see them rather than silently succeeding.
+async function sendViaResend(
+  params: Parameters<Resend["emails"]["send"]>[0],
+): Promise<void> {
+  const { error } = await resend!.emails.send(params);
+  if (error) {
+    throw new Error(`[Email] Resend error (${error.name}): ${error.message}`);
+  }
+}
 
 // ── Design tokens (matched to frontend theme.css) ─────────────────────────────
 const t = {
@@ -150,7 +167,7 @@ export async function sendMagicLinkEmail(
     </p>
   `;
 
-  await resend.emails.send({
+  await sendViaResend({
     from: EMAIL_FROM,
     to,
     subject: `${APP_NAME} — Sign in to your account`,
@@ -196,7 +213,7 @@ export async function sendInvitationEmail(
     </p>
   `;
 
-  await resend.emails.send({
+  await sendViaResend({
     from: EMAIL_FROM,
     to,
     subject: `You've been invited to ${APP_NAME}`,
@@ -239,7 +256,7 @@ export async function sendPasswordResetEmail(
     </p>
   `;
 
-  await resend.emails.send({
+  await sendViaResend({
     from: EMAIL_FROM,
     to,
     subject: `${APP_NAME} — Reset your password`,

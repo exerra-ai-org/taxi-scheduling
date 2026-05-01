@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
 import {
   MapContainer,
   TileLayer,
@@ -7,8 +7,8 @@ import {
   useMap,
 } from "react-leaflet";
 import L from "leaflet";
-import { getDriverLocation } from "../../api/bookings";
 import type { DriverLocation } from "shared/types";
+import { useRealtimeEvent } from "../../context/RealtimeContext";
 
 interface Coords {
   lat: number;
@@ -63,8 +63,6 @@ interface Props {
   onUpdate?: (loc: DriverLocation) => void;
 }
 
-const POLL_MS = 8000;
-
 export default function LiveDriverMap({
   bookingId,
   pickup,
@@ -74,7 +72,6 @@ export default function LiveDriverMap({
 }: Props) {
   const [driver, setDriver] = useState<DriverLocation | null>(null);
   const [route, setRoute] = useState<L.LatLngExpression[]>([]);
-  const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // Static OSRM route between pickup and dropoff for the polyline.
   useEffect(() => {
@@ -98,31 +95,19 @@ export default function LiveDriverMap({
       });
   }, [pickup.lat, pickup.lon, dropoff.lat, dropoff.lon]);
 
-  // Poll driver location while trackable and the tab is visible.
-  useEffect(() => {
-    if (!trackable) return;
-    let cancelled = false;
-    async function tick() {
-      if (cancelled) return;
-      if (document.visibilityState === "visible") {
-        try {
-          const loc = await getDriverLocation(bookingId);
-          if (!cancelled) {
-            setDriver(loc);
-            onUpdate?.(loc);
-          }
-        } catch {
-          /* swallow — show last-known on transient error */
-        }
-      }
-      timerRef.current = setTimeout(tick, POLL_MS);
-    }
-    tick();
-    return () => {
-      cancelled = true;
-      if (timerRef.current) clearTimeout(timerRef.current);
-    };
-  }, [bookingId, trackable, onUpdate]);
+  useRealtimeEvent("driver_location", (e) => {
+    if (!trackable || e.bookingId !== bookingId) return;
+    setDriver((prev) => {
+      const loc = {
+        lat: e.lat,
+        lon: e.lon,
+        lastUpdatedAt: e.updatedAt,
+        distanceMiles: prev?.distanceMiles ?? null,
+      };
+      onUpdate?.(loc);
+      return loc;
+    });
+  });
 
   const driverCoords =
     driver && driver.lat != null && driver.lon != null

@@ -1,5 +1,6 @@
-import { Link } from "react-router-dom";
+import { useState } from "react";
 import { useAuth } from "../../context/AuthContext";
+import SignInModal from "../../components/auth/SignInModal";
 import type { BookingData } from "../BookingFlow";
 
 interface Props {
@@ -11,6 +12,7 @@ interface Props {
 
 export default function CustomerDetails({ onNext, onBack }: Props) {
   const { user } = useAuth();
+  const [signInOpen, setSignInOpen] = useState(false);
 
   return (
     <div className="space-y-4 animate-fade-in">
@@ -39,15 +41,19 @@ export default function CustomerDetails({ onNext, onBack }: Props) {
         <div className="page-card p-5 space-y-3">
           <p className="section-label">Account</p>
           <p className="body-copy">
-            Sign in or create an account to confirm your booking. We'll bring
-            you back here.
+            Sign in or create an account to confirm your booking. Your booking
+            details stay in place.
           </p>
-          <Link to="/login?next=/book" className="btn-green w-full">
+          <button
+            type="button"
+            onClick={() => setSignInOpen(true)}
+            className="btn-green w-full"
+          >
             <span>Sign in to continue</span>
             <span className="btn-icon" aria-hidden="true">
               <span className="btn-icon-glyph">↗</span>
             </span>
-          </Link>
+          </button>
         </div>
       )}
 
@@ -66,6 +72,8 @@ export default function CustomerDetails({ onNext, onBack }: Props) {
           </span>
         </button>
       </div>
+
+      <SignInModal isOpen={signInOpen} onClose={() => setSignInOpen(false)} />
     </div>
   );
 }

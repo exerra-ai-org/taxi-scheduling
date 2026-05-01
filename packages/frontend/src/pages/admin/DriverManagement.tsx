@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import {
   listDrivers,
   inviteDriver,
@@ -13,6 +13,7 @@ import {
   IconX,
 } from "../../components/icons";
 import { ApiError } from "../../api/client";
+import { useRealtimeEvent } from "../../context/RealtimeContext";
 
 export default function DriverManagement() {
   const [drivers, setDrivers] = useState<AdminDriverRow[]>([]);
@@ -25,16 +26,22 @@ export default function DriverManagement() {
   const [inviteError, setInviteError] = useState("");
   const [inviteDone, setInviteDone] = useState("");
 
-  function load() {
+  const load = useCallback(() => {
     setLoading(true);
     listDrivers()
       .then((d) => setDrivers(d.drivers))
       .finally(() => setLoading(false));
-  }
+  }, []);
 
   useEffect(() => {
     load();
-  }, []);
+  }, [load]);
+
+  // Refresh upcomingAssignments counts when an assignment lands or a ride
+  // moves to/from completed.
+  useRealtimeEvent("drivers_assigned", load);
+  useRealtimeEvent("booking_updated", load);
+  useRealtimeEvent("booking_cancelled", load);
 
   async function handleInvite(e: React.FormEvent) {
     e.preventDefault();

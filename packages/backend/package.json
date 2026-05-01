@@ -7,7 +7,10 @@
     "db:push": "bunx drizzle-kit push",
     "db:seed": "bun run src/db/seed.ts",
     "db:generate": "bunx drizzle-kit generate",
-    "db:studio": "bunx drizzle-kit studio"
+    "db:studio": "bunx drizzle-kit studio",
+    "test": "bun test",
+    "test:unit": "bun test tests/unit",
+    "test:integration": "bun test tests/integration"
   },
   "dependencies": {
     "drizzle-orm": "^0.36.0",

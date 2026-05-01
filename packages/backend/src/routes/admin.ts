@@ -9,6 +9,7 @@ import { db } from "../db/index";
 import { users, driverProfiles, reviews } from "../db/schema";
 import { authMiddleware, requireRole } from "../middleware/auth";
 import { ok, err } from "../lib/response";
+import { generateAuthToken } from "../lib/tokens";
 import { sendInvitationEmail } from "../services/email";
 
 export const adminRoutes = new Hono();
@@ -28,13 +29,13 @@ adminRoutes.post("/invite", async (c) => {
   const existing = await db
     .select({ id: users.id })
     .from(users)
-    .where(sql`LOWER(${users.email}) = ${normalizedEmail}`)
+    .where(eq(users.email, normalizedEmail))
     .limit(1);
 
   if (existing.length > 0)
     return err(c, "An account with this email already exists", 409);
 
-  const token = crypto.randomUUID() + "-" + crypto.randomUUID();
+  const { raw, hash } = generateAuthToken();
   const expiresAt = new Date(Date.now() + 48 * 60 * 60 * 1000); // 48 hours
 
   const [user] = await db
@@ -43,12 +44,12 @@ adminRoutes.post("/invite", async (c) => {
       email: normalizedEmail,
       name,
       role,
-      invitationToken: token,
+      invitationToken: hash,
       invitationTokenExpiresAt: expiresAt,
     })
     .returning();
 
-  await sendInvitationEmail(normalizedEmail, token, name, role);
+  await sendInvitationEmail(normalizedEmail, raw, name, role);
 
   return ok(c, {
     user: { id: user.id, email: user.email, name: user.name, role: user.role },

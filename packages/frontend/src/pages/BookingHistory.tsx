@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { listBookings, cancelBooking } from "../api/bookings";
 import type { CustomerBooking } from "../api/bookings";
@@ -12,6 +12,7 @@ import { BookingCardSkeleton } from "../components/Skeleton";
 import ConfirmDialog from "../components/ConfirmDialog";
 import { useConfirm } from "../hooks/useConfirm";
 import { useToast } from "../context/ToastContext";
+import { useRealtimeEvent } from "../context/RealtimeContext";
 import { IconMapPin, IconCar, IconStar } from "../components/icons";
 
 type Tab = "active" | "upcoming" | "past";
@@ -32,7 +33,7 @@ export default function BookingHistory() {
   const { confirm, dialogProps } = useConfirm();
   const toast = useToast();
 
-  async function fetchBookings() {
+  const fetchBookings = useCallback(async () => {
     try {
       const data = await listBookings();
       setBookings(data.bookings);
@@ -41,11 +42,17 @@ export default function BookingHistory() {
     } finally {
       setLoading(false);
     }
-  }
+  }, []);
 
   useEffect(() => {
     fetchBookings();
-  }, []);
+  }, [fetchBookings]);
+
+  // Live updates — keep the list fresh without manual refresh.
+  useRealtimeEvent("booking_created", fetchBookings);
+  useRealtimeEvent("booking_updated", fetchBookings);
+  useRealtimeEvent("drivers_assigned", fetchBookings);
+  useRealtimeEvent("booking_cancelled", fetchBookings);
 
   const filtered = useMemo(() => {
     return bookings.filter((b) => {

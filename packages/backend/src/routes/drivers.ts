@@ -18,6 +18,7 @@ import {
 import { ok, err } from "../lib/response";
 import { runDriverWatchdog } from "../services/driverWatchdog";
 import { notifyWatchdogResult } from "../services/notifications";
+import { broadcastBookingEvent } from "../services/broadcaster";
 
 export const driverRoutes = new Hono();
 
@@ -115,6 +116,7 @@ driverRoutes.post(
     const assignment = await db
       .select({
         bookingId: driverAssignments.bookingId,
+        customerId: bookings.customerId,
       })
       .from(driverAssignments)
       .innerJoin(bookings, eq(driverAssignments.bookingId, bookings.id))
@@ -137,12 +139,13 @@ driverRoutes.post(
       return err(c, "You are not actively assigned to this ride", 403);
     }
 
+    const now = new Date();
     const [heartbeat] = await db
       .insert(driverHeartbeats)
       .values({
         bookingId,
         driverId: payload.sub,
-        lastHeartbeatAt: new Date(),
+        lastHeartbeatAt: now,
         missedWindows: 0,
         lat: lat ?? null,
         lon: lon ?? null,
@@ -150,13 +153,23 @@ driverRoutes.post(
       .onConflictDoUpdate({
         target: [driverHeartbeats.bookingId, driverHeartbeats.driverId],
         set: {
-          lastHeartbeatAt: new Date(),
+          lastHeartbeatAt: now,
           missedWindows: 0,
           lat: lat ?? null,
           lon: lon ?? null,
         },
       })
       .returning();
+
+    if (lat != null && lon != null) {
+      broadcastBookingEvent([assignment[0].customerId], {
+        type: "driver_location",
+        bookingId,
+        lat,
+        lon,
+        updatedAt: now.toISOString(),
+      });
+    }
 
     return ok(c, { heartbeat });
   },

@@ -7,9 +7,11 @@ import {
   timestamp,
   pgEnum,
   uniqueIndex,
+  index,
   doublePrecision,
   jsonb,
 } from "drizzle-orm/pg-core";
+import { sql } from "drizzle-orm";
 
 export const userRoleEnum = pgEnum("user_role", [
   "customer",
@@ -45,22 +47,34 @@ export const vehicleClassEnum = pgEnum("vehicle_class", [
 
 // ── Users ──────────────────────────────────────────────
 
-export const users = pgTable("users", {
-  id: serial("id").primaryKey(),
-  email: text("email").notNull().unique(),
-  name: text("name").notNull(),
-  phone: text("phone"),
-  role: userRoleEnum("role").notNull().default("customer"),
-  passwordHash: text("password_hash"),
-  magicLinkToken: text("magic_link_token"),
-  magicLinkExpiresAt: timestamp("magic_link_expires_at"),
-  resetPasswordToken: text("reset_password_token"),
-  resetPasswordExpiresAt: timestamp("reset_password_expires_at"),
-  invitationToken: text("invitation_token"),
-  invitationTokenExpiresAt: timestamp("invitation_token_expires_at"),
-  profilePictureUrl: text("profile_picture_url"),
-  createdAt: timestamp("created_at").notNull().defaultNow(),
-});
+export const users = pgTable(
+  "users",
+  {
+    id: serial("id").primaryKey(),
+    email: text("email").notNull().unique(),
+    name: text("name").notNull(),
+    phone: text("phone"),
+    role: userRoleEnum("role").notNull().default("customer"),
+    passwordHash: text("password_hash"),
+    magicLinkToken: text("magic_link_token"),
+    magicLinkExpiresAt: timestamp("magic_link_expires_at"),
+    resetPasswordToken: text("reset_password_token"),
+    resetPasswordExpiresAt: timestamp("reset_password_expires_at"),
+    invitationToken: text("invitation_token"),
+    invitationTokenExpiresAt: timestamp("invitation_token_expires_at"),
+    profilePictureUrl: text("profile_picture_url"),
+    createdAt: timestamp("created_at").notNull().defaultNow(),
+  },
+  (table) => [
+    index("idx_users_role").on(table.role),
+    // Auth-token lookups happen on every magic-link / reset / invite verify.
+    index("idx_users_magic_link_token").on(table.magicLinkToken),
+    index("idx_users_reset_password_token").on(table.resetPasswordToken),
+    index("idx_users_invitation_token").on(table.invitationToken),
+    // Email is stored canonically lowercase; the unique btree on email
+    // already serves login lookups directly.
+  ],
+);
 
 // ── Driver Profiles ────────────────────────────────
 export const driverProfiles = pgTable("driver_profiles", {
@@ -143,50 +157,70 @@ export const fixedRoutes = pgTable("fixed_routes", {
 
 // ── Bookings ───────────────────────────────────────────
 
-export const bookings = pgTable("bookings", {
-  id: serial("id").primaryKey(),
-  customerId: integer("customer_id")
-    .notNull()
-    .references(() => users.id),
-  pickupAddress: text("pickup_address").notNull(),
-  dropoffAddress: text("dropoff_address").notNull(),
-  pickupLat: doublePrecision("pickup_lat"),
-  pickupLon: doublePrecision("pickup_lon"),
-  dropoffLat: doublePrecision("dropoff_lat"),
-  dropoffLon: doublePrecision("dropoff_lon"),
-  pickupZoneId: integer("pickup_zone_id").references(() => zones.id),
-  dropoffZoneId: integer("dropoff_zone_id").references(() => zones.id),
-  fixedRouteId: integer("fixed_route_id").references(() => fixedRoutes.id),
-  scheduledAt: timestamp("scheduled_at").notNull(),
-  pricePence: integer("price_pence").notNull(),
-  discountPence: integer("discount_pence").notNull().default(0),
-  couponId: integer("coupon_id").references(() => coupons.id),
-  status: bookingStatusEnum("status").notNull().default("scheduled"),
-  isAirport: boolean("is_airport").notNull().default(false),
-  flightNumber: text("flight_number"),
-  pickupFlightNumber: text("pickup_flight_number"),
-  dropoffFlightNumber: text("dropoff_flight_number"),
-  vehicleClass: vehicleClassEnum("vehicle_class").notNull().default("regular"),
-  distanceMiles: doublePrecision("distance_miles"),
-  ratePerMilePence: integer("rate_per_mile_pence"),
-  baseFarePence: integer("base_fare_pence"),
-  createdAt: timestamp("created_at").notNull().defaultNow(),
-});
+export const bookings = pgTable(
+  "bookings",
+  {
+    id: serial("id").primaryKey(),
+    customerId: integer("customer_id")
+      .notNull()
+      .references(() => users.id),
+    pickupAddress: text("pickup_address").notNull(),
+    dropoffAddress: text("dropoff_address").notNull(),
+    pickupLat: doublePrecision("pickup_lat"),
+    pickupLon: doublePrecision("pickup_lon"),
+    dropoffLat: doublePrecision("dropoff_lat"),
+    dropoffLon: doublePrecision("dropoff_lon"),
+    pickupZoneId: integer("pickup_zone_id").references(() => zones.id),
+    dropoffZoneId: integer("dropoff_zone_id").references(() => zones.id),
+    fixedRouteId: integer("fixed_route_id").references(() => fixedRoutes.id),
+    scheduledAt: timestamp("scheduled_at").notNull(),
+    pricePence: integer("price_pence").notNull(),
+    discountPence: integer("discount_pence").notNull().default(0),
+    couponId: integer("coupon_id").references(() => coupons.id),
+    status: bookingStatusEnum("status").notNull().default("scheduled"),
+    isAirport: boolean("is_airport").notNull().default(false),
+    flightNumber: text("flight_number"),
+    pickupFlightNumber: text("pickup_flight_number"),
+    dropoffFlightNumber: text("dropoff_flight_number"),
+    vehicleClass: vehicleClassEnum("vehicle_class")
+      .notNull()
+      .default("regular"),
+    distanceMiles: doublePrecision("distance_miles"),
+    ratePerMilePence: integer("rate_per_mile_pence"),
+    baseFarePence: integer("base_fare_pence"),
+    createdAt: timestamp("created_at").notNull().defaultNow(),
+  },
+  (table) => [
+    index("idx_bookings_customer_id").on(table.customerId),
+    index("idx_bookings_status").on(table.status),
+    index("idx_bookings_scheduled_at").on(table.scheduledAt),
+    // Watchdog + reminder background jobs filter by (status, scheduled_at).
+    index("idx_bookings_status_sched").on(table.status, table.scheduledAt),
+  ],
+);
 
 // ── Driver Assignments ─────────────────────────────────
 
-export const driverAssignments = pgTable("driver_assignments", {
-  id: serial("id").primaryKey(),
-  bookingId: integer("booking_id")
-    .notNull()
-    .references(() => bookings.id),
-  driverId: integer("driver_id")
-    .notNull()
-    .references(() => users.id),
-  role: driverAssignmentRoleEnum("role").notNull(),
-  isActive: boolean("is_active").notNull().default(true),
-  assignedAt: timestamp("assigned_at").notNull().defaultNow(),
-});
+export const driverAssignments = pgTable(
+  "driver_assignments",
+  {
+    id: serial("id").primaryKey(),
+    bookingId: integer("booking_id")
+      .notNull()
+      .references(() => bookings.id),
+    driverId: integer("driver_id")
+      .notNull()
+      .references(() => users.id),
+    role: driverAssignmentRoleEnum("role").notNull(),
+    isActive: boolean("is_active").notNull().default(true),
+    assignedAt: timestamp("assigned_at").notNull().defaultNow(),
+  },
+  (table) => [
+    index("idx_da_booking").on(table.bookingId),
+    index("idx_da_driver_active").on(table.driverId, table.isActive),
+    index("idx_da_booking_active").on(table.bookingId, table.isActive),
+  ],
+);
 
 export const driverHeartbeats = pgTable(
   "driver_heartbeats",
@@ -208,6 +242,7 @@ export const driverHeartbeats = pgTable(
       table.bookingId,
       table.driverId,
     ),
+    index("idx_hb_last").on(table.lastHeartbeatAt),
   ],
 );
 
@@ -223,16 +258,20 @@ export const coupons = pgTable("coupons", {
   currentUses: integer("current_uses").notNull().default(0),
 });
 
-export const notificationSubscriptions = pgTable("notification_subscriptions", {
-  id: serial("id").primaryKey(),
-  userId: integer("user_id")
-    .notNull()
-    .references(() => users.id),
-  endpoint: text("endpoint").notNull().unique(),
-  p256dh: text("p256dh").notNull(),
-  auth: text("auth").notNull(),
-  createdAt: timestamp("created_at").notNull().defaultNow(),
-});
+export const notificationSubscriptions = pgTable(
+  "notification_subscriptions",
+  {
+    id: serial("id").primaryKey(),
+    userId: integer("user_id")
+      .notNull()
+      .references(() => users.id),
+    endpoint: text("endpoint").notNull().unique(),
+    p256dh: text("p256dh").notNull(),
+    auth: text("auth").notNull(),
+    createdAt: timestamp("created_at").notNull().defaultNow(),
+  },
+  (table) => [index("idx_notif_subs_user_id").on(table.userId)],
+);
 
 export const notificationEvents = pgTable("notification_events", {
   id: serial("id").primaryKey(),
@@ -244,19 +283,23 @@ export const notificationEvents = pgTable("notification_events", {
 
 // ── Incidents ──────────────────────────────────────────
 
-export const incidents = pgTable("incidents", {
-  id: serial("id").primaryKey(),
-  bookingId: integer("booking_id")
-    .notNull()
-    .references(() => bookings.id),
-  reporterId: integer("reporter_id")
-    .notNull()
-    .references(() => users.id),
-  type: text("type").notNull().default("contact_admin"),
-  message: text("message"),
-  resolved: boolean("resolved").notNull().default(false),
-  createdAt: timestamp("created_at").notNull().defaultNow(),
-});
+export const incidents = pgTable(
+  "incidents",
+  {
+    id: serial("id").primaryKey(),
+    bookingId: integer("booking_id")
+      .notNull()
+      .references(() => bookings.id),
+    reporterId: integer("reporter_id")
+      .notNull()
+      .references(() => users.id),
+    type: text("type").notNull().default("contact_admin"),
+    message: text("message"),
+    resolved: boolean("resolved").notNull().default(false),
+    createdAt: timestamp("created_at").notNull().defaultNow(),
+  },
+  (table) => [index("idx_incidents_booking_id").on(table.bookingId)],
+);
 
 // ── Reviews ────────────────────────────────────────────
 
@@ -282,5 +325,7 @@ export const reviews = pgTable(
       table.bookingId,
       table.customerId,
     ),
+    // Aggregate rating queries (avg, count) filter by driver_id.
+    index("idx_reviews_driver_id").on(table.driverId),
   ],
 );

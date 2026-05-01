@@ -1,6 +1,7 @@
 import { Hono } from "hono";
 import { sign } from "hono/jwt";
 import { setCookie, deleteCookie } from "hono/cookie";
+import { config } from "../config";
 import { eq, sql } from "drizzle-orm";
 import {
   loginSchema,
@@ -22,23 +23,36 @@ import {
   JWT_EXPIRES_IN_SECONDS,
 } from "../lib/constants";
 import { ok, err } from "../lib/response";
+import { decideLoginAttempt } from "../lib/loginPolicy";
+import { generateAuthToken, hashAuthToken } from "../lib/tokens";
 import { authMiddleware, type JwtPayload } from "../middleware/auth";
+import { createRateLimiter } from "../middleware/rateLimit";
 import { sendMagicLinkEmail, sendPasswordResetEmail } from "../services/email";
 
 export const authRoutes = new Hono();
+
+// Brute-force / abuse protection on the auth surface.
+//
+// Login: 10 / minute / IP — generous for legitimate retypes, restrictive
+// enough that credential stuffing is impractical.
+const loginLimiter = createRateLimiter({ max: 10, windowMs: 60_000 });
+
+// Email-bombing / token-spam mitigation. Magic-link, reset, and
+// check-email endpoints trigger emails (or could be probed for
+// existence).
+const emailFlowLimiter = createRateLimiter({ max: 5, windowMs: 5 * 60_000 });
+
+// Registration is also email-triggering for the magic-link branch.
+const registerLimiter = createRateLimiter({ max: 5, windowMs: 60 * 60_000 });
 
 function normalizeEmail(email: string): string {
   return email.trim().toLowerCase();
 }
 
-function normalizePhone(phone: string): string {
-  return phone.replace(/\D/g, "");
-}
-
 function setAuthCookie(c: Parameters<typeof setCookie>[0], token: string) {
   setCookie(c, JWT_COOKIE_NAME, token, {
     httpOnly: true,
-    secure: process.env.NODE_ENV === "production",
+    secure: config.isProduction,
     sameSite: "Lax",
     path: "/",
     maxAge: JWT_EXPIRES_IN_SECONDS,
@@ -66,7 +80,7 @@ async function issueAuthCookie(
   setAuthCookie(c, token);
 }
 
-authRoutes.post("/check-email", async (c) => {
+authRoutes.post("/check-email", emailFlowLimiter, async (c) => {
   const body = await c.req.json();
   const parsed = checkEmailSchema.safeParse(body);
   if (!parsed.success) {
@@ -83,7 +97,7 @@ authRoutes.post("/check-email", async (c) => {
       passwordHash: users.passwordHash,
     })
     .from(users)
-    .where(sql`LOWER(${users.email}) = ${email}`)
+    .where(eq(users.email, email))
     .limit(1);
 
   if (result.length === 0) {
@@ -99,7 +113,7 @@ authRoutes.post("/check-email", async (c) => {
   });
 });
 
-authRoutes.post("/login", async (c) => {
+authRoutes.post("/login", loginLimiter, async (c) => {
   const body = await c.req.json();
   const parsed = loginSchema.safeParse(body);
   if (!parsed.success) {
@@ -107,38 +121,39 @@ authRoutes.post("/login", async (c) => {
   }
 
   const email = normalizeEmail(parsed.data.email);
-  const { password, phone } = parsed.data;
+  const { password } = parsed.data;
 
   const result = await db
     .select()
     .from(users)
-    .where(sql`LOWER(${users.email}) = ${email}`)
+    .where(eq(users.email, email))
     .limit(1);
 
+  // Generic 401 for unknown email — avoids account enumeration via /login.
   if (result.length === 0) {
-    return err(c, "Account not found", 404);
+    return err(c, "Invalid credentials", 401);
   }
 
   const user = result[0];
+  const outcome = decideLoginAttempt(user, password);
 
-  // Staff and password-based accounts require password.
-  if (user.role === "admin" || user.role === "driver" || user.passwordHash) {
-    if (!password || !user.passwordHash) {
-      return err(c, "Password required", 401);
-    }
-    const valid = await Bun.password.verify(password, user.passwordHash);
-    if (!valid) {
-      return err(c, "Invalid credentials", 401);
-    }
-  } else {
-    // Customer accounts without password must verify phone.
-    if (!phone || !user.phone) {
-      return err(c, "Phone number required for customer login", 401);
-    }
-    const phoneMatches = normalizePhone(phone) === normalizePhone(user.phone);
-    if (!phoneMatches) {
-      return err(c, "Invalid credentials", 401);
-    }
+  if (outcome.kind === "magic_link_required") {
+    return err(
+      c,
+      "This account uses magic-link sign-in. Request a sign-in link from your email.",
+      401,
+    );
+  }
+  if (outcome.kind === "password_required") {
+    return err(c, "Password required", 401);
+  }
+
+  const valid = await Bun.password.verify(
+    outcome.password,
+    outcome.passwordHash,
+  );
+  if (!valid) {
+    return err(c, "Invalid credentials", 401);
   }
 
   await issueAuthCookie(c, user);
@@ -154,7 +169,7 @@ authRoutes.post("/login", async (c) => {
   });
 });
 
-authRoutes.post("/register", async (c) => {
+authRoutes.post("/register", registerLimiter, async (c) => {
   const body = await c.req.json();
   const parsed = registerSchema.safeParse(body);
   if (!parsed.success) {
@@ -170,7 +185,7 @@ authRoutes.post("/register", async (c) => {
   const existing = await db
     .select()
     .from(users)
-    .where(sql`LOWER(${users.email}) = ${email}`)
+    .where(eq(users.email, email))
     .limit(1);
 
   if (existing.length > 0) {
@@ -183,6 +198,21 @@ authRoutes.post("/register", async (c) => {
     .insert(users)
     .values({ email, name, phone, role: "customer", passwordHash })
     .returning();
+
+  // Magic-link registration: send verification email instead of issuing cookie
+  if (!password) {
+    const { raw, hash } = generateAuthToken();
+    const expiresAt = new Date(Date.now() + 15 * 60 * 1000);
+
+    await db
+      .update(users)
+      .set({ magicLinkToken: hash, magicLinkExpiresAt: expiresAt })
+      .where(eq(users.id, user.id));
+
+    await sendMagicLinkEmail(email, raw, name);
+
+    return ok(c, { magicLinkSent: true });
+  }
 
   await issueAuthCookie(c, user);
 
@@ -202,7 +232,7 @@ authRoutes.post("/logout", (c) => {
   return ok(c, { message: "Logged out" });
 });
 
-authRoutes.post("/magic-link", async (c) => {
+authRoutes.post("/magic-link", emailFlowLimiter, async (c) => {
   const body = await c.req.json();
   const parsed = magicLinkRequestSchema.safeParse(body);
   if (!parsed.success) {
@@ -214,7 +244,7 @@ authRoutes.post("/magic-link", async (c) => {
   const result = await db
     .select({ id: users.id, name: users.name })
     .from(users)
-    .where(sql`LOWER(${users.email}) = ${email}`)
+    .where(eq(users.email, email))
     .limit(1);
 
   if (result.length === 0) {
@@ -223,21 +253,20 @@ authRoutes.post("/magic-link", async (c) => {
 
   const account = result[0];
 
-  // Generate a secure random token
-  const token = crypto.randomUUID() + "-" + crypto.randomUUID();
+  const { raw, hash } = generateAuthToken();
   const expiresAt = new Date(Date.now() + 15 * 60 * 1000); // 15 minutes
 
   await db
     .update(users)
-    .set({ magicLinkToken: token, magicLinkExpiresAt: expiresAt })
+    .set({ magicLinkToken: hash, magicLinkExpiresAt: expiresAt })
     .where(eq(users.id, account.id));
 
-  await sendMagicLinkEmail(email, token, account.name);
+  await sendMagicLinkEmail(email, raw, account.name);
 
   return ok(c, { message: "Magic link sent to your email" });
 });
 
-authRoutes.post("/magic-link/verify", async (c) => {
+authRoutes.post("/magic-link/verify", loginLimiter, async (c) => {
   const body = await c.req.json();
   const parsed = magicLinkVerifySchema.safeParse(body);
   if (!parsed.success) {
@@ -245,11 +274,12 @@ authRoutes.post("/magic-link/verify", async (c) => {
   }
 
   const { token } = parsed.data;
+  const tokenHash = hashAuthToken(token);
 
   const result = await db
     .select()
     .from(users)
-    .where(eq(users.magicLinkToken, token))
+    .where(eq(users.magicLinkToken, tokenHash))
     .limit(1);
 
   if (result.length === 0) {
@@ -281,7 +311,7 @@ authRoutes.post("/magic-link/verify", async (c) => {
   });
 });
 
-authRoutes.post("/reset-password/request", async (c) => {
+authRoutes.post("/reset-password/request", emailFlowLimiter, async (c) => {
   const body = await c.req.json();
   const parsed = passwordResetRequestSchema.safeParse(body);
   if (!parsed.success) {
@@ -293,7 +323,7 @@ authRoutes.post("/reset-password/request", async (c) => {
   const result = await db
     .select({ id: users.id, name: users.name })
     .from(users)
-    .where(sql`LOWER(${users.email}) = ${email}`)
+    .where(eq(users.email, email))
     .limit(1);
 
   if (result.length === 0) {
@@ -304,20 +334,20 @@ authRoutes.post("/reset-password/request", async (c) => {
   }
 
   const account = result[0];
-  const token = crypto.randomUUID() + "-" + crypto.randomUUID();
+  const { raw, hash } = generateAuthToken();
   const expiresAt = new Date(Date.now() + 15 * 60 * 1000); // 15 minutes
 
   await db
     .update(users)
-    .set({ resetPasswordToken: token, resetPasswordExpiresAt: expiresAt })
+    .set({ resetPasswordToken: hash, resetPasswordExpiresAt: expiresAt })
     .where(eq(users.id, account.id));
 
-  await sendPasswordResetEmail(email, token, account.name);
+  await sendPasswordResetEmail(email, raw, account.name);
 
   return ok(c, { message: "If that email exists, a reset link has been sent" });
 });
 
-authRoutes.post("/reset-password/verify", async (c) => {
+authRoutes.post("/reset-password/verify", loginLimiter, async (c) => {
   const body = await c.req.json();
   const parsed = passwordResetVerifySchema.safeParse(body);
   if (!parsed.success) {
@@ -325,11 +355,12 @@ authRoutes.post("/reset-password/verify", async (c) => {
   }
 
   const { token, password } = parsed.data;
+  const tokenHash = hashAuthToken(token);
 
   const result = await db
     .select()
     .from(users)
-    .where(eq(users.resetPasswordToken, token))
+    .where(eq(users.resetPasswordToken, tokenHash))
     .limit(1);
 
   if (result.length === 0) {
@@ -369,7 +400,7 @@ authRoutes.post("/reset-password/verify", async (c) => {
   });
 });
 
-authRoutes.post("/accept-invitation", async (c) => {
+authRoutes.post("/accept-invitation", loginLimiter, async (c) => {
   const body = await c.req.json();
   const parsed = acceptInvitationSchema.safeParse(body);
   if (!parsed.success) {
@@ -377,11 +408,12 @@ authRoutes.post("/accept-invitation", async (c) => {
   }
 
   const { token, password } = parsed.data;
+  const tokenHash = hashAuthToken(token);
 
   const result = await db
     .select()
     .from(users)
-    .where(eq(users.invitationToken, token))
+    .where(eq(users.invitationToken, tokenHash))
     .limit(1);
 
   if (result.length === 0) {

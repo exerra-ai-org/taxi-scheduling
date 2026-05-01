@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import type { Booking, BookingStatus } from "shared/types";
 import Modal from "../../components/Modal";
 import StatusBadge from "../../components/StatusBadge";
@@ -13,6 +13,7 @@ import ConfirmDialog from "../../components/ConfirmDialog";
 import { formatPrice, formatDate } from "../../lib/format";
 import { useConfirm } from "../../hooks/useConfirm";
 import { useToast } from "../../context/ToastContext";
+import { useRealtimeEvent } from "../../context/RealtimeContext";
 import { IconCar } from "../../components/icons";
 
 interface Assignment {
@@ -43,7 +44,7 @@ export default function RideDetail({
   const { confirm: confirmAction, dialogProps } = useConfirm();
   const toast = useToast();
 
-  async function fetchDetail() {
+  const fetchDetail = useCallback(async () => {
     if (!bookingId) return;
     setLoading(true);
     try {
@@ -55,7 +56,7 @@ export default function RideDetail({
     } finally {
       setLoading(false);
     }
-  }
+  }, [bookingId]);
 
   useEffect(() => {
     if (!bookingId) {
@@ -64,7 +65,19 @@ export default function RideDetail({
       return;
     }
     fetchDetail();
-  }, [bookingId]);
+  }, [bookingId, fetchDetail]);
+
+  // Live updates while this ride is open. Filter on bookingId — events for
+  // unrelated rides shouldn't trigger a refetch here.
+  useRealtimeEvent("booking_updated", (e) => {
+    if (e.bookingId === bookingId) fetchDetail();
+  });
+  useRealtimeEvent("drivers_assigned", (e) => {
+    if (e.bookingId === bookingId) fetchDetail();
+  });
+  useRealtimeEvent("booking_cancelled", (e) => {
+    if (e.bookingId === bookingId) fetchDetail();
+  });
 
   async function handleStatusChange(status: BookingStatus) {
     if (!bookingId) return;

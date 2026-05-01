@@ -11,33 +11,21 @@ import {
   users,
 } from "../db/schema";
 import type { DriverWatchdogResult } from "./driverWatchdog";
+import { config } from "../config";
 
-const APP_NAME = process.env.APP_NAME || "Taxi Concierge";
-const APP_BASE_URL = (
-  process.env.APP_BASE_URL || "http://localhost:5173"
-).replace(/\/$/, "");
+const APP_NAME = config.app.name;
+const APP_BASE_URL = config.app.baseUrl;
 
-const VAPID_PUBLIC_KEY = process.env.VAPID_PUBLIC_KEY;
-const VAPID_PRIVATE_KEY = process.env.VAPID_PRIVATE_KEY;
-const VAPID_SUBJECT = process.env.VAPID_SUBJECT || "mailto:ops@taxi.local";
-
-const EMAIL_FROM = process.env.EMAIL_FROM;
-const SMTP_HOST = process.env.SMTP_HOST;
-const SMTP_PORT = Number(process.env.SMTP_PORT || "587");
-const SMTP_SECURE = String(process.env.SMTP_SECURE || "false") === "true";
-const SMTP_USER = process.env.SMTP_USER;
-const SMTP_PASS = process.env.SMTP_PASS;
-
-const PUSH_ENABLED = Boolean(VAPID_PUBLIC_KEY && VAPID_PRIVATE_KEY);
-const EMAIL_ENABLED = Boolean(SMTP_HOST && EMAIL_FROM);
+const PUSH_ENABLED = Boolean(config.push.publicKey && config.push.privateKey);
+const EMAIL_ENABLED = Boolean(config.email.smtp.host && config.email.from);
 let PUSH_READY = false;
 
 if (PUSH_ENABLED) {
   try {
     webpush.setVapidDetails(
-      VAPID_SUBJECT,
-      VAPID_PUBLIC_KEY!,
-      VAPID_PRIVATE_KEY!,
+      config.push.subject,
+      config.push.publicKey!,
+      config.push.privateKey!,
     );
     PUSH_READY = true;
   } catch (cause) {
@@ -110,11 +98,13 @@ function getTransporter(): nodemailer.Transporter | null {
   }
 
   transporter = nodemailer.createTransport({
-    host: SMTP_HOST,
-    port: SMTP_PORT,
-    secure: SMTP_SECURE,
+    host: config.email.smtp.host,
+    port: config.email.smtp.port,
+    secure: config.email.smtp.secure,
     auth:
-      SMTP_USER && SMTP_PASS ? { user: SMTP_USER, pass: SMTP_PASS } : undefined,
+      config.email.smtp.user && config.email.smtp.pass
+        ? { user: config.email.smtp.user, pass: config.email.smtp.pass }
+        : undefined,
   });
 
   return transporter;
@@ -205,7 +195,7 @@ async function sendEmail(
   message: RideMessage,
 ): Promise<void> {
   const mailer = getTransporter();
-  if (!mailer || !EMAIL_FROM) {
+  if (!mailer || !config.email.from) {
     return;
   }
 
@@ -221,7 +211,7 @@ async function sendEmail(
 
   for (const recipient of recipients) {
     await mailer.sendMail({
-      from: EMAIL_FROM,
+      from: config.email.from,
       to: recipient.email,
       subject: message.emailSubject || message.title,
       text: `${message.body}\n\nOpen: ${absoluteUrl(message.url)}`,
@@ -523,13 +513,7 @@ export async function processDueRideReminders(
   windowStart: Date,
   windowEnd: Date,
 ): Promise<number> {
-  const reminderMinutes = String(
-    process.env.RIDE_REMINDER_MINUTES || "120,60,15",
-  )
-    .split(",")
-    .map((v) => Number(v.trim()))
-    .filter((v) => Number.isInteger(v) && v > 0)
-    .sort((a, b) => b - a);
+  const reminderMinutes = config.jobs.rideReminderMinutes;
 
   if (reminderMinutes.length === 0) {
     return 0;
@@ -618,5 +602,5 @@ export async function notifyIncident(
 }
 
 export function getPublicVapidKey(): string | null {
-  return VAPID_PUBLIC_KEY || null;
+  return PUSH_READY ? (config.push.publicKey ?? null) : null;
 }

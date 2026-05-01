@@ -25,11 +25,11 @@ import {
  */
 function Brand() {
   return (
-    <Link to="/" className="brand-link" aria-label="Taxi Concierge, home">
+    <Link to="/" className="brand-link" aria-label="London Luton Taxi, home">
       <span className="brand-mark" aria-hidden="true">
         TC
       </span>
-      <span className="brand-wordmark hidden sm:inline">Taxi Concierge</span>
+      <span className="brand-wordmark hidden sm:inline">London Luton Taxi</span>
     </Link>
   );
 }

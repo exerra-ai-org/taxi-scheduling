@@ -6,6 +6,7 @@ import "./index.css";
 
 import { AuthProvider } from "./context/AuthContext";
 import { ToastProvider } from "./context/ToastContext";
+import { RealtimeProvider } from "./context/RealtimeContext";
 import Layout from "./components/Layout";
 import ProtectedRoute from "./components/ProtectedRoute";
 import DriverGuard from "./components/DriverGuard";
@@ -33,42 +34,50 @@ ReactDOM.createRoot(document.getElementById("root")!).render(
   <React.StrictMode>
     <ToastProvider>
       <AuthProvider>
-        <BrowserRouter>
-          <Routes>
-            <Route element={<Layout />}>
-              <Route path="/login" element={<Login />} />
-              <Route path="/reset-password" element={<ResetPassword />} />
-              <Route path="/accept-invitation" element={<AcceptInvitation />} />
-              <Route path="/" element={<BookingFlow />} />
-              <Route path="/book" element={<BookingFlow />} />
+        <RealtimeProvider>
+          <BrowserRouter>
+            <Routes>
+              <Route element={<Layout />}>
+                <Route path="/login" element={<Login />} />
+                <Route path="/reset-password" element={<ResetPassword />} />
+                <Route
+                  path="/accept-invitation"
+                  element={<AcceptInvitation />}
+                />
+                <Route path="/" element={<BookingFlow />} />
+                <Route path="/book" element={<BookingFlow />} />
 
-              {/* Customer */}
-              <Route element={<ProtectedRoute roles={["customer"]} />}>
-                <Route path="/bookings" element={<BookingHistory />} />
-                <Route path="/bookings/:id" element={<CustomerRideDetail />} />
-                <Route path="/profile" element={<ProfilePage />} />
-              </Route>
-
-              {/* Admin */}
-              <Route element={<ProtectedRoute roles={["admin"]} />}>
-                <Route path="/admin" element={<RideTimeline />} />
-                <Route path="/admin/drivers" element={<DriverManagement />} />
-                <Route path="/admin/coupons" element={<CouponManagement />} />
-                <Route path="/admin/profile" element={<ProfilePage />} />
-              </Route>
-
-              {/* Driver */}
-              <Route element={<ProtectedRoute roles={["driver"]} />}>
-                <Route element={<DriverGuard />}>
-                  <Route path="/driver" element={<MyRides />} />
-                  <Route path="/driver/profile" element={<DriverProfile />} />
+                {/* Customer */}
+                <Route element={<ProtectedRoute roles={["customer"]} />}>
+                  <Route path="/bookings" element={<BookingHistory />} />
+                  <Route
+                    path="/bookings/:id"
+                    element={<CustomerRideDetail />}
+                  />
+                  <Route path="/profile" element={<ProfilePage />} />
                 </Route>
-              </Route>
 
-              <Route path="*" element={<Navigate to="/" replace />} />
-            </Route>
-          </Routes>
-        </BrowserRouter>
+                {/* Admin */}
+                <Route element={<ProtectedRoute roles={["admin"]} />}>
+                  <Route path="/admin" element={<RideTimeline />} />
+                  <Route path="/admin/drivers" element={<DriverManagement />} />
+                  <Route path="/admin/coupons" element={<CouponManagement />} />
+                  <Route path="/admin/profile" element={<ProfilePage />} />
+                </Route>
+
+                {/* Driver */}
+                <Route element={<ProtectedRoute roles={["driver"]} />}>
+                  <Route element={<DriverGuard />}>
+                    <Route path="/driver" element={<MyRides />} />
+                    <Route path="/driver/profile" element={<DriverProfile />} />
+                  </Route>
+                </Route>
+
+                <Route path="*" element={<Navigate to="/" replace />} />
+              </Route>
+            </Routes>
+          </BrowserRouter>
+        </RealtimeProvider>
       </AuthProvider>
     </ToastProvider>
   </React.StrictMode>,
