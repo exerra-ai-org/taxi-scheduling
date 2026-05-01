@@ -1,10 +1,11 @@
 import { Hono } from "hono";
 import { cors } from "hono/cors";
-import { logger } from "hono/logger";
 import { secureHeaders } from "hono/secure-headers";
 import { bodyLimit } from "hono/body-limit";
 import { join } from "path";
 import { config } from "./config";
+import { logger } from "./lib/logger";
+import { requestContext } from "./middleware/requestContext";
 import { authRoutes } from "./routes/auth";
 import { pricingRoutes } from "./routes/pricing";
 import { bookingRoutes } from "./routes/bookings";
@@ -23,7 +24,17 @@ import { resolveSafeUploadPath } from "./lib/safeUploadPath";
 
 const app = new Hono();
 
-app.use("*", logger());
+app.use("*", requestContext());
+
+// Lightweight per-request access log. Tied to the request-scoped logger so
+// all entries carry the same x-request-id for correlation.
+app.use("*", async (c, next) => {
+  const log = c.get("logger");
+  const start = performance.now();
+  await next();
+  const ms = Math.round(performance.now() - start);
+  log.info("request", { status: c.res.status, durationMs: ms });
+});
 
 app.use(
   "*",
@@ -117,24 +128,20 @@ app.notFound((c) => c.json({ success: false, error: "Not found" }, 404));
 
 app.onError((cause, c) => {
   // Log full detail server-side; never leak the stack to clients.
-  console.error("[onError]", c.req.method, c.req.path, cause);
+  const log = c.get("logger") ?? logger;
+  log.error("unhandled exception", { err: cause as Error });
   return c.json({ success: false, error: "Internal server error" }, 500);
 });
 
 startBackgroundJobs();
 
-// Startup diagnostics — make missing config visible immediately
-console.log(
-  "[Config] Email:",
-  config.email.resendApiKey
-    ? "Resend ✓"
-    : "NOT CONFIGURED (set RESEND_API_KEY)",
-);
-console.log(
-  "[Config] Push:",
-  config.push.publicKey ? "VAPID ✓" : "NOT CONFIGURED (set VAPID keys)",
-);
-console.log("[Config] CORS origins:", config.cors.origins.join(", "));
+// Startup diagnostics — make missing config visible immediately.
+logger.info("server startup", {
+  email: config.email.resendApiKey ? "resend" : "unconfigured",
+  push: config.push.publicKey ? "vapid" : "unconfigured",
+  corsOrigins: config.cors.origins,
+  port: config.server.port,
+});
 
 export default {
   port: config.server.port,
