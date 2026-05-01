@@ -24,6 +24,7 @@ import {
 } from "../lib/constants";
 import { ok, err } from "../lib/response";
 import { decideLoginAttempt } from "../lib/loginPolicy";
+import { generateAuthToken, hashAuthToken } from "../lib/tokens";
 import { authMiddleware, type JwtPayload } from "../middleware/auth";
 import { sendMagicLinkEmail, sendPasswordResetEmail } from "../services/email";
 
@@ -185,15 +186,15 @@ authRoutes.post("/register", async (c) => {
 
   // Magic-link registration: send verification email instead of issuing cookie
   if (!password) {
-    const token = crypto.randomUUID() + "-" + crypto.randomUUID();
+    const { raw, hash } = generateAuthToken();
     const expiresAt = new Date(Date.now() + 15 * 60 * 1000);
 
     await db
       .update(users)
-      .set({ magicLinkToken: token, magicLinkExpiresAt: expiresAt })
+      .set({ magicLinkToken: hash, magicLinkExpiresAt: expiresAt })
       .where(eq(users.id, user.id));
 
-    await sendMagicLinkEmail(email, token, name);
+    await sendMagicLinkEmail(email, raw, name);
 
     return ok(c, { magicLinkSent: true });
   }
@@ -237,16 +238,15 @@ authRoutes.post("/magic-link", async (c) => {
 
   const account = result[0];
 
-  // Generate a secure random token
-  const token = crypto.randomUUID() + "-" + crypto.randomUUID();
+  const { raw, hash } = generateAuthToken();
   const expiresAt = new Date(Date.now() + 15 * 60 * 1000); // 15 minutes
 
   await db
     .update(users)
-    .set({ magicLinkToken: token, magicLinkExpiresAt: expiresAt })
+    .set({ magicLinkToken: hash, magicLinkExpiresAt: expiresAt })
     .where(eq(users.id, account.id));
 
-  await sendMagicLinkEmail(email, token, account.name);
+  await sendMagicLinkEmail(email, raw, account.name);
 
   return ok(c, { message: "Magic link sent to your email" });
 });
@@ -259,11 +259,12 @@ authRoutes.post("/magic-link/verify", async (c) => {
   }
 
   const { token } = parsed.data;
+  const tokenHash = hashAuthToken(token);
 
   const result = await db
     .select()
     .from(users)
-    .where(eq(users.magicLinkToken, token))
+    .where(eq(users.magicLinkToken, tokenHash))
     .limit(1);
 
   if (result.length === 0) {
@@ -318,15 +319,15 @@ authRoutes.post("/reset-password/request", async (c) => {
   }
 
   const account = result[0];
-  const token = crypto.randomUUID() + "-" + crypto.randomUUID();
+  const { raw, hash } = generateAuthToken();
   const expiresAt = new Date(Date.now() + 15 * 60 * 1000); // 15 minutes
 
   await db
     .update(users)
-    .set({ resetPasswordToken: token, resetPasswordExpiresAt: expiresAt })
+    .set({ resetPasswordToken: hash, resetPasswordExpiresAt: expiresAt })
     .where(eq(users.id, account.id));
 
-  await sendPasswordResetEmail(email, token, account.name);
+  await sendPasswordResetEmail(email, raw, account.name);
 
   return ok(c, { message: "If that email exists, a reset link has been sent" });
 });
@@ -339,11 +340,12 @@ authRoutes.post("/reset-password/verify", async (c) => {
   }
 
   const { token, password } = parsed.data;
+  const tokenHash = hashAuthToken(token);
 
   const result = await db
     .select()
     .from(users)
-    .where(eq(users.resetPasswordToken, token))
+    .where(eq(users.resetPasswordToken, tokenHash))
     .limit(1);
 
   if (result.length === 0) {
@@ -391,11 +393,12 @@ authRoutes.post("/accept-invitation", async (c) => {
   }
 
   const { token, password } = parsed.data;
+  const tokenHash = hashAuthToken(token);
 
   const result = await db
     .select()
     .from(users)
-    .where(eq(users.invitationToken, token))
+    .where(eq(users.invitationToken, tokenHash))
     .limit(1);
 
   if (result.length === 0) {
