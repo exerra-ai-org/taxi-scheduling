@@ -13,6 +13,8 @@ export type BroadcastEvent =
   | { type: "ping" }
   | { type: "overflow" };
 
+import { config } from "../config";
+
 type Callback = (event: BroadcastEvent) => void;
 
 interface Subscriber {
@@ -20,8 +22,24 @@ interface Subscriber {
   role: string;
 }
 
-// userId → Set of active SSE connections for that user
-const connections = new Map<number, Set<Subscriber>>();
+// userId → Set of active SSE connections for that user.
+//
+// `bun --hot` re-imports this module on every save. A fresh `new Map()`
+// here would orphan every existing SSE subscription registered against
+// the previous module instance, and broadcasts would silently drop. Pin
+// the Map to globalThis in non-production so re-imports reuse the same
+// registry. Production loads the module exactly once, so a normal
+// module-local Map is fine and avoids leaking refs into globalThis.
+const globalForBroadcaster = globalThis as unknown as {
+  __broadcasterConnections?: Map<number, Set<Subscriber>>;
+};
+
+const connections: Map<number, Set<Subscriber>> = config.isProduction
+  ? new Map<number, Set<Subscriber>>()
+  : (globalForBroadcaster.__broadcasterConnections ??= new Map<
+      number,
+      Set<Subscriber>
+    >());
 
 export function subscribe(
   userId: number,

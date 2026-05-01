@@ -1,6 +1,6 @@
 import { db } from "../db/index";
 import { fixedRoutes, zones, mileRates } from "../db/schema";
-import { eq, and, sql } from "drizzle-orm";
+import { eq, and, sql, inArray } from "drizzle-orm";
 import type {
   PricingQuote,
   PricingQuoteMulti,
@@ -8,8 +8,39 @@ import type {
 } from "shared/types";
 import { LONDON_ZONE_PATTERN } from "../lib/constants";
 import { getOsrmDistance } from "./osrm";
+import { createTtlCache } from "../lib/cache";
 
 const VEHICLE_CLASSES: VehicleClass[] = ["regular", "comfort", "max"];
+
+// mile_rates is a tiny tariff table that changes only when an admin
+// edits it. 60s TTL is a fine compromise between query latency and
+// pricing freshness — a tariff update is reflected after one minute.
+type MileRateRow = typeof mileRates.$inferSelect;
+const MILE_RATES_CACHE_KEY = "all";
+const mileRatesCache = createTtlCache<string, MileRateRow[]>({
+  maxSize: 1,
+  ttlMs: 60_000,
+});
+
+const getMileRatesCached = mileRatesCache.wrap(async () => {
+  return await db.select().from(mileRates);
+});
+
+/** Test-only escape hatch — invalidates the cache so admin tariff
+ *  changes take effect immediately during integration tests. */
+export function __resetMileRatesCacheForTests(): void {
+  mileRatesCache.clear();
+}
+
+// Multipliers used when a fixed route exists for some classes but not
+// others. We extrapolate from a known price rather than fall through to
+// mile-based pricing — keeps the customer-facing price stable across
+// classes when the dispatch team only configured one tier.
+const CLASS_MULTIPLIER: Record<VehicleClass, number> = {
+  regular: 1,
+  comfort: 1.3,
+  max: 1.7,
+};
 
 function isAirportAddress(address: string): boolean {
   return address.toLowerCase().includes("airport");
@@ -166,15 +197,9 @@ export async function getPricingQuote(
     );
     if (!osrm) return null;
 
-    const rateRow = await db
-      .select()
-      .from(mileRates)
-      .where(eq(mileRates.vehicleClass, vehicleClass))
-      .limit(1);
-
-    if (rateRow.length === 0) return null;
-
-    const rate = rateRow[0];
+    const allRates = await getMileRatesCached(MILE_RATES_CACHE_KEY);
+    const rate = allRates.find((r) => r.vehicleClass === vehicleClass);
+    if (!rate) return null;
     const pricePence =
       rate.baseFarePence +
       Math.round(osrm.distanceMiles * rate.ratePerMilePence);
@@ -210,7 +235,25 @@ export async function getPricingQuoteAllClasses(
   },
 ): Promise<PricingQuoteMulti | null> {
   try {
-    // 1. Check fixed routes for each vehicle class
+    // 1. Single batched query for fixed routes across all vehicle classes.
+    //    Replaces the previous N=3 sequential SELECTs (one per class).
+    const allFixedMatches = await db
+      .select()
+      .from(fixedRoutes)
+      .where(
+        and(
+          sql`${from} ILIKE '%' || ${fixedRoutes.fromLabel} || '%'`,
+          sql`${to} ILIKE '%' || ${fixedRoutes.toLabel} || '%'`,
+          inArray(fixedRoutes.vehicleType, VEHICLE_CLASSES),
+        ),
+      );
+
+    const fixedByClass = new Map<VehicleClass, (typeof allFixedMatches)[number]>();
+    for (const row of allFixedMatches) {
+      const vc = row.vehicleType as VehicleClass;
+      if (!fixedByClass.has(vc)) fixedByClass.set(vc, row);
+    }
+
     const fixedQuotes: PricingQuoteMulti["quotes"] = [];
     let routeType: "fixed" | "mile" = "mile";
     let routeName: string | null = null;
@@ -220,32 +263,17 @@ export async function getPricingQuoteAllClasses(
     let distanceMiles: number | undefined;
 
     for (const vc of VEHICLE_CLASSES) {
-      const fixedMatch = await db
-        .select()
-        .from(fixedRoutes)
-        .where(
-          and(
-            sql`${from} ILIKE '%' || ${fixedRoutes.fromLabel} || '%'`,
-            sql`${to} ILIKE '%' || ${fixedRoutes.toLabel} || '%'`,
-            eq(fixedRoutes.vehicleType, vc),
-          ),
-        )
-        .limit(1);
-
-      if (fixedMatch.length > 0) {
-        fixedQuotes.push({
-          vehicleClass: vc,
-          pricePence: fixedMatch[0].pricePence,
-        });
+      const match = fixedByClass.get(vc);
+      if (match) {
+        fixedQuotes.push({ vehicleClass: vc, pricePence: match.pricePence });
         routeType = "fixed";
-        routeName = fixedMatch[0].name;
-        isAirport = fixedMatch[0].isAirport;
+        routeName = match.name;
+        isAirport = match.isAirport;
       }
     }
 
-    // If we found fixed routes for all classes, return them
+    // All three classes have explicit fixed routes — return as-is.
     if (fixedQuotes.length === VEHICLE_CLASSES.length) {
-      // For fixed routes, detect per-address airport from the address text
       isPickupAirport = isAirportAddress(from);
       isDropoffAirport = isAirportAddress(to);
       return {
@@ -258,16 +286,15 @@ export async function getPricingQuoteAllClasses(
       };
     }
 
-    // If some but not all fixed routes matched, try fallback to any fixed route
-    if (fixedQuotes.length > 0 && fixedQuotes.length < VEHICLE_CLASSES.length) {
-      // Use the found ones and estimate missing from ratios
+    // Some but not all classes matched — extrapolate the rest from the
+    // first known price using the class multiplier.
+    if (fixedQuotes.length > 0) {
       const basePrice = fixedQuotes[0].pricePence;
       for (const vc of VEHICLE_CLASSES) {
         if (!fixedQuotes.find((q) => q.vehicleClass === vc)) {
-          const multiplier = vc === "comfort" ? 1.3 : vc === "max" ? 1.7 : 1;
           fixedQuotes.push({
             vehicleClass: vc,
-            pricePence: Math.round(basePrice * multiplier),
+            pricePence: Math.round(basePrice * CLASS_MULTIPLIER[vc]),
           });
         }
       }
@@ -306,7 +333,7 @@ export async function getPricingQuoteAllClasses(
     isDropoffAirport = isAirportAddress(to);
     isAirport = isPickupAirport || isDropoffAirport;
 
-    const allRates = await db.select().from(mileRates);
+    const allRates = await getMileRatesCached(MILE_RATES_CACHE_KEY);
     if (allRates.length === 0) return null;
 
     const mileQuotes: PricingQuoteMulti["quotes"] = [];
