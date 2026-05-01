@@ -14,6 +14,8 @@ const TICK_LOCK_ID = 8472001;
 let started = false;
 let isTickRunning = false;
 let lastTickWindowEnd: Date | null = null;
+let tickInterval: ReturnType<typeof setInterval> | null = null;
+let warmupTimer: ReturnType<typeof setTimeout> | null = null;
 
 async function runTick(): Promise<void> {
   if (isTickRunning) {
@@ -57,18 +59,19 @@ export function startBackgroundJobs(): void {
   started = true;
 
   // Warm-up tick shortly after startup.
-  setTimeout(() => {
+  warmupTimer = setTimeout(() => {
     void runTick();
   }, 2_000);
 
-  const timer = setInterval(() => {
+  tickInterval = setInterval(() => {
     void runTick();
   }, BACKGROUND_JOBS_TICK_SECONDS * 1_000);
 
   if (
-    typeof (timer as unknown as { unref?: () => void }).unref === "function"
+    typeof (tickInterval as unknown as { unref?: () => void }).unref ===
+    "function"
   ) {
-    (timer as unknown as { unref: () => void }).unref();
+    (tickInterval as unknown as { unref: () => void }).unref();
   }
 
   logger.info("background jobs started", {
@@ -76,4 +79,23 @@ export function startBackgroundJobs(): void {
     rideReminderMinutes: config.jobs.rideReminderMinutes,
     lockId: TICK_LOCK_ID,
   });
+}
+
+/**
+ * Stop emitting new ticks and wait for any in-flight tick to settle.
+ * Used by the graceful-shutdown handler.
+ */
+export async function stopBackgroundJobs(): Promise<void> {
+  if (warmupTimer) clearTimeout(warmupTimer);
+  if (tickInterval) clearInterval(tickInterval);
+  warmupTimer = null;
+  tickInterval = null;
+
+  // Wait up to 5s for an in-flight tick to settle.
+  const deadline = Date.now() + 5_000;
+  while (isTickRunning && Date.now() < deadline) {
+    await new Promise((r) => setTimeout(r, 50));
+  }
+  started = false;
+  logger.info("background jobs stopped");
 }

@@ -8,6 +8,7 @@ process.env.BACKGROUND_JOBS_ENABLED = "false";
 
 // Pretend the DB is fine for the few startup paths that care.
 mock.module("../../src/db/index", () => ({
+  dbClient: { end: async () => {} },
   db: {
     execute: async () => [{ "?column?": 1 }],
     select: () => ({

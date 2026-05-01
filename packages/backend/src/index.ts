@@ -19,10 +19,11 @@ import { vehicleRoutes } from "./routes/vehicles";
 import { adminRoutes } from "./routes/admin";
 import { uploadRoutes } from "./routes/upload";
 import { eventsRoutes } from "./routes/events";
-import { startBackgroundJobs } from "./services/jobs";
+import { startBackgroundJobs, stopBackgroundJobs } from "./services/jobs";
 import { resolveSafeUploadPath } from "./lib/safeUploadPath";
-import { db } from "./db/index";
+import { db, dbClient } from "./db/index";
 import { sql } from "drizzle-orm";
+import { createShutdown } from "./lib/shutdown";
 
 const app = new Hono();
 
@@ -170,7 +171,47 @@ logger.info("server startup", {
   port: config.server.port,
 });
 
+// ── Graceful shutdown ─────────────────────────────────────────────────────
+// `stopAcceptingRequests` is set after Bun.serve is invoked. The serve call
+// at module-level is gated for tests: when running under `bun test` we
+// import `app` for in-process Hono request handling and never call serve.
+let stopAcceptingRequests: (() => void | Promise<void>) | null = null;
+
+const isTestRun =
+  typeof Bun !== "undefined" &&
+  typeof (Bun as { jest?: unknown }).jest !== "undefined";
+
+if (!isTestRun) {
+  const server = Bun.serve({ port: config.server.port, fetch: app.fetch });
+  stopAcceptingRequests = () => server.stop();
+}
+
+const shutdown = createShutdown({ hookTimeoutMs: 10_000 });
+
+shutdown.register("postgres", async () => {
+  // dbClient may be undefined under certain test mocks.
+  if (dbClient && typeof dbClient.end === "function") {
+    await dbClient.end({ timeout: 5 });
+  }
+});
+shutdown.register("background-jobs", async () => {
+  await stopBackgroundJobs();
+});
+shutdown.register("http-server", async () => {
+  if (stopAcceptingRequests) await stopAcceptingRequests();
+});
+
+if (!isTestRun) {
+  for (const sig of ["SIGTERM", "SIGINT"] as const) {
+    process.on(sig, async () => {
+      await shutdown.run(sig);
+      process.exit(0);
+    });
+  }
+}
+
 export default {
   port: config.server.port,
   fetch: app.fetch,
 };
+export { app, shutdown };

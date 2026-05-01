@@ -6,6 +6,7 @@ process.env.JWT_SECRET ??= "x".repeat(40);
 let dbHealthy = true;
 
 mock.module("../../src/db/index", () => ({
+  dbClient: { end: async () => {} },
   db: {
     execute: async () => {
       if (!dbHealthy) throw new Error("DB down");
