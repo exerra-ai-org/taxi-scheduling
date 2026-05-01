@@ -6,7 +6,7 @@ describe("readDbPoolConfig", () => {
     const cfg = readDbPoolConfig({});
     expect(cfg.max).toBe(20);
     expect(cfg.idleTimeoutSeconds).toBe(20);
-    expect(cfg.connectTimeoutSeconds).toBe(10);
+    expect(cfg.connectTimeoutSeconds).toBe(30);
   });
 
   test("DB_POOL_MAX overrides max", () => {

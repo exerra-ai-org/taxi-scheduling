@@ -45,6 +45,6 @@ describe("config.database.pool reflects env vars", () => {
     const pool = await readPoolWithEnv({});
     expect(pool.max).toBe(20);
     expect(pool.idleTimeoutSeconds).toBe(20);
-    expect(pool.connectTimeoutSeconds).toBe(10);
+    expect(pool.connectTimeoutSeconds).toBe(30);
   });
 });

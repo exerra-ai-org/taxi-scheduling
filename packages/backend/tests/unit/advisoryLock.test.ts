@@ -1,35 +1,44 @@
 import { test, expect, describe } from "bun:test";
 import { withAdvisoryLock } from "../../src/lib/advisoryLock";
 
+function flatSql(sql: any): string {
+  const chunks = sql?.queryChunks ?? [];
+  return chunks
+    .map((c: any) => {
+      if (Array.isArray(c?.value)) return c.value.join("");
+      if (typeof c?.value === "string") return c.value;
+      if (typeof c?.value === "number") return String(c.value);
+      return "";
+    })
+    .join("");
+}
+
 function makeFakeDb(opts: { acquired: boolean }) {
   const calls: { sql: string }[] = [];
+
+  // The implementation now wraps work in db.transaction(async tx => ...).
+  // Our fake transaction simply forwards execute() into the call log.
+  const tx = {
+    execute: async (sql: any) => {
+      const flat = flatSql(sql);
+      calls.push({ sql: flat });
+      if (flat.includes("pg_try_advisory_xact_lock")) {
+        return [{ locked: opts.acquired }];
+      }
+      return [];
+    },
+  };
+
   return {
     calls,
     db: {
-      execute: async (sql: any) => {
-        // Drizzle SQL has queryChunks; concat their .value StringChunk
-        // representations to a flat string for assertions.
-        const chunks = sql?.queryChunks ?? [];
-        const flat = chunks
-          .map((c: any) => {
-            if (Array.isArray(c?.value)) return c.value.join("");
-            if (typeof c?.value === "string") return c.value;
-            if (typeof c?.value === "number") return String(c.value);
-            return "";
-          })
-          .join("");
-        calls.push({ sql: flat });
-        if (flat.includes("pg_try_advisory_lock")) {
-          return [{ locked: opts.acquired }];
-        }
-        return [];
-      },
+      transaction: async <T>(fn: (tx: typeof tx) => Promise<T>) => fn(tx),
     },
   };
 }
 
 describe("withAdvisoryLock", () => {
-  test("runs fn when lock is acquired and releases after", async () => {
+  test("runs fn when lock is acquired", async () => {
     const fake = makeFakeDb({ acquired: true });
     let ran = false;
     const result = await withAdvisoryLock(fake.db as any, 12345, async () => {
@@ -41,11 +50,20 @@ describe("withAdvisoryLock", () => {
     expect(result).toEqual({ ran: true, value: "ok" });
 
     const sqls = fake.calls.map((c) => c.sql).join("|");
-    expect(sqls).toContain("pg_try_advisory_lock");
-    expect(sqls).toContain("pg_advisory_unlock");
+    expect(sqls).toContain("pg_try_advisory_xact_lock");
   });
 
-  test("skips fn when lock is NOT acquired and does NOT call unlock", async () => {
+  test("does NOT call any pg_advisory_unlock — txn-scoped locks auto-release", async () => {
+    const fake = makeFakeDb({ acquired: true });
+    await withAdvisoryLock(fake.db as any, 12345, async () => "ok");
+
+    const unlockCalls = fake.calls.filter((c) =>
+      c.sql.includes("pg_advisory_unlock"),
+    );
+    expect(unlockCalls).toHaveLength(0);
+  });
+
+  test("skips fn when lock is NOT acquired", async () => {
     const fake = makeFakeDb({ acquired: false });
     let ran = false;
     const result = await withAdvisoryLock(fake.db as any, 12345, async () => {
@@ -54,24 +72,14 @@ describe("withAdvisoryLock", () => {
 
     expect(ran).toBe(false);
     expect(result).toEqual({ ran: false });
-
-    const unlockCalls = fake.calls.filter((c) =>
-      c.sql.includes("pg_advisory_unlock"),
-    );
-    expect(unlockCalls).toHaveLength(0);
   });
 
-  test("releases the lock even if fn throws", async () => {
+  test("propagates exceptions from fn (transaction rolls back, lock auto-releases)", async () => {
     const fake = makeFakeDb({ acquired: true });
     await expect(
       withAdvisoryLock(fake.db as any, 12345, async () => {
         throw new Error("boom");
       }),
     ).rejects.toThrow("boom");
-
-    const unlockCalls = fake.calls.filter((c) =>
-      c.sql.includes("pg_advisory_unlock"),
-    );
-    expect(unlockCalls).toHaveLength(1);
   });
 });

@@ -6,12 +6,16 @@
  * jobs + per-request queries can saturate the pool while idle clients
  * pile up. These defaults are reasonable for a single-node deployment;
  * tune via env in larger fleets.
+ *
+ * connect_timeout=30s is a safety margin for cross-region or shared-host
+ * Postgres (alwaysdata, low-tier RDS) where TLS + auth can spike past
+ * 5-10s under contention. Override via DB_CONNECT_TIMEOUT_SECONDS.
  */
 
 const POOL_MAX_DEFAULT = 20;
 const POOL_MAX_CEILING = 200;
 const IDLE_TIMEOUT_DEFAULT = 20; // seconds
-const CONNECT_TIMEOUT_DEFAULT = 10; // seconds
+const CONNECT_TIMEOUT_DEFAULT = 30; // seconds
 
 export interface DbPoolConfig {
   max: number;
