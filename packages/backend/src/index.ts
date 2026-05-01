@@ -21,6 +21,8 @@ import { uploadRoutes } from "./routes/upload";
 import { eventsRoutes } from "./routes/events";
 import { startBackgroundJobs } from "./services/jobs";
 import { resolveSafeUploadPath } from "./lib/safeUploadPath";
+import { db } from "./db/index";
+import { sql } from "drizzle-orm";
 
 const app = new Hono();
 
@@ -72,12 +74,37 @@ app.use(
   }),
 );
 
-app.get("/health", (c) => {
-  return c.json({
-    status: "ok",
-    timestamp: new Date().toISOString(),
-  });
-});
+// Liveness — never depends on external systems. Used by orchestrators to
+// decide whether the process is alive.
+app.get("/livez", (c) =>
+  c.json({ status: "ok", timestamp: new Date().toISOString() }),
+);
+
+// Readiness — depends on Postgres. Returns 503 if the DB is unreachable so
+// load balancers can drain this replica until it recovers.
+const readinessHandler = async (c: any) => {
+  try {
+    await db.execute(sql`SELECT 1`);
+    return c.json({
+      status: "ok",
+      db: "ok",
+      timestamp: new Date().toISOString(),
+    });
+  } catch (cause) {
+    c.get("logger")?.warn("readiness check failed", { err: cause as Error });
+    return c.json(
+      {
+        status: "degraded",
+        db: "down",
+        timestamp: new Date().toISOString(),
+      },
+      503,
+    );
+  }
+};
+app.get("/readyz", readinessHandler);
+// Backwards-compat alias.
+app.get("/health", readinessHandler);
 
 app.route("/auth", authRoutes);
 app.route("/pricing", pricingRoutes);

@@ -12,7 +12,7 @@ describe("getPublicVapidKey", () => {
     process.env.VAPID_PRIVATE_KEY = TEST_VAPID_PRIVATE;
     process.env.VAPID_SUBJECT = "mailto:test@example.com";
     // Quiet startup warnings for unrelated config.
-    process.env.JWT_SECRET ??= "x".repeat(32);
+    process.env.JWT_SECRET ??= "x".repeat(40);
     process.env.DATABASE_URL ??=
       "postgresql://postgres:postgres@localhost:5432/taxi";
   });

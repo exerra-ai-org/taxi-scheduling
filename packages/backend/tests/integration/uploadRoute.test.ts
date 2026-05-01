@@ -1,31 +1,17 @@
-import { describe, test, expect, beforeAll, afterAll, mock } from "bun:test";
+import { describe, test, expect, beforeAll, afterAll } from "bun:test";
 import { rm, mkdir, readdir } from "node:fs/promises";
 import { join } from "node:path";
+import { sign } from "hono/jwt";
 
 process.env.DATABASE_URL ??= "postgresql://test:test@localhost:5432/taxi";
 process.env.JWT_SECRET ??= "x".repeat(40);
-
-// Bypass auth for tests — the upload route is protected by jwt() which
-// requires a valid signed cookie; we don't care to test auth here.
-mock.module("../../src/middleware/auth", () => ({
-  authMiddleware: async (c: any, next: any) => {
-    c.set("jwtPayload", {
-      sub: 1,
-      email: "t@t",
-      role: "customer",
-      name: "T",
-      exp: Math.floor(Date.now() / 1000) + 3600,
-    });
-    await next();
-  },
-  requireRole:
-    (..._roles: any[]) =>
-    async (_c: any, next: any) =>
-      next(),
-}));
+// Sign with whatever JWT_SECRET ended up being — works regardless of which
+// test file imported config.ts first.
+const TEST_SECRET = process.env.JWT_SECRET;
 
 const UPLOAD_DIR = join(import.meta.dir, "../../uploads");
 let app: any;
+let authCookie: string;
 
 beforeAll(async () => {
   await mkdir(UPLOAD_DIR, { recursive: true });
@@ -33,6 +19,20 @@ beforeAll(async () => {
   const { uploadRoutes } = await import("../../src/routes/upload");
   app = new Hono();
   app.route("/upload", uploadRoutes);
+
+  // Sign a real JWT so the route's jwt() middleware passes regardless of
+  // module-cache ordering across test files.
+  const token = await sign(
+    {
+      sub: 1,
+      email: "t@t.com",
+      role: "customer",
+      name: "T",
+      exp: Math.floor(Date.now() / 1000) + 3600,
+    },
+    TEST_SECRET,
+  );
+  authCookie = `token=${token}`;
 });
 
 async function listUploaded(): Promise<string[]> {
@@ -73,6 +73,7 @@ describe("POST /upload/profile-picture", () => {
 
     const res = await app.request("/upload/profile-picture", {
       method: "POST",
+      headers: { cookie: authCookie },
       body: makeForm("evil.jpg", "image/jpeg", HTML_PAYLOAD),
     });
 
@@ -87,6 +88,7 @@ describe("POST /upload/profile-picture", () => {
 
     const res = await app.request("/upload/profile-picture", {
       method: "POST",
+      headers: { cookie: authCookie },
       body: makeForm("logo.gif", "image/gif", PNG_MAGIC), // mislabelled mime + extension
     });
 
@@ -106,6 +108,7 @@ describe("POST /upload/profile-picture", () => {
   test("rejects empty file", async () => {
     const res = await app.request("/upload/profile-picture", {
       method: "POST",
+      headers: { cookie: authCookie },
       body: makeForm("zero.jpg", "image/jpeg", new Uint8Array(0)),
     });
     expect(res.status).toBe(400);
@@ -116,6 +119,7 @@ describe("POST /upload/profile-picture", () => {
     fd.append("notfile", "x");
     const res = await app.request("/upload/profile-picture", {
       method: "POST",
+      headers: { cookie: authCookie },
       body: fd,
     });
     expect(res.status).toBe(400);
