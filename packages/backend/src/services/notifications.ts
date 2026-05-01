@@ -602,5 +602,9 @@ export async function notifyIncident(
 }
 
 export function getPublicVapidKey(): string | null {
-  return PUSH_READY ? (config.push.publicKey ?? null) : null;
+  // Read env at call time. config is cached at module load, so if VAPID
+  // wasn't in env when the module first imported (test setup, late
+  // configuration), config.push.publicKey is undefined for the rest of
+  // the process. The env var is the canonical source either way.
+  return process.env.VAPID_PUBLIC_KEY ?? config.push.publicKey ?? null;
 }

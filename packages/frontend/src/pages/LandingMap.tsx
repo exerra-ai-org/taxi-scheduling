@@ -11,6 +11,7 @@ import L from "leaflet";
 import type { BookingData } from "./BookingFlow";
 import AddressAutocomplete from "../components/maps/AddressAutocomplete";
 import { IconMapPin } from "../components/icons";
+import { config } from "../config";
 
 const DARK_TILES =
   "https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png";
@@ -137,7 +138,7 @@ export default function LandingMap({ data, onNext }: Props) {
       setRoute([]);
       return;
     }
-    const url = `https://router.project-osrm.org/route/v1/driving/${pickupLon},${pickupLat};${dropoffLon},${dropoffLat}?overview=full&geometries=geojson`;
+    const url = `${config.osrmUrl}/route/v1/driving/${pickupLon},${pickupLat};${dropoffLon},${dropoffLat}?overview=full&geometries=geojson`;
     fetch(url)
       .then((r) => r.json())
       .then((data) => {

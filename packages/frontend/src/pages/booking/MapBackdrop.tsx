@@ -8,6 +8,7 @@ import {
   useMapEvents,
 } from "react-leaflet";
 import L from "leaflet";
+import { config } from "../../config";
 
 const TILES =
   "https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png";
@@ -173,7 +174,7 @@ export default function MapBackdrop({
       setRoute([]);
       return;
     }
-    const url = `https://router.project-osrm.org/route/v1/driving/${pickup.lon},${pickup.lat};${dropoff.lon},${dropoff.lat}?overview=full&geometries=geojson`;
+    const url = `${config.osrmUrl}/route/v1/driving/${pickup.lon},${pickup.lat};${dropoff.lon},${dropoff.lat}?overview=full&geometries=geojson`;
     let cancelled = false;
     fetch(url)
       .then((r) => r.json())

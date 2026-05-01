@@ -9,6 +9,7 @@ import {
 import L from "leaflet";
 import type { DriverLocation } from "shared/types";
 import { useRealtimeEvent } from "../../context/RealtimeContext";
+import { config } from "../../config";
 
 interface Coords {
   lat: number;
@@ -75,7 +76,7 @@ export default function LiveDriverMap({
 
   // Static OSRM route between pickup and dropoff for the polyline.
   useEffect(() => {
-    const url = `https://router.project-osrm.org/route/v1/driving/${pickup.lon},${pickup.lat};${dropoff.lon},${dropoff.lat}?overview=full&geometries=geojson`;
+    const url = `${config.osrmUrl}/route/v1/driving/${pickup.lon},${pickup.lat};${dropoff.lon},${dropoff.lat}?overview=full&geometries=geojson`;
     fetch(url)
       .then((res) => res.json())
       .then((data) => {

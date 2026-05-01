@@ -8,8 +8,14 @@ import {
 } from "react-leaflet";
 import L from "leaflet";
 import type { LiveDriver } from "shared/types";
-import { listLiveDrivers } from "../../api/drivers";
+import {
+  getBookingPath,
+  listLiveDrivers,
+  type BookingPathPoint,
+} from "../../api/drivers";
 import { useRealtimeEvent } from "../../context/RealtimeContext";
+import { snapBreadcrumb } from "../../lib/snapBreadcrumb";
+import { config } from "../../config";
 
 const TILES =
   "https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png";
@@ -76,6 +82,8 @@ export default function LiveDriversMap() {
   const [selectedId, setSelectedId] = useState<number | null>(null);
   const [route, setRoute] = useState<L.LatLngExpression[]>([]);
   const [routeError, setRouteError] = useState<string | null>(null);
+  const [breadcrumb, setBreadcrumb] = useState<BookingPathPoint[]>([]);
+  const [snapped, setSnapped] = useState<L.LatLngExpression[]>([]);
   const [loading, setLoading] = useState(true);
 
   const refresh = useCallback(async () => {
@@ -128,11 +136,31 @@ export default function LiveDriversMap() {
     });
   });
 
-  useRealtimeEvent("driver_location", () => {
+  useRealtimeEvent("driver_location", (e) => {
     // driver_location is per-booking, not per-driver. We can't map booking →
     // driver without an extra cache, so just trigger a refetch to pick up the
     // canonical positions. Cheap (~few ms) and keeps things consistent.
     refresh();
+    // If the moving driver is the one we're inspecting, extend the
+    // breadcrumb client-side instead of refetching the whole path.
+    setBreadcrumb((prev) => {
+      const sel = selectedId != null ? drivers.get(selectedId) : null;
+      if (!sel?.activeBooking || sel.activeBooking.id !== e.bookingId) {
+        return prev;
+      }
+      const last = prev[prev.length - 1];
+      if (last && last.lat === e.lat && last.lon === e.lon) return prev;
+      return [
+        ...prev,
+        {
+          lat: e.lat,
+          lon: e.lon,
+          accuracyM: null,
+          speedMps: null,
+          recordedAt: e.updatedAt,
+        },
+      ];
+    });
   });
 
   // Re-fetch on assignment changes too — driver's activeBooking just changed.
@@ -141,7 +169,66 @@ export default function LiveDriversMap() {
   useRealtimeEvent("booking_cancelled", refresh);
 
   const driverList = useMemo(() => Array.from(drivers.values()), [drivers]);
-  const selected = selectedId != null ? drivers.get(selectedId) ?? null : null;
+  const selected =
+    selectedId != null ? (drivers.get(selectedId) ?? null) : null;
+
+  // Run the breadcrumb through OSRM map-matching so the rendered polyline
+  // follows actual roads instead of drawing straight lines between raw GPS
+  // fixes. Debounced so a burst of SSE updates produces one request, not
+  // many. On failure (rate limit, OSRM down) the raw thinned points are
+  // returned and we still get something useful.
+  useEffect(() => {
+    if (breadcrumb.length < 2) {
+      setSnapped([]);
+      return;
+    }
+    const ac = new AbortController();
+    const t = setTimeout(() => {
+      snapBreadcrumb(breadcrumb, ac.signal).then((path) => {
+        if (!ac.signal.aborted) setSnapped(path);
+      });
+    }, 1500);
+    return () => {
+      clearTimeout(t);
+      ac.abort();
+    };
+  }, [breadcrumb]);
+
+  // Fetch the actual breadcrumb (recorded GPS trail) for the selected booking.
+  // Re-fetched whenever the selection changes; subsequent driver_location SSE
+  // events extend it in place to avoid hammering the endpoint. If the server
+  // returns a cached snappedPath (completed rides), we use it directly and
+  // skip client-side snapping entirely.
+  useEffect(() => {
+    if (!selected?.activeBooking) {
+      setBreadcrumb([]);
+      setSnapped([]);
+      return;
+    }
+    const bookingId = selected.activeBooking.id;
+    let cancelled = false;
+    getBookingPath(bookingId)
+      .then(({ points, snappedPath }) => {
+        if (cancelled) return;
+        if (snappedPath && snappedPath.length > 1) {
+          setBreadcrumb([]);
+          setSnapped(
+            snappedPath.map(([lat, lon]) => [lat, lon] as L.LatLngExpression),
+          );
+        } else {
+          setBreadcrumb(points);
+        }
+      })
+      .catch(() => {
+        if (!cancelled) {
+          setBreadcrumb([]);
+          setSnapped([]);
+        }
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [selected?.activeBooking?.id]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Fetch the planned pickup→dropoff polyline whenever we select an on-ride
   // driver. We cache nothing: the polyline is small and OSRM is fast.
@@ -167,7 +254,7 @@ export default function LiveDriversMap() {
     if (lastFetchedBookingRef.current === b.id) return;
     lastFetchedBookingRef.current = b.id;
 
-    const url = `https://router.project-osrm.org/route/v1/driving/${b.pickupLon},${b.pickupLat};${b.dropoffLon},${b.dropoffLat}?overview=full&geometries=geojson`;
+    const url = `${config.osrmUrl}/route/v1/driving/${b.pickupLon},${b.pickupLat};${b.dropoffLon},${b.dropoffLat}?overview=full&geometries=geojson`;
     fetch(url)
       .then((res) => res.json())
       .then((data) => {
@@ -282,9 +369,31 @@ export default function LiveDriversMap() {
             {selected && route.length > 0 && (
               <Polyline
                 positions={route}
-                pathOptions={{ color: "#131313", weight: 4, opacity: 0.75 }}
+                pathOptions={{
+                  color: "#131313",
+                  weight: 4,
+                  opacity: 0.45,
+                  dashArray: "6 8",
+                }}
               />
             )}
+
+            {selected &&
+              (snapped.length > 1 ? (
+                <Polyline
+                  positions={snapped}
+                  pathOptions={{ color: "#ff8c00", weight: 5, opacity: 0.9 }}
+                />
+              ) : breadcrumb.length > 1 ? (
+                // Fallback while we wait for the snap result, or if the
+                // OSRM match failed and we couldn't road-snap.
+                <Polyline
+                  positions={breadcrumb.map(
+                    (p) => [p.lat, p.lon] as L.LatLngExpression,
+                  )}
+                  pathOptions={{ color: "#ff8c00", weight: 4, opacity: 0.5 }}
+                />
+              ) : null)}
           </MapContainer>
         </div>
 
@@ -299,14 +408,14 @@ export default function LiveDriversMap() {
             <div className="card-pad">
               <p className="section-label">Tip</p>
               <p className="body-copy">
-                Click any driver marker to inspect their status. On-ride
-                drivers are highlighted in orange and show their planned
-                pickup → dropoff route.
+                Click any driver marker to inspect their status. On-ride drivers
+                are highlighted in orange and show their planned pickup →
+                dropoff route.
               </p>
               <p className="caption-copy text-[var(--color-muted)] mt-3">
-                Drivers count as live for 2 min after their last ping. The
-                feed refreshes every {REFRESH_MS / 1000}s and patches in
-                real time via SSE.
+                Drivers count as live for 2 min after their last ping. The feed
+                refreshes every {REFRESH_MS / 1000}s and patches in real time
+                via SSE.
               </p>
             </div>
           )}

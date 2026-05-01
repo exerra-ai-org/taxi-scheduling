@@ -13,8 +13,7 @@ mock.module("../../src/db/index", () => ({
   db: {
     select: () => ({
       from: (table: any) => {
-        const tableName =
-          table?.[Symbol.for("drizzle:Name")] ?? "unknown";
+        const tableName = table?.[Symbol.for("drizzle:Name")] ?? "unknown";
         const obj: any = {};
         obj.where = () => obj;
         obj.limit = () => Promise.resolve([]);

@@ -55,6 +55,7 @@ import {
   notifyIncident,
 } from "../services/notifications";
 import { broadcastBookingEvent } from "../services/broadcaster";
+import { broadcastBookingChange } from "../services/bookingBroadcast";
 
 export const bookingRoutes = new Hono();
 
@@ -715,7 +716,7 @@ bookingRoutes.patch(
       notifyBookingStatusChanged(id, nextStatus),
     );
 
-    broadcastBookingEvent([booking.customerId], {
+    await broadcastBookingChange(id, {
       type: "booking_updated",
       bookingId: id,
       status: nextStatus,
@@ -764,7 +765,7 @@ bookingRoutes.patch(
 
     runAsyncSideEffect("notifyBookingCancelled", notifyBookingCancelled(id));
 
-    broadcastBookingEvent([booking.customerId], {
+    await broadcastBookingChange(id, {
       type: "booking_cancelled",
       bookingId: id,
     });

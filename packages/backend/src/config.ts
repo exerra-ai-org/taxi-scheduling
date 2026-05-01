@@ -82,6 +82,30 @@ export const config = {
     ),
   },
 
+  geofence: {
+    // Auto-flip en_route → arrived once driver dwells inside the pickup
+    // radius for the dwell window. Off by default; flip via env to ship.
+    autoArrive: process.env.GEOFENCE_AUTO_ARRIVE === "true",
+    pickupRadiusM: Math.max(
+      20,
+      Number(process.env.GEOFENCE_PICKUP_RADIUS_M) || 75,
+    ),
+    pickupDwellMs: Math.max(
+      5_000,
+      Number(process.env.GEOFENCE_PICKUP_DWELL_MS) || 20000,
+    ),
+  },
+
+  // OSRM host used for server-side breadcrumb map-matching. Defaults to
+  // the public demo (rate-limited, no SLA). Swap to a self-hosted or
+  // paid endpoint via OSRM_URL in prod. See docs/breadcrumb-and-osrm.md.
+  osrm: {
+    url: (process.env.OSRM_URL || "https://router.project-osrm.org").replace(
+      /\/$/,
+      "",
+    ),
+  },
+
   jobs: {
     enabled: process.env.BACKGROUND_JOBS_ENABLED !== "false",
     tickSeconds: Math.max(

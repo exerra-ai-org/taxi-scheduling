@@ -147,6 +147,11 @@ export const driverHeartbeatSchema = z.object({
   bookingId: z.number().int().positive(),
   lat: z.number().min(-90).max(90).optional(),
   lon: z.number().min(-180).max(180).optional(),
+  // accuracy in meters; speed in m/s. Both come straight from the browser's
+  // GeolocationPosition.coords and are forwarded so we can score points when
+  // computing actual ride distance later.
+  accuracyM: z.number().nonnegative().optional(),
+  speedMps: z.number().optional(),
 });
 
 export const driverPresenceSchema = z.object({

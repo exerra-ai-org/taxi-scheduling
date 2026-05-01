@@ -11,10 +11,14 @@ import {
   driverAssignments,
   bookings,
   driverHeartbeats,
+  driverLocationPoints,
   driverPresence,
   driverProfiles,
   reviews,
 } from "../db/schema";
+import { config } from "../config";
+import { evaluatePickupDwell } from "../services/geofence";
+import { notifyBookingStatusChanged } from "../services/notifications";
 import {
   authMiddleware,
   requireRole,
@@ -24,6 +28,7 @@ import { ok, err } from "../lib/response";
 import { runDriverWatchdog } from "../services/driverWatchdog";
 import { notifyWatchdogResult } from "../services/notifications";
 import { broadcastBookingEvent } from "../services/broadcaster";
+import { broadcastBookingChange } from "../services/bookingBroadcast";
 
 export const driverRoutes = new Hono();
 
@@ -116,12 +121,15 @@ driverRoutes.post(
       return err(c, "Invalid input", 400, parsed.error.flatten());
     }
 
-    const { bookingId, lat, lon } = parsed.data;
+    const { bookingId, lat, lon, accuracyM, speedMps } = parsed.data;
 
     const assignment = await db
       .select({
         bookingId: driverAssignments.bookingId,
         customerId: bookings.customerId,
+        status: bookings.status,
+        pickupLat: bookings.pickupLat,
+        pickupLon: bookings.pickupLon,
       })
       .from(driverAssignments)
       .innerJoin(bookings, eq(driverAssignments.bookingId, bookings.id))
@@ -143,8 +151,46 @@ driverRoutes.post(
     if (assignment.length === 0) {
       return err(c, "You are not actively assigned to this ride", 403);
     }
+    const ride = assignment[0];
 
     const now = new Date();
+
+    // Geofence dwell evaluation runs against the previous heartbeat row's
+    // pickup_geofence_since. We read it before the upsert so the dwell math
+    // sees the prior state, not the row we're about to write.
+    const previousHb = await db
+      .select({ pickupGeofenceSince: driverHeartbeats.pickupGeofenceSince })
+      .from(driverHeartbeats)
+      .where(
+        and(
+          eq(driverHeartbeats.bookingId, bookingId),
+          eq(driverHeartbeats.driverId, payload.sub),
+        ),
+      )
+      .limit(1);
+
+    let nextGeofenceSince: Date | null = null;
+    let shouldArrive = false;
+    if (
+      lat != null &&
+      lon != null &&
+      ride.status === "en_route" &&
+      config.geofence.autoArrive
+    ) {
+      const dwell = evaluatePickupDwell({
+        driverLat: lat,
+        driverLon: lon,
+        pickupLat: ride.pickupLat,
+        pickupLon: ride.pickupLon,
+        previousSince: previousHb[0]?.pickupGeofenceSince ?? null,
+        now,
+        radiusM: config.geofence.pickupRadiusM,
+        dwellMs: config.geofence.pickupDwellMs,
+      });
+      nextGeofenceSince = dwell.nextSince;
+      shouldArrive = dwell.shouldArrive;
+    }
+
     const [heartbeat] = await db
       .insert(driverHeartbeats)
       .values({
@@ -154,6 +200,7 @@ driverRoutes.post(
         missedWindows: 0,
         lat: lat ?? null,
         lon: lon ?? null,
+        pickupGeofenceSince: nextGeofenceSince,
       })
       .onConflictDoUpdate({
         target: [driverHeartbeats.bookingId, driverHeartbeats.driverId],
@@ -162,18 +209,55 @@ driverRoutes.post(
           missedWindows: 0,
           lat: lat ?? null,
           lon: lon ?? null,
+          pickupGeofenceSince: nextGeofenceSince,
         },
       })
       .returning();
 
+    // Append the point to the breadcrumb trail. Skipped when coords are
+    // missing (occasional pings without GPS still keep the heartbeat alive
+    // for the watchdog but don't add to the path).
     if (lat != null && lon != null) {
-      broadcastBookingEvent([assignment[0].customerId], {
+      await db.insert(driverLocationPoints).values({
+        bookingId,
+        driverId: payload.sub,
+        lat,
+        lon,
+        accuracyM: accuracyM ?? null,
+        speedMps: speedMps ?? null,
+        recordedAt: now,
+      });
+    }
+
+    if (lat != null && lon != null) {
+      broadcastBookingEvent([ride.customerId], {
         type: "driver_location",
         bookingId,
         lat,
         lon,
         updatedAt: now.toISOString(),
       });
+    }
+
+    // Auto-arrive transition. Fire-and-forget so the heartbeat itself
+    // returns fast even if notification dispatch is slow. Errors are
+    // logged but do not fail the request.
+    if (shouldArrive) {
+      const [updated] = await db
+        .update(bookings)
+        .set({ status: "arrived" })
+        .where(and(eq(bookings.id, bookingId), eq(bookings.status, "en_route")))
+        .returning({ id: bookings.id });
+      if (updated) {
+        void notifyBookingStatusChanged(bookingId, "arrived").catch((cause) =>
+          console.error("notifyBookingStatusChanged (geofence) failed:", cause),
+        );
+        await broadcastBookingChange(bookingId, {
+          type: "booking_updated",
+          bookingId,
+          status: "arrived",
+        });
+      }
     }
 
     // Mirror to driver_presence so the admin live map sees on-ride drivers

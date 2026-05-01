@@ -188,6 +188,11 @@ export const bookings = pgTable(
     distanceMiles: doublePrecision("distance_miles"),
     ratePerMilePence: integer("rate_per_mile_pence"),
     baseFarePence: integer("base_fare_pence"),
+    // Cached road-snapped polyline for the completed ride. Computed on
+    // first /admin/bookings/:id/path GET after status flips to completed
+    // and stored as a flat [[lat, lon], ...] array. Avoids re-running
+    // OSRM map-matching on every admin view of a finished ride.
+    snappedPath: jsonb("snapped_path"),
     createdAt: timestamp("created_at").notNull().defaultNow(),
   },
   (table) => [
@@ -236,6 +241,11 @@ export const driverHeartbeats = pgTable(
     missedWindows: integer("missed_windows").notNull().default(0),
     lat: doublePrecision("lat"),
     lon: doublePrecision("lon"),
+    // Geofence dwell tracking. Set when the driver first enters the pickup
+    // radius; cleared if they leave it. Auto-arrival fires when the dwell
+    // duration exceeds the configured window. Leaving this on the heartbeat
+    // row keeps the dwell state colocated with the heartbeat upsert.
+    pickupGeofenceSince: timestamp("pickup_geofence_since"),
   },
   (table) => [
     uniqueIndex("driver_heartbeats_booking_driver_unique").on(
@@ -243,6 +253,34 @@ export const driverHeartbeats = pgTable(
       table.driverId,
     ),
     index("idx_hb_last").on(table.lastHeartbeatAt),
+  ],
+);
+
+// ── Driver Location Breadcrumb ─────────────────────────
+//
+// Append-only trail of every GPS fix during a ride. driver_heartbeats only
+// stores the latest position (for watchdog liveness); this table preserves
+// history so we can replay a trip, compute actual distance, or settle
+// disputes about the route taken. One row per heartbeat that carries coords.
+
+export const driverLocationPoints = pgTable(
+  "driver_location_points",
+  {
+    id: serial("id").primaryKey(),
+    bookingId: integer("booking_id")
+      .notNull()
+      .references(() => bookings.id),
+    driverId: integer("driver_id")
+      .notNull()
+      .references(() => users.id),
+    lat: doublePrecision("lat").notNull(),
+    lon: doublePrecision("lon").notNull(),
+    accuracyM: doublePrecision("accuracy_m"),
+    speedMps: doublePrecision("speed_mps"),
+    recordedAt: timestamp("recorded_at").notNull().defaultNow(),
+  },
+  (table) => [
+    index("idx_dlp_booking_recorded").on(table.bookingId, table.recordedAt),
   ],
 );
 

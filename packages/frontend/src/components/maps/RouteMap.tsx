@@ -7,6 +7,7 @@ import {
   useMap,
 } from "react-leaflet";
 import L from "leaflet";
+import { config } from "../../config";
 
 interface Coords {
   lat: number;
@@ -55,7 +56,7 @@ export default function RouteMap({ pickup, dropoff }: RouteMapProps) {
   const [route, setRoute] = useState<L.LatLngExpression[]>([]);
 
   useEffect(() => {
-    const url = `https://router.project-osrm.org/route/v1/driving/${pickup.lon},${pickup.lat};${dropoff.lon},${dropoff.lat}?overview=full&geometries=geojson`;
+    const url = `${config.osrmUrl}/route/v1/driving/${pickup.lon},${pickup.lat};${dropoff.lon},${dropoff.lat}?overview=full&geometries=geojson`;
     fetch(url)
       .then((res) => res.json())
       .then((data) => {

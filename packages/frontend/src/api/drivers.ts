@@ -83,8 +83,33 @@ export function sendHeartbeat(input: {
   bookingId: number;
   lat?: number;
   lon?: number;
+  accuracyM?: number;
+  speedMps?: number;
 }) {
   return api.post<{ heartbeat: DriverHeartbeat }>("/drivers/heartbeat", input);
+}
+
+export interface BookingPathPoint {
+  lat: number;
+  lon: number;
+  accuracyM: number | null;
+  speedMps: number | null;
+  recordedAt: string;
+}
+
+// Server returns either:
+//   - `points` (raw filtered GPS fixes) for active rides
+//   - `points: []` plus `snappedPath` (cached road-snapped polyline) for
+//     completed rides whose path has been computed and cached
+// The frontend uses snappedPath verbatim when present; otherwise it runs
+// its own client-side snap on points.
+export type SnappedPolyline = [number, number][];
+
+export function getBookingPath(bookingId: number) {
+  return api.get<{
+    points: BookingPathPoint[];
+    snappedPath?: SnappedPolyline | null;
+  }>(`/admin/bookings/${bookingId}/path`);
 }
 
 export function sendPresence(input: {

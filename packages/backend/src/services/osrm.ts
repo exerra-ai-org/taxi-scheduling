@@ -1,6 +1,7 @@
 import { createTtlCache } from "../lib/cache";
+import { config } from "../config";
 
-const OSRM_BASE = "https://router.project-osrm.org/route/v1/driving";
+const OSRM_BASE = `${config.osrm.url}/route/v1/driving`;
 const METERS_PER_MILE = 1609.344;
 
 // 4 dp ≈ 11m precision. Far below taxi-routing accuracy. Coords sharing
@@ -70,7 +71,12 @@ async function fetchOsrm(k: OsrmKey): Promise<OsrmResult | null> {
 
 const cachedFetch = cache.wrap(async (key: string) => {
   const [a, b, c, d] = key.split("|").map(Number);
-  const result = await fetchOsrm({ fromLat: a, fromLon: b, toLat: c, toLon: d });
+  const result = await fetchOsrm({
+    fromLat: a,
+    fromLon: b,
+    toLat: c,
+    toLon: d,
+  });
   // The cache wrap layer treats null as a value to cache, but we
   // explicitly do NOT want to memoise transport failures — let a later
   // call retry. Throw a sentinel here and convert at the public API.
@@ -92,9 +98,7 @@ export async function getOsrmDistance(
   toLon: number,
 ): Promise<OsrmResult | null> {
   try {
-    return await cachedFetch(
-      cacheKey({ fromLat, fromLon, toLat, toLon }),
-    );
+    return await cachedFetch(cacheKey({ fromLat, fromLon, toLat, toLon }));
   } catch (cause) {
     if (cause instanceof OsrmFailure) return null;
     throw cause;

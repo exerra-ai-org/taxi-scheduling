@@ -21,7 +21,12 @@ export function useDriverHeartbeat(
   status: string | null,
 ): { gpsStatus: GpsStatus } {
   const [gpsStatus, setGpsStatus] = useState<GpsStatus>("idle");
-  const coordsRef = useRef<{ lat: number; lon: number } | null>(null);
+  const coordsRef = useRef<{
+    lat: number;
+    lon: number;
+    accuracyM?: number;
+    speedMps?: number;
+  } | null>(null);
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const watchRef = useRef<number | null>(null);
 
@@ -37,6 +42,8 @@ export function useDriverHeartbeat(
         bookingId,
         lat: coordsRef.current?.lat,
         lon: coordsRef.current?.lon,
+        accuracyM: coordsRef.current?.accuracyM,
+        speedMps: coordsRef.current?.speedMps,
       });
     } catch {
       // Missed heartbeat — backend watchdog handles recovery
@@ -62,6 +69,12 @@ export function useDriverHeartbeat(
           coordsRef.current = {
             lat: pos.coords.latitude,
             lon: pos.coords.longitude,
+            accuracyM: pos.coords.accuracy,
+            // pos.coords.speed is null when stationary or unsupported
+            speedMps:
+              pos.coords.speed != null && pos.coords.speed >= 0
+                ? pos.coords.speed
+                : undefined,
           };
           setGpsStatus("active");
         },

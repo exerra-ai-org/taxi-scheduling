@@ -6,12 +6,14 @@ import {
   updateUserSchema,
 } from "shared/validation";
 import type { LiveDriver } from "shared/types";
+import { asc } from "drizzle-orm";
 import { db } from "../db/index";
 import {
   users,
   driverProfiles,
   driverPresence,
   driverAssignments,
+  driverLocationPoints,
   bookings,
   reviews,
 } from "../db/schema";
@@ -19,6 +21,8 @@ import { authMiddleware, requireRole } from "../middleware/auth";
 import { ok, err } from "../lib/response";
 import { generateAuthToken } from "../lib/tokens";
 import { sendInvitationEmail } from "../services/email";
+import { haversineMeters } from "../services/geofence";
+import { snapPathServer } from "../services/snapPath";
 
 // A driver counts as "live" if presence was pinged within this window.
 const LIVE_WINDOW_MS = 2 * 60 * 1000;
@@ -65,6 +69,124 @@ adminRoutes.post("/invite", async (c) => {
   return ok(c, {
     user: { id: user.id, email: user.email, name: user.name, role: user.role },
   });
+});
+
+// Live drivers feed for the admin map. MUST be registered before
+// /drivers/:id — otherwise Hono matches "live" as the :id parameter and
+// the request falls into the wrong handler (resulting in a 400).
+adminRoutes.get("/drivers/live", async (c) => {
+  const cutoff = new Date(Date.now() - LIVE_WINDOW_MS);
+
+  const liveRows = await db
+    .select({
+      driverId: driverPresence.driverId,
+      isOnDuty: driverPresence.isOnDuty,
+      lastSeenAt: driverPresence.lastSeenAt,
+      lat: driverPresence.lastLat,
+      lon: driverPresence.lastLon,
+      name: users.name,
+      phone: users.phone,
+    })
+    .from(driverPresence)
+    .innerJoin(users, eq(driverPresence.driverId, users.id))
+    .where(
+      and(
+        eq(driverPresence.isOnDuty, true),
+        gte(driverPresence.lastSeenAt, cutoff),
+      ),
+    );
+
+  if (liveRows.length === 0) return ok(c, { drivers: [] as LiveDriver[] });
+
+  const driverIds = liveRows.map((r) => r.driverId);
+
+  const profiles = await db
+    .select()
+    .from(driverProfiles)
+    .where(inArray(driverProfiles.driverId, driverIds));
+  const profileById = new Map(profiles.map((p) => [p.driverId, p]));
+
+  const ACTIVE_STATUSES = [
+    "assigned",
+    "en_route",
+    "arrived",
+    "in_progress",
+  ] as const;
+  const activeAssignments = await db
+    .select({
+      driverId: driverAssignments.driverId,
+      bookingId: bookings.id,
+      status: bookings.status,
+      pickupAddress: bookings.pickupAddress,
+      dropoffAddress: bookings.dropoffAddress,
+      pickupLat: bookings.pickupLat,
+      pickupLon: bookings.pickupLon,
+      dropoffLat: bookings.dropoffLat,
+      dropoffLon: bookings.dropoffLon,
+      customerName: users.name,
+      scheduledAt: bookings.scheduledAt,
+    })
+    .from(driverAssignments)
+    .innerJoin(bookings, eq(driverAssignments.bookingId, bookings.id))
+    .innerJoin(users, eq(bookings.customerId, users.id))
+    .where(
+      and(
+        inArray(driverAssignments.driverId, driverIds),
+        eq(driverAssignments.isActive, true),
+        inArray(bookings.status, [...ACTIVE_STATUSES]),
+      ),
+    );
+
+  const STATUS_PRIORITY: Record<string, number> = {
+    in_progress: 4,
+    arrived: 3,
+    en_route: 2,
+    assigned: 1,
+  };
+  const activeByDriver = new Map<number, (typeof activeAssignments)[number]>();
+  for (const row of activeAssignments) {
+    const existing = activeByDriver.get(row.driverId);
+    if (
+      !existing ||
+      (STATUS_PRIORITY[row.status] ?? 0) >
+        (STATUS_PRIORITY[existing.status] ?? 0)
+    ) {
+      activeByDriver.set(row.driverId, row);
+    }
+  }
+
+  const drivers: LiveDriver[] = liveRows
+    .filter((r) => r.lat != null && r.lon != null && r.lastSeenAt != null)
+    .map((r) => {
+      const active = activeByDriver.get(r.driverId);
+      const profile = profileById.get(r.driverId) ?? null;
+      return {
+        driverId: r.driverId,
+        name: r.name,
+        phone: r.phone,
+        vehicle: profile,
+        lat: r.lat as number,
+        lon: r.lon as number,
+        lastSeenAt: (r.lastSeenAt as Date).toISOString(),
+        isOnDuty: r.isOnDuty,
+        activeBooking: active
+          ? {
+              id: active.bookingId,
+              status: active.status,
+              pickupAddress: active.pickupAddress,
+              dropoffAddress: active.dropoffAddress,
+              pickupLat: active.pickupLat,
+              pickupLon: active.pickupLon,
+              dropoffLat: active.dropoffLat,
+              dropoffLon: active.dropoffLon,
+              customerName: active.customerName,
+              scheduledAt: active.scheduledAt.toISOString(),
+            }
+          : null,
+      };
+    });
+
+  return ok(c, { drivers });
 });
 
 // Get full driver profile (admin)
@@ -173,123 +295,101 @@ adminRoutes.put("/drivers/:id/profile", async (c) => {
   return ok(c, { profile });
 });
 
-// Live drivers feed for the admin map. Returns drivers whose presence
-// was pinged inside LIVE_WINDOW_MS, with their latest coords plus an
-// active booking summary if they're currently on a ride.
-adminRoutes.get("/drivers/live", async (c) => {
-  const cutoff = new Date(Date.now() - LIVE_WINDOW_MS);
+// Breadcrumb path for a booking. Returns every recorded GPS point for the
+// ride in chronological order. Used by the admin live map to draw the
+// actual route a driver took, separate from the planned OSRM polyline.
+//
+// Two filters are applied to clean up the path:
+//   1. Drop low-accuracy fixes (browser Wi-Fi / IP geolocation can be off
+//      by kilometers — those would draw absurd straight lines on the map).
+//   2. Drop impossible-speed jumps between consecutive kept points — a
+//      remaining safety net for the rare bad fix that slips through.
+const PATH_MAX_ACCURACY_M = 100; // typical Wi-Fi fixes report 50-2000m; GPS <30m
+const PATH_MAX_SPEED_MPS = 55; // ~200 km/h, anything beyond that is GPS error
 
-  const liveRows = await db
+adminRoutes.get("/bookings/:id/path", async (c) => {
+  const id = Number(c.req.param("id"));
+  if (!Number.isFinite(id)) return err(c, "Invalid ID", 400);
+
+  // Read the booking shell first so we can decide whether to use the
+  // cache. Once a ride is completed the path is immutable, so a cached
+  // snap is always correct.
+  const [booking] = await db
     .select({
-      driverId: driverPresence.driverId,
-      isOnDuty: driverPresence.isOnDuty,
-      lastSeenAt: driverPresence.lastSeenAt,
-      lat: driverPresence.lastLat,
-      lon: driverPresence.lastLon,
-      name: users.name,
-      phone: users.phone,
-    })
-    .from(driverPresence)
-    .innerJoin(users, eq(driverPresence.driverId, users.id))
-    .where(
-      and(
-        eq(driverPresence.isOnDuty, true),
-        gte(driverPresence.lastSeenAt, cutoff),
-      ),
-    );
-
-  if (liveRows.length === 0) return ok(c, { drivers: [] as LiveDriver[] });
-
-  const driverIds = liveRows.map((r) => r.driverId);
-
-  const profiles = await db
-    .select()
-    .from(driverProfiles)
-    .where(inArray(driverProfiles.driverId, driverIds));
-  const profileById = new Map(profiles.map((p) => [p.driverId, p]));
-
-  // Find each driver's currently-active booking, if any. A driver should
-  // only have one active assignment at a time, but if multiple ever leak
-  // through we pick the most "in-progress" one via status priority.
-  const ACTIVE_STATUSES = [
-    "assigned",
-    "en_route",
-    "arrived",
-    "in_progress",
-  ] as const;
-  const activeAssignments = await db
-    .select({
-      driverId: driverAssignments.driverId,
-      bookingId: bookings.id,
+      id: bookings.id,
       status: bookings.status,
-      pickupAddress: bookings.pickupAddress,
-      dropoffAddress: bookings.dropoffAddress,
-      pickupLat: bookings.pickupLat,
-      pickupLon: bookings.pickupLon,
-      dropoffLat: bookings.dropoffLat,
-      dropoffLon: bookings.dropoffLon,
-      customerName: users.name,
-      scheduledAt: bookings.scheduledAt,
+      snappedPath: bookings.snappedPath,
     })
-    .from(driverAssignments)
-    .innerJoin(bookings, eq(driverAssignments.bookingId, bookings.id))
-    .innerJoin(users, eq(bookings.customerId, users.id))
-    .where(
-      and(
-        inArray(driverAssignments.driverId, driverIds),
-        eq(driverAssignments.isActive, true),
-        inArray(bookings.status, [...ACTIVE_STATUSES]),
-      ),
-    );
+    .from(bookings)
+    .where(eq(bookings.id, id))
+    .limit(1);
+  if (!booking) return err(c, "Booking not found", 404);
 
-  const STATUS_PRIORITY: Record<string, number> = {
-    in_progress: 4,
-    arrived: 3,
-    en_route: 2,
-    assigned: 1,
-  };
-  const activeByDriver = new Map<number, (typeof activeAssignments)[number]>();
-  for (const row of activeAssignments) {
-    const existing = activeByDriver.get(row.driverId);
-    if (
-      !existing ||
-      (STATUS_PRIORITY[row.status] ?? 0) >
-        (STATUS_PRIORITY[existing.status] ?? 0)
-    ) {
-      activeByDriver.set(row.driverId, row);
+  // Cache hit: completed ride with a previously-snapped path.
+  if (booking.status === "completed" && booking.snappedPath) {
+    return ok(c, {
+      points: [],
+      snappedPath: booking.snappedPath as [number, number][],
+    });
+  }
+
+  const rows = await db
+    .select({
+      lat: driverLocationPoints.lat,
+      lon: driverLocationPoints.lon,
+      accuracyM: driverLocationPoints.accuracyM,
+      speedMps: driverLocationPoints.speedMps,
+      recordedAt: driverLocationPoints.recordedAt,
+    })
+    .from(driverLocationPoints)
+    .where(eq(driverLocationPoints.bookingId, id))
+    .orderBy(asc(driverLocationPoints.recordedAt));
+
+  const accurate = rows.filter(
+    (p) => p.accuracyM == null || p.accuracyM <= PATH_MAX_ACCURACY_M,
+  );
+
+  const cleaned: typeof accurate = [];
+  for (const p of accurate) {
+    const prev = cleaned[cleaned.length - 1];
+    if (!prev) {
+      cleaned.push(p);
+      continue;
+    }
+    const dtSec = (p.recordedAt.getTime() - prev.recordedAt.getTime()) / 1000;
+    if (dtSec <= 0) continue;
+    const dM = haversineMeters(prev.lat, prev.lon, p.lat, p.lon);
+    if (dM / dtSec > PATH_MAX_SPEED_MPS) continue;
+    cleaned.push(p);
+  }
+
+  const points = cleaned.map((p) => ({
+    lat: p.lat,
+    lon: p.lon,
+    accuracyM: p.accuracyM,
+    speedMps: p.speedMps,
+    recordedAt: p.recordedAt.toISOString(),
+  }));
+
+  // Cache miss: completed ride with no snap yet. Compute now, persist,
+  // and serve the snapped path. If the OSRM call fails we fall through
+  // to returning raw points; the next request will retry the snap.
+  if (booking.status === "completed" && cleaned.length >= 2) {
+    const snapped = await snapPathServer(
+      cleaned.map((p) => ({
+        lat: p.lat,
+        lon: p.lon,
+        recordedAt: p.recordedAt,
+      })),
+    );
+    if (snapped) {
+      await db
+        .update(bookings)
+        .set({ snappedPath: snapped })
+        .where(eq(bookings.id, id));
+      return ok(c, { points: [], snappedPath: snapped });
     }
   }
 
-  const drivers: LiveDriver[] = liveRows
-    .filter((r) => r.lat != null && r.lon != null && r.lastSeenAt != null)
-    .map((r) => {
-      const active = activeByDriver.get(r.driverId);
-      const profile = profileById.get(r.driverId) ?? null;
-      return {
-        driverId: r.driverId,
-        name: r.name,
-        phone: r.phone,
-        vehicle: profile,
-        lat: r.lat as number,
-        lon: r.lon as number,
-        lastSeenAt: (r.lastSeenAt as Date).toISOString(),
-        isOnDuty: r.isOnDuty,
-        activeBooking: active
-          ? {
-              id: active.bookingId,
-              status: active.status,
-              pickupAddress: active.pickupAddress,
-              dropoffAddress: active.dropoffAddress,
-              pickupLat: active.pickupLat,
-              pickupLon: active.pickupLon,
-              dropoffLat: active.dropoffLat,
-              dropoffLon: active.dropoffLon,
-              customerName: active.customerName,
-              scheduledAt: active.scheduledAt.toISOString(),
-            }
-          : null,
-      };
-    });
-
-  return ok(c, { drivers });
+  return ok(c, { points });
 });

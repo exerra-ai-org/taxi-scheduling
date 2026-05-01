@@ -248,7 +248,10 @@ export async function getPricingQuoteAllClasses(
         ),
       );
 
-    const fixedByClass = new Map<VehicleClass, (typeof allFixedMatches)[number]>();
+    const fixedByClass = new Map<
+      VehicleClass,
+      (typeof allFixedMatches)[number]
+    >();
     for (const row of allFixedMatches) {
       const vc = row.vehicleType as VehicleClass;
       if (!fixedByClass.has(vc)) fixedByClass.set(vc, row);
