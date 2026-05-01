@@ -23,6 +23,7 @@ import {
   JWT_EXPIRES_IN_SECONDS,
 } from "../lib/constants";
 import { ok, err } from "../lib/response";
+import { decideLoginAttempt } from "../lib/loginPolicy";
 import { authMiddleware, type JwtPayload } from "../middleware/auth";
 import { sendMagicLinkEmail, sendPasswordResetEmail } from "../services/email";
 
@@ -30,10 +31,6 @@ export const authRoutes = new Hono();
 
 function normalizeEmail(email: string): string {
   return email.trim().toLowerCase();
-}
-
-function normalizePhone(phone: string): string {
-  return phone.replace(/\D/g, "");
 }
 
 function setAuthCookie(c: Parameters<typeof setCookie>[0], token: string) {
@@ -108,7 +105,7 @@ authRoutes.post("/login", async (c) => {
   }
 
   const email = normalizeEmail(parsed.data.email);
-  const { password, phone } = parsed.data;
+  const { password } = parsed.data;
 
   const result = await db
     .select()
@@ -116,30 +113,31 @@ authRoutes.post("/login", async (c) => {
     .where(sql`LOWER(${users.email}) = ${email}`)
     .limit(1);
 
+  // Generic 401 for unknown email — avoids account enumeration via /login.
   if (result.length === 0) {
-    return err(c, "Account not found", 404);
+    return err(c, "Invalid credentials", 401);
   }
 
   const user = result[0];
+  const outcome = decideLoginAttempt(user, password);
 
-  // Staff and password-based accounts require password.
-  if (user.role === "admin" || user.role === "driver" || user.passwordHash) {
-    if (!password || !user.passwordHash) {
-      return err(c, "Password required", 401);
-    }
-    const valid = await Bun.password.verify(password, user.passwordHash);
-    if (!valid) {
-      return err(c, "Invalid credentials", 401);
-    }
-  } else {
-    // Customer accounts without password must verify phone.
-    if (!phone || !user.phone) {
-      return err(c, "Phone number required for customer login", 401);
-    }
-    const phoneMatches = normalizePhone(phone) === normalizePhone(user.phone);
-    if (!phoneMatches) {
-      return err(c, "Invalid credentials", 401);
-    }
+  if (outcome.kind === "magic_link_required") {
+    return err(
+      c,
+      "This account uses magic-link sign-in. Request a sign-in link from your email.",
+      401,
+    );
+  }
+  if (outcome.kind === "password_required") {
+    return err(c, "Password required", 401);
+  }
+
+  const valid = await Bun.password.verify(
+    outcome.password,
+    outcome.passwordHash,
+  );
+  if (!valid) {
+    return err(c, "Invalid credentials", 401);
   }
 
   await issueAuthCookie(c, user);
