@@ -1,4 +1,12 @@
+import { validateRuntimeConfig } from "./lib/configValidation";
+
 const nodeEnv = process.env.NODE_ENV || "development";
+
+validateRuntimeConfig({
+  nodeEnv,
+  jwtSecret: process.env.JWT_SECRET,
+  databaseUrl: process.env.DATABASE_URL,
+});
 
 export const config = {
   env: nodeEnv as "development" | "production" | "test",
