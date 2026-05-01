@@ -1,9 +1,15 @@
 import { runDriverWatchdog } from "./driverWatchdog";
 import { notifyWatchdogResult, processDueRideReminders } from "./notifications";
 import { config } from "../config";
+import { db } from "../db/index";
+import { withAdvisoryLock } from "../lib/advisoryLock";
+import { logger } from "../lib/logger";
 
 const BACKGROUND_JOBS_ENABLED = config.jobs.enabled;
 const BACKGROUND_JOBS_TICK_SECONDS = config.jobs.tickSeconds;
+// Cluster-wide lock id for the background tick. Picked once and never
+// changed — every replica must use the same id to coordinate.
+const TICK_LOCK_ID = 8472001;
 
 let started = false;
 let isTickRunning = false;
@@ -15,18 +21,29 @@ async function runTick(): Promise<void> {
   }
 
   isTickRunning = true;
-  const now = new Date();
-  const previous =
-    lastTickWindowEnd ||
-    new Date(now.getTime() - BACKGROUND_JOBS_TICK_SECONDS * 1000);
-  lastTickWindowEnd = now;
-
   try {
-    const watchdogResult = await runDriverWatchdog(now);
-    await notifyWatchdogResult(watchdogResult);
-    await processDueRideReminders(previous, now);
+    const result = await withAdvisoryLock(db, TICK_LOCK_ID, async () => {
+      const now = new Date();
+      const previous =
+        lastTickWindowEnd ||
+        new Date(now.getTime() - BACKGROUND_JOBS_TICK_SECONDS * 1000);
+      lastTickWindowEnd = now;
+
+      try {
+        const watchdogResult = await runDriverWatchdog(now);
+        await notifyWatchdogResult(watchdogResult);
+        await processDueRideReminders(previous, now);
+      } catch (cause) {
+        logger.error("background tick failed", { err: cause as Error });
+      }
+    });
+
+    if (!result.ran) {
+      logger.debug("background tick skipped — another replica holds the lock");
+    }
   } catch (cause) {
-    console.error("Background jobs tick failed:", cause);
+    // Lock acquire/release errors should not crash the loop.
+    logger.error("background tick lock failed", { err: cause as Error });
   } finally {
     isTickRunning = false;
   }
@@ -54,7 +71,9 @@ export function startBackgroundJobs(): void {
     (timer as unknown as { unref: () => void }).unref();
   }
 
-  console.log(
-    `Background jobs started: tick=${BACKGROUND_JOBS_TICK_SECONDS}s, reminders=${config.jobs.rideReminderMinutes.join(",")}`,
-  );
+  logger.info("background jobs started", {
+    tickSeconds: BACKGROUND_JOBS_TICK_SECONDS,
+    rideReminderMinutes: config.jobs.rideReminderMinutes,
+    lockId: TICK_LOCK_ID,
+  });
 }
