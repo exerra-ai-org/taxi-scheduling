@@ -26,9 +26,24 @@ import { ok, err } from "../lib/response";
 import { decideLoginAttempt } from "../lib/loginPolicy";
 import { generateAuthToken, hashAuthToken } from "../lib/tokens";
 import { authMiddleware, type JwtPayload } from "../middleware/auth";
+import { createRateLimiter } from "../middleware/rateLimit";
 import { sendMagicLinkEmail, sendPasswordResetEmail } from "../services/email";
 
 export const authRoutes = new Hono();
+
+// Brute-force / abuse protection on the auth surface.
+//
+// Login: 10 / minute / IP — generous for legitimate retypes, restrictive
+// enough that credential stuffing is impractical.
+const loginLimiter = createRateLimiter({ max: 10, windowMs: 60_000 });
+
+// Email-bombing / token-spam mitigation. Magic-link, reset, and
+// check-email endpoints trigger emails (or could be probed for
+// existence).
+const emailFlowLimiter = createRateLimiter({ max: 5, windowMs: 5 * 60_000 });
+
+// Registration is also email-triggering for the magic-link branch.
+const registerLimiter = createRateLimiter({ max: 5, windowMs: 60 * 60_000 });
 
 function normalizeEmail(email: string): string {
   return email.trim().toLowerCase();
@@ -65,7 +80,7 @@ async function issueAuthCookie(
   setAuthCookie(c, token);
 }
 
-authRoutes.post("/check-email", async (c) => {
+authRoutes.post("/check-email", emailFlowLimiter, async (c) => {
   const body = await c.req.json();
   const parsed = checkEmailSchema.safeParse(body);
   if (!parsed.success) {
@@ -98,7 +113,7 @@ authRoutes.post("/check-email", async (c) => {
   });
 });
 
-authRoutes.post("/login", async (c) => {
+authRoutes.post("/login", loginLimiter, async (c) => {
   const body = await c.req.json();
   const parsed = loginSchema.safeParse(body);
   if (!parsed.success) {
@@ -154,7 +169,7 @@ authRoutes.post("/login", async (c) => {
   });
 });
 
-authRoutes.post("/register", async (c) => {
+authRoutes.post("/register", registerLimiter, async (c) => {
   const body = await c.req.json();
   const parsed = registerSchema.safeParse(body);
   if (!parsed.success) {
@@ -217,7 +232,7 @@ authRoutes.post("/logout", (c) => {
   return ok(c, { message: "Logged out" });
 });
 
-authRoutes.post("/magic-link", async (c) => {
+authRoutes.post("/magic-link", emailFlowLimiter, async (c) => {
   const body = await c.req.json();
   const parsed = magicLinkRequestSchema.safeParse(body);
   if (!parsed.success) {
@@ -251,7 +266,7 @@ authRoutes.post("/magic-link", async (c) => {
   return ok(c, { message: "Magic link sent to your email" });
 });
 
-authRoutes.post("/magic-link/verify", async (c) => {
+authRoutes.post("/magic-link/verify", loginLimiter, async (c) => {
   const body = await c.req.json();
   const parsed = magicLinkVerifySchema.safeParse(body);
   if (!parsed.success) {
@@ -296,7 +311,7 @@ authRoutes.post("/magic-link/verify", async (c) => {
   });
 });
 
-authRoutes.post("/reset-password/request", async (c) => {
+authRoutes.post("/reset-password/request", emailFlowLimiter, async (c) => {
   const body = await c.req.json();
   const parsed = passwordResetRequestSchema.safeParse(body);
   if (!parsed.success) {
@@ -332,7 +347,7 @@ authRoutes.post("/reset-password/request", async (c) => {
   return ok(c, { message: "If that email exists, a reset link has been sent" });
 });
 
-authRoutes.post("/reset-password/verify", async (c) => {
+authRoutes.post("/reset-password/verify", loginLimiter, async (c) => {
   const body = await c.req.json();
   const parsed = passwordResetVerifySchema.safeParse(body);
   if (!parsed.success) {
@@ -385,7 +400,7 @@ authRoutes.post("/reset-password/verify", async (c) => {
   });
 });
 
-authRoutes.post("/accept-invitation", async (c) => {
+authRoutes.post("/accept-invitation", loginLimiter, async (c) => {
   const body = await c.req.json();
   const parsed = acceptInvitationSchema.safeParse(body);
   if (!parsed.success) {

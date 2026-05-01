@@ -5,13 +5,21 @@ import { db } from "../db/index";
 import { coupons } from "../db/schema";
 import { authMiddleware } from "../middleware/auth";
 import { requireRole } from "../middleware/auth";
+import { createRateLimiter } from "../middleware/rateLimit";
 import { ok, err } from "../lib/response";
 import { validateCoupon } from "../services/coupon";
 
 export const couponRoutes = new Hono();
 
+// Block enumeration of coupon codes by attackers — 30 attempts / minute / IP
+// is well within legitimate UX (one user typing) but kills scraping.
+const couponValidateLimiter = createRateLimiter({
+  max: 30,
+  windowMs: 60_000,
+});
+
 // Public: validate a coupon code
-couponRoutes.post("/validate", async (c) => {
+couponRoutes.post("/validate", couponValidateLimiter, async (c) => {
   const body = await c.req.json();
   const parsed = validateCouponSchema.safeParse(body);
   if (!parsed.success) {
