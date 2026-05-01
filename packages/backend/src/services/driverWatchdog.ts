@@ -1,7 +1,9 @@
 import { and, eq, inArray } from "drizzle-orm";
+import { alias } from "drizzle-orm/pg-core";
 import { db } from "../db/index";
 import { bookings, driverAssignments, driverHeartbeats } from "../db/schema";
 import { config } from "../config";
+import { classifyHeartbeat } from "./watchdogClassify";
 
 const HEARTBEAT_STALE_MINUTES = config.drivers.heartbeatStaleMinutes;
 const HEARTBEAT_FALLBACK_WINDOWS = config.drivers.heartbeatFallbackWindows;
@@ -28,110 +30,116 @@ export interface DriverWatchdogResult {
   };
 }
 
+const ACTIVE_STATUSES = [
+  "assigned",
+  "en_route",
+  "arrived",
+  "in_progress",
+] as const;
+
 export async function runDriverWatchdog(
   now = new Date(),
 ): Promise<DriverWatchdogResult> {
-  const staleThreshold = new Date(
-    now.getTime() - HEARTBEAT_STALE_MINUTES * 60 * 1000,
-  );
+  const primary = alias(driverAssignments, "primary_da");
+  const backup = alias(driverAssignments, "backup_da");
 
-  const activeBookings = await db
-    .select({ id: bookings.id })
+  // Single query: fetch every active booking that has BOTH an active
+  // primary and an active backup, plus the primary's latest heartbeat
+  // (LEFT JOIN — a never-beat driver is still considered).
+  const candidates = await db
+    .select({
+      bookingId: bookings.id,
+      primaryAssignmentId: primary.id,
+      primaryDriverId: primary.driverId,
+      backupAssignmentId: backup.id,
+      backupDriverId: backup.driverId,
+      heartbeatId: driverHeartbeats.id,
+      lastHeartbeatAt: driverHeartbeats.lastHeartbeatAt,
+      missedWindows: driverHeartbeats.missedWindows,
+    })
     .from(bookings)
-    .where(
-      inArray(bookings.status, [
-        "assigned",
-        "en_route",
-        "arrived",
-        "in_progress",
-      ]),
-    );
+    .innerJoin(
+      primary,
+      and(
+        eq(primary.bookingId, bookings.id),
+        eq(primary.role, "primary"),
+        eq(primary.isActive, true),
+      ),
+    )
+    .innerJoin(
+      backup,
+      and(
+        eq(backup.bookingId, bookings.id),
+        eq(backup.role, "backup"),
+        eq(backup.isActive, true),
+      ),
+    )
+    .leftJoin(
+      driverHeartbeats,
+      and(
+        eq(driverHeartbeats.bookingId, bookings.id),
+        eq(driverHeartbeats.driverId, primary.driverId),
+      ),
+    )
+    .where(inArray(bookings.status, ACTIVE_STATUSES));
 
   const warnings: DriverWatchdogWarning[] = [];
   const fallbacks: DriverWatchdogFallback[] = [];
 
-  for (const booking of activeBookings) {
-    const assignments = await db
-      .select({
-        id: driverAssignments.id,
-        driverId: driverAssignments.driverId,
-        role: driverAssignments.role,
-      })
-      .from(driverAssignments)
-      .where(
-        and(
-          eq(driverAssignments.bookingId, booking.id),
-          eq(driverAssignments.isActive, true),
-        ),
-      );
+  for (const row of candidates) {
+    const decision = classifyHeartbeat({
+      now,
+      staleMinutes: HEARTBEAT_STALE_MINUTES,
+      fallbackWindows: HEARTBEAT_FALLBACK_WINDOWS,
+      lastHeartbeatAt: row.lastHeartbeatAt ?? null,
+      missedWindows: row.missedWindows ?? 0,
+    });
 
-    const primary = assignments.find((a) => a.role === "primary");
-    const backup = assignments.find((a) => a.role === "backup");
-    if (!primary || !backup) {
-      continue;
-    }
-
-    const heartbeatRow = await db
-      .select()
-      .from(driverHeartbeats)
-      .where(
-        and(
-          eq(driverHeartbeats.bookingId, booking.id),
-          eq(driverHeartbeats.driverId, primary.driverId),
-        ),
-      )
-      .limit(1);
-
-    const heartbeat = heartbeatRow[0];
-    const isStale = !heartbeat || heartbeat.lastHeartbeatAt < staleThreshold;
-
-    if (!isStale) {
-      if (heartbeat && heartbeat.missedWindows !== 0) {
+    if (decision.kind === "ok") {
+      if (decision.shouldResetMissedWindows && row.heartbeatId !== null) {
         await db
           .update(driverHeartbeats)
           .set({ missedWindows: 0 })
-          .where(eq(driverHeartbeats.id, heartbeat.id));
+          .where(eq(driverHeartbeats.id, row.heartbeatId));
       }
       continue;
     }
 
-    const newMissedWindows = (heartbeat?.missedWindows || 0) + 1;
-
+    // For warn / fallback we need a heartbeat row — upsert it now.
     const [updatedHeartbeat] = await db
       .insert(driverHeartbeats)
       .values({
-        bookingId: booking.id,
-        driverId: primary.driverId,
-        lastHeartbeatAt: heartbeat?.lastHeartbeatAt || now,
-        missedWindows: newMissedWindows,
+        bookingId: row.bookingId,
+        driverId: row.primaryDriverId,
+        lastHeartbeatAt: row.lastHeartbeatAt ?? now,
+        missedWindows: decision.newMissedWindows,
       })
       .onConflictDoUpdate({
         target: [driverHeartbeats.bookingId, driverHeartbeats.driverId],
-        set: {
-          missedWindows: newMissedWindows,
-        },
+        set: { missedWindows: decision.newMissedWindows },
       })
       .returning();
 
-    if (newMissedWindows < HEARTBEAT_FALLBACK_WINDOWS) {
+    if (decision.kind === "warn") {
       warnings.push({
-        bookingId: booking.id,
-        primaryDriverId: primary.driverId,
-        missedWindows: newMissedWindows,
+        bookingId: row.bookingId,
+        primaryDriverId: row.primaryDriverId,
+        missedWindows: decision.newMissedWindows,
       });
       continue;
     }
 
+    // Fallback: deactivate primary, promote backup, reset counters.
     await db.transaction(async (tx) => {
       await tx
         .update(driverAssignments)
         .set({ isActive: false })
-        .where(eq(driverAssignments.id, primary.id));
+        .where(eq(driverAssignments.id, row.primaryAssignmentId));
 
       await tx
         .update(driverAssignments)
         .set({ role: "primary" })
-        .where(eq(driverAssignments.id, backup.id));
+        .where(eq(driverAssignments.id, row.backupAssignmentId));
 
       await tx
         .update(driverHeartbeats)
@@ -140,14 +148,14 @@ export async function runDriverWatchdog(
     });
 
     fallbacks.push({
-      bookingId: booking.id,
-      oldPrimaryDriverId: primary.driverId,
-      newPrimaryDriverId: backup.driverId,
+      bookingId: row.bookingId,
+      oldPrimaryDriverId: row.primaryDriverId,
+      newPrimaryDriverId: row.backupDriverId,
     });
   }
 
   return {
-    checked: activeBookings.length,
+    checked: candidates.length,
     warnings,
     fallbacks,
     config: {
