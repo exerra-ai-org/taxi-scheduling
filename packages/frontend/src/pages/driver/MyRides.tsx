@@ -2,7 +2,10 @@ import { useEffect, useState, useCallback } from "react";
 import { Link } from "react-router-dom";
 import type { Booking } from "shared/types";
 import { listBookings } from "../../api/bookings";
-import { useRealtimeEvent } from "../../context/RealtimeContext";
+import {
+  useRealtimeEvent,
+  useRealtimeRecovery,
+} from "../../context/RealtimeContext";
 import { useAuth } from "../../context/AuthContext";
 import RideCard from "./RideCard";
 import { SkeletonCard } from "../../components/Skeleton";
@@ -54,6 +57,7 @@ export default function MyRides() {
   useRealtimeEvent("booking_updated", fetchBookings);
   useRealtimeEvent("drivers_assigned", fetchBookings);
   useRealtimeEvent("booking_cancelled", fetchBookings);
+  useRealtimeRecovery(fetchBookings);
 
   const active = bookings.filter(
     (b) => !["completed", "cancelled"].includes(b.status),

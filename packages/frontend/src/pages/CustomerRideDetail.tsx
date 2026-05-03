@@ -93,7 +93,7 @@ function IncidentModal({ type, onClose, onSubmit }: IncidentModalProps) {
 
   return (
     <div
-      className="fixed inset-0 z-[300] flex items-end sm:items-center justify-center p-4 bg-black/60 backdrop-blur-sm"
+      className="fixed inset-0 z-[2000] flex items-end sm:items-center justify-center p-4 bg-black/60 backdrop-blur-sm"
       onClick={(e) => {
         if (e.target === e.currentTarget) onClose();
       }}
@@ -791,7 +791,7 @@ export default function CustomerRideDetail() {
       {/* Help modal — choose between Contact Admin and SOS */}
       {helpOpen && (
         <div
-          className="fixed inset-0 z-[300] flex items-end sm:items-center justify-center p-4 bg-black/60 backdrop-blur-sm"
+          className="fixed inset-0 z-[2000] flex items-end sm:items-center justify-center p-4 bg-black/60 backdrop-blur-sm"
           onClick={(e) => {
             if (e.target === e.currentTarget) setHelpOpen(false);
           }}

@@ -1,7 +1,10 @@
 import { useEffect, useState, useCallback, useMemo } from "react";
 import type { Booking } from "shared/types";
 import { listAllBookings } from "../../api/admin";
-import { useRealtimeEvent } from "../../context/RealtimeContext";
+import {
+  useRealtimeEvent,
+  useRealtimeRecovery,
+} from "../../context/RealtimeContext";
 import { useToast } from "../../context/ToastContext";
 import { formatPrice, formatDate, statusLabel } from "../../lib/format";
 import { SkeletonCard } from "../../components/Skeleton";
@@ -89,6 +92,7 @@ export default function RideTimeline() {
   useRealtimeEvent("booking_updated", fetchBookings);
   useRealtimeEvent("drivers_assigned", fetchBookings);
   useRealtimeEvent("booking_cancelled", fetchBookings);
+  useRealtimeRecovery(fetchBookings);
   // Customer SOS / contact-admin lands here. Surface as a toast and select
   // the affected booking so the dispatcher can act immediately.
   useRealtimeEvent("incident_reported", (e) => {

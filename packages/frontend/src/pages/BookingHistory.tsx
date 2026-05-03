@@ -12,7 +12,10 @@ import { BookingCardSkeleton } from "../components/Skeleton";
 import ConfirmDialog from "../components/ConfirmDialog";
 import { useConfirm } from "../hooks/useConfirm";
 import { useToast } from "../context/ToastContext";
-import { useRealtimeEvent } from "../context/RealtimeContext";
+import {
+  useRealtimeEvent,
+  useRealtimeRecovery,
+} from "../context/RealtimeContext";
 import { IconMapPin, IconCar, IconStar } from "../components/icons";
 
 type Tab = "active" | "upcoming" | "past";
@@ -53,6 +56,7 @@ export default function BookingHistory() {
   useRealtimeEvent("booking_updated", fetchBookings);
   useRealtimeEvent("drivers_assigned", fetchBookings);
   useRealtimeEvent("booking_cancelled", fetchBookings);
+  useRealtimeRecovery(fetchBookings);
 
   const filtered = useMemo(() => {
     return bookings.filter((b) => {

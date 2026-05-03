@@ -13,7 +13,10 @@ import {
   IconX,
 } from "../../components/icons";
 import { ApiError } from "../../api/client";
-import { useRealtimeEvent } from "../../context/RealtimeContext";
+import {
+  useRealtimeEvent,
+  useRealtimeRecovery,
+} from "../../context/RealtimeContext";
 
 export default function DriverManagement() {
   const [drivers, setDrivers] = useState<AdminDriverRow[]>([]);
@@ -45,6 +48,7 @@ export default function DriverManagement() {
   // Driver vehicle, name, phone, or rating changed.
   useRealtimeEvent("driver_profile_updated", load);
   useRealtimeEvent("user_updated", load);
+  useRealtimeRecovery(load);
 
   async function handleInvite(e: React.FormEvent) {
     e.preventDefault();

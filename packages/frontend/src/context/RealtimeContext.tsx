@@ -65,15 +65,24 @@ export function RealtimeProvider({ children }: { children: React.ReactNode }) {
     // events that fired *during* the gap are simply lost — that's how we
     // saw "had to refresh" symptoms even though the page was on-screen.
     // We track open/error transitions and synthesize an overflow event
-    // on reconnect so every subscriber refetches its state from the
-    // canonical source.
+    // on reconnect so subscribers refetch their state from the canonical
+    // source.
+    //
+    // Fan-out semantics: overflow ONLY fires handlers explicitly
+    // subscribed to type "overflow" (i.e. via useRealtimeRecovery).
+    // Earlier we fanned out to every registered handler regardless of
+    // type, which caused content-aware handlers (e.g. the SOS toast
+    // reading e.bookingId) to run with undefined fields and produce
+    // nonsense like "Booking #undefined". Pages that want recovery on
+    // overflow now opt in explicitly.
+    const fireOverflow = () => {
+      const overflowEvent: RealtimeEvent = { type: "overflow" };
+      handlers.current.get("overflow")?.forEach((h) => h(overflowEvent));
+    };
+
     let wasOpen = false;
     es.onopen = () => {
-      if (wasOpen) {
-        // Reconnected after a drop — recover by treating it like overflow.
-        const overflowEvent: RealtimeEvent = { type: "overflow" };
-        handlers.current.forEach((set) => set.forEach((h) => h(overflowEvent)));
-      }
+      if (wasOpen) fireOverflow();
       wasOpen = true;
     };
     es.onerror = () => {
@@ -86,9 +95,7 @@ export function RealtimeProvider({ children }: { children: React.ReactNode }) {
         const event = JSON.parse(e.data as string) as RealtimeEvent;
         if (event.type === "ping") return;
         if (event.type === "overflow") {
-          // Server dropped events because we fell behind. Fan out to every
-          // registered handler so each subscriber refetches state.
-          handlers.current.forEach((set) => set.forEach((h) => h(event)));
+          fireOverflow();
           return;
         }
         handlers.current.get(event.type)?.forEach((h) => h(event));
@@ -101,8 +108,7 @@ export function RealtimeProvider({ children }: { children: React.ReactNode }) {
     // without surfacing a clean error → open transition we can detect.
     const onVisibility = () => {
       if (document.visibilityState !== "visible") return;
-      const overflowEvent: RealtimeEvent = { type: "overflow" };
-      handlers.current.forEach((set) => set.forEach((h) => h(overflowEvent)));
+      fireOverflow();
     };
     document.addEventListener("visibilitychange", onVisibility);
 
