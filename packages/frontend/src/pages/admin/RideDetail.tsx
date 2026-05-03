@@ -13,7 +13,10 @@ import ConfirmDialog from "../../components/ConfirmDialog";
 import { formatPrice, formatDate } from "../../lib/format";
 import { useConfirm } from "../../hooks/useConfirm";
 import { useToast } from "../../context/ToastContext";
-import { useRealtimeEvent } from "../../context/RealtimeContext";
+import {
+  useRealtimeEvent,
+  useRealtimeRecovery,
+} from "../../context/RealtimeContext";
 import { IconCar } from "../../components/icons";
 
 interface Assignment {
@@ -87,6 +90,7 @@ export default function RideDetail({
   useRealtimeEvent("driver_profile_updated", (e) => {
     if (assignments.some((a) => a.driverId === e.driverId)) fetchDetail();
   });
+  useRealtimeRecovery(fetchDetail);
 
   async function handleStatusChange(status: BookingStatus) {
     if (!bookingId) return;

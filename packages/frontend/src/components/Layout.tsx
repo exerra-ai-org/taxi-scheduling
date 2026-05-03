@@ -175,6 +175,7 @@ export default function Layout() {
                 <DesktopNavItem to="/admin" label="Rides" end />
                 <DesktopNavItem to="/admin/drivers" label="Drivers" />
                 <DesktopNavItem to="/admin/live-map" label="Live map" />
+                <DesktopNavItem to="/admin/incidents" label="Incidents" />
                 <DesktopNavItem to="/admin/coupons" label="Coupons" />
               </>
             )}
@@ -253,6 +254,11 @@ export default function Layout() {
                   to="/admin/live-map"
                   icon={<IconMapPin className="w-5 h-5" />}
                   label="Live"
+                />
+                <NavItem
+                  to="/admin/incidents"
+                  icon={<IconTicket className="w-5 h-5" />}
+                  label="SOS"
                 />
                 <NavItem
                   to="/admin/coupons"

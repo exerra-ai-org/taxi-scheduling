@@ -14,7 +14,10 @@ import ConfirmDialog from "../../components/ConfirmDialog";
 import { SkeletonCard } from "../../components/Skeleton";
 import { IconUser, IconCar, IconStar } from "../../components/icons";
 import { useAuth } from "../../context/AuthContext";
-import { useRealtimeEvent } from "../../context/RealtimeContext";
+import {
+  useRealtimeEvent,
+  useRealtimeRecovery,
+} from "../../context/RealtimeContext";
 
 const VEHICLE_CLASSES = [
   { value: "regular", label: "Regular" },
@@ -88,6 +91,11 @@ export default function DriverProfile() {
         .then(({ driver: d }) => populate(d))
         .catch(() => {});
     }
+  });
+  useRealtimeRecovery(() => {
+    getMyProfile()
+      .then(({ driver: d }) => populate(d))
+      .catch(() => {});
   });
 
   async function handleFileChange(e: React.ChangeEvent<HTMLInputElement>) {

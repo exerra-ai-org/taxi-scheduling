@@ -1,12 +1,22 @@
 import { Hono } from "hono";
-import { and, eq, gt, gte, inArray, sql, avg, count } from "drizzle-orm";
+import {
+  and,
+  eq,
+  gt,
+  gte,
+  inArray,
+  sql,
+  avg,
+  count,
+  asc,
+  desc,
+} from "drizzle-orm";
 import {
   inviteUserSchema,
   driverProfileSchema,
   updateUserSchema,
 } from "shared/validation";
 import type { LiveDriver } from "shared/types";
-import { asc } from "drizzle-orm";
 import { db } from "../db/index";
 import {
   users,
@@ -16,6 +26,7 @@ import {
   driverLocationPoints,
   bookings,
   reviews,
+  incidents,
 } from "../db/schema";
 import { authMiddleware, requireRole } from "../middleware/auth";
 import { ok, err } from "../lib/response";
@@ -427,4 +438,44 @@ adminRoutes.get("/bookings/:id/path", async (c) => {
   }
 
   return ok(c, { points });
+});
+
+// ── Incident inbox ──────────────────────────────────────
+// Admin sees every incident customers raised, newest first. Used by the
+// dispatch board to triage SOS / contact-admin events that came in via
+// SSE (incident_reported) or were missed because the operator was on
+// another tab.
+adminRoutes.get("/incidents", async (c) => {
+  const rows = await db
+    .select({
+      id: incidents.id,
+      bookingId: incidents.bookingId,
+      reporterId: incidents.reporterId,
+      type: incidents.type,
+      message: incidents.message,
+      resolved: incidents.resolved,
+      createdAt: incidents.createdAt,
+      reporterName: users.name,
+      reporterPhone: users.phone,
+    })
+    .from(incidents)
+    .innerJoin(users, eq(users.id, incidents.reporterId))
+    .orderBy(desc(incidents.createdAt))
+    .limit(200);
+
+  return ok(c, { incidents: rows });
+});
+
+adminRoutes.patch("/incidents/:id/resolve", async (c) => {
+  const id = Number(c.req.param("id"));
+  if (!Number.isFinite(id)) return err(c, "Invalid ID", 400);
+
+  const [row] = await db
+    .update(incidents)
+    .set({ resolved: true })
+    .where(eq(incidents.id, id))
+    .returning();
+  if (!row) return err(c, "Incident not found", 404);
+
+  return ok(c, { incident: row });
 });

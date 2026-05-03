@@ -1,5 +1,8 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { useRealtimeEvent } from "../context/RealtimeContext";
+import {
+  useRealtimeEvent,
+  useRealtimeRecovery,
+} from "../context/RealtimeContext";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import type { Booking, BookingStatus, DriverLocation } from "shared/types";
 import {
@@ -236,6 +239,8 @@ export default function CustomerRideDetail() {
   useRealtimeEvent("user_updated", (e) => {
     if (detail?.assignments.some((a) => a.driverId === e.userId)) load();
   });
+  // Self-heal after an SSE drop / visibility resume / server overflow.
+  useRealtimeRecovery(load);
 
   const booking = detail?.booking as CustomerBookingExtra | undefined;
   const primaryAssignment = useMemo(

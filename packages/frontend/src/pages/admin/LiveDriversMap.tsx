@@ -13,7 +13,10 @@ import {
   listLiveDrivers,
   type BookingPathPoint,
 } from "../../api/drivers";
-import { useRealtimeEvent } from "../../context/RealtimeContext";
+import {
+  useRealtimeEvent,
+  useRealtimeRecovery,
+} from "../../context/RealtimeContext";
 import { snapBreadcrumb } from "../../lib/snapBreadcrumb";
 import { config } from "../../config";
 
@@ -195,6 +198,7 @@ export default function LiveDriversMap() {
   // Vehicle/name/phone changed for someone visible on the map.
   useRealtimeEvent("driver_profile_updated", refresh);
   useRealtimeEvent("user_updated", refresh);
+  useRealtimeRecovery(refresh);
 
   const driverList = useMemo(() => Array.from(drivers.values()), [drivers]);
   const selected =

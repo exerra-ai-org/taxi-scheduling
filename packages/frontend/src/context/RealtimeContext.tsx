@@ -60,6 +60,27 @@ export function RealtimeProvider({ children }: { children: React.ReactNode }) {
       withCredentials: true,
     });
 
+    // EventSource auto-reconnects after transient errors (network blip,
+    // proxy idle-close, server restart). Browsers do this silently, so
+    // events that fired *during* the gap are simply lost — that's how we
+    // saw "had to refresh" symptoms even though the page was on-screen.
+    // We track open/error transitions and synthesize an overflow event
+    // on reconnect so every subscriber refetches its state from the
+    // canonical source.
+    let wasOpen = false;
+    es.onopen = () => {
+      if (wasOpen) {
+        // Reconnected after a drop — recover by treating it like overflow.
+        const overflowEvent: RealtimeEvent = { type: "overflow" };
+        handlers.current.forEach((set) => set.forEach((h) => h(overflowEvent)));
+      }
+      wasOpen = true;
+    };
+    es.onerror = () => {
+      // EventSource will auto-reconnect; we don't close it here. The
+      // onopen above handles the recovery once reconnection completes.
+    };
+
     es.onmessage = (e: MessageEvent) => {
       try {
         const event = JSON.parse(e.data as string) as RealtimeEvent;
@@ -74,8 +95,21 @@ export function RealtimeProvider({ children }: { children: React.ReactNode }) {
       } catch {}
     };
 
-    // EventSource reconnects automatically on error — no manual handling needed
-    return () => es.close();
+    // Belt-and-braces: when the tab returns to visible after being
+    // hidden (mobile lock, switched tabs), also fire overflow. Browsers
+    // will sometimes pause/resume EventSource on visibility changes
+    // without surfacing a clean error → open transition we can detect.
+    const onVisibility = () => {
+      if (document.visibilityState !== "visible") return;
+      const overflowEvent: RealtimeEvent = { type: "overflow" };
+      handlers.current.forEach((set) => set.forEach((h) => h(overflowEvent)));
+    };
+    document.addEventListener("visibilitychange", onVisibility);
+
+    return () => {
+      es.close();
+      document.removeEventListener("visibilitychange", onVisibility);
+    };
   }, [user]);
 
   const on = useCallback(
@@ -111,4 +145,14 @@ export function useRealtimeEvent<T extends RealtimeEvent["type"]>(
 ): void {
   const { on } = useRealtime();
   useEffect(() => on(type, handler), [on, type, handler]);
+}
+
+// Recovery hook: fires when the SSE pipeline says "you may have missed
+// events" — server-side overflow, network drop + reconnect, or visibility
+// resume. Pages with *filtered* subscribers (e.g. "if e.bookingId ===
+// myId") should call this with their refetch function so a missed event
+// during a gap still gets reconciled.
+export function useRealtimeRecovery(refetch: () => void): void {
+  const { on } = useRealtime();
+  useEffect(() => on("overflow", refetch), [on, refetch]);
 }
