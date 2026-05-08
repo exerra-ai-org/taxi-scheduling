@@ -15,6 +15,18 @@ export type DriverAssignmentRole = "primary" | "backup";
 
 export type DiscountType = "fixed" | "percentage";
 
+export type PaymentStatus =
+  | "unpaid"
+  | "pending"
+  | "requires_action"
+  | "authorized"
+  | "captured"
+  | "partially_refunded"
+  | "refunded"
+  | "failed"
+  | "disputed"
+  | "uncollectible";
+
 export interface User {
   id: number;
   email: string;
@@ -89,6 +101,13 @@ export interface Booking {
   hasReview?: boolean;
   customerName?: string | null;
   customerPhone?: string | null;
+  paymentStatus: PaymentStatus;
+  amountAuthorizedPence: number;
+  amountCapturedPence: number;
+  amountRefundedPence: number;
+  cancellationFeePence: number;
+  paymentHoldExpiresAt?: string | Date | null;
+  activePaymentIntentId?: string | null;
   createdAt: Date;
 }
 

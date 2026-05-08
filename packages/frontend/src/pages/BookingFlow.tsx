@@ -17,6 +17,8 @@ import PriceDisplay from "./booking-steps/PriceDisplay";
 import CustomerDetails from "./booking-steps/CustomerDetails";
 import CouponStep from "./booking-steps/CouponStep";
 import Confirmation from "./booking-steps/Confirmation";
+import PaymentStep from "./booking-steps/PaymentStep";
+import type { BookingPaymentInit } from "../api/bookings";
 import type { VehicleClass } from "shared/types";
 
 export interface BookingData {
@@ -56,7 +58,8 @@ const STEP_LABELS = [
   "PRICE",
   "DETAILS",
   "COUPON",
-  "CONFIRM",
+  "REVIEW",
+  "PAY",
 ];
 
 function loadDraft(): Partial<BookingData> | null {
@@ -109,6 +112,13 @@ export default function BookingFlow() {
     discountPence: 0,
     ...(draft || {}),
   });
+  // Set when Confirmation successfully creates a booking + payment intent.
+  // Drives the PaymentStep at step 7. Not persisted — if the user reloads
+  // the page mid-payment the hold-expiry job releases the slot.
+  const [pendingPayment, setPendingPayment] = useState<{
+    bookingId: number;
+    payment: BookingPaymentInit;
+  } | null>(null);
 
   const [activeField, setActiveField] = useState<ActiveField>(null);
   const [pendingPick, setPendingPick] = useState<{
@@ -270,7 +280,7 @@ export default function BookingFlow() {
       >
         <div ref={contentRef} className="booking-flow-panel-inner">
           <div className="mb-5">
-            <StepProgress step={step} total={6} labels={STEP_LABELS} />
+            <StepProgress step={step} total={7} labels={STEP_LABELS} />
           </div>
 
           <div
@@ -335,6 +345,19 @@ export default function BookingFlow() {
                 data={data as BookingData}
                 onBack={() => goToStep(5)}
                 onReset={reset}
+                onBookingCreated={(bookingId, payment) => {
+                  if (payment) {
+                    setPendingPayment({ bookingId, payment });
+                    goToStep(7);
+                  }
+                }}
+              />
+            )}
+            {step === 7 && pendingPayment && (
+              <PaymentStep
+                bookingId={pendingPayment.bookingId}
+                payment={pendingPayment.payment}
+                onBack={() => goToStep(6)}
               />
             )}
           </div>

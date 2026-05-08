@@ -986,6 +986,37 @@
   transform: translateY(-1px);
 }
 
+.status-pill-compact {
+  min-height: 20px;
+  padding: 2px 6px;
+  font-size: 10px;
+  letter-spacing: 0.04em;
+}
+
+.admin-refund-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-top: 4px;
+}
+
+.admin-refund-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 6px;
+  padding: 8px 10px;
+  border: 1px solid var(--color-border-light);
+  border-radius: var(--radius-default);
+  background: var(--color-surface);
+}
+
+.link-underline {
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
 .status-pill:hover::after {
   opacity: 1;
   animation: status-sheen 0.75s cubic-bezier(0.2, 1, 0.3, 1);

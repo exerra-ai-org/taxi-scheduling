@@ -5,36 +5,8 @@
     {
       "idx": 0,
       "version": "7",
-      "when": 1777445168411,
-      "tag": "0000_tricky_starhawk",
-      "breakpoints": true
-    },
-    {
-      "idx": 1,
-      "version": "7",
-      "when": 1777642282802,
-      "tag": "0001_aromatic_mordo",
-      "breakpoints": true
-    },
-    {
-      "idx": 2,
-      "version": "7",
-      "when": 1777644070946,
-      "tag": "0002_fantastic_meltdown",
-      "breakpoints": true
-    },
-    {
-      "idx": 3,
-      "version": "7",
-      "when": 1777665996572,
-      "tag": "0003_robust_scarecrow",
-      "breakpoints": true
-    },
-    {
-      "idx": 4,
-      "version": "7",
-      "when": 1777672273371,
-      "tag": "0004_quick_longshot",
+      "when": 1778262839308,
+      "tag": "0000_hard_eternals",
       "breakpoints": true
     }
   ]

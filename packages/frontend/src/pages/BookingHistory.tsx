@@ -9,6 +9,7 @@ import {
   statusColor,
 } from "../lib/format";
 import { BookingCardSkeleton } from "../components/Skeleton";
+import PaymentStatusBadge from "../components/PaymentStatusBadge";
 import ConfirmDialog from "../components/ConfirmDialog";
 import { useConfirm } from "../hooks/useConfirm";
 import { useToast } from "../context/ToastContext";
@@ -56,6 +57,9 @@ export default function BookingHistory() {
   useRealtimeEvent("booking_updated", fetchBookings);
   useRealtimeEvent("drivers_assigned", fetchBookings);
   useRealtimeEvent("booking_cancelled", fetchBookings);
+  // Refund / capture / authorise lifecycle — re-fetch so the payment
+  // chip on each card reflects the webhook-driven state without manual refresh.
+  useRealtimeEvent("payment_status_changed", fetchBookings);
   useRealtimeRecovery(fetchBookings);
 
   const filtered = useMemo(() => {
@@ -178,9 +182,23 @@ export default function BookingHistory() {
                   <span className={`status-pill ${statusColor(b.status)}`}>
                     {statusLabel(b.status)}
                   </span>
+                  {b.paymentStatus &&
+                    b.paymentStatus !== "unpaid" &&
+                    b.paymentStatus !== "pending" &&
+                    b.paymentStatus !== "captured" && (
+                      <PaymentStatusBadge
+                        status={b.paymentStatus}
+                        compact
+                      />
+                    )}
                   <div className="metric-value text-[24px] leading-none">
                     {formatPrice(b.pricePence)}
                   </div>
+                  {b.amountRefundedPence > 0 && (
+                    <div className="caption-copy text-[var(--color-forest)] tabular-nums">
+                      −{formatPrice(b.amountRefundedPence)} refunded
+                    </div>
+                  )}
                   {b.isAirport && (
                     <span className="ds-tag tag-airport">AIRPORT</span>
                   )}

@@ -1,5 +1,6 @@
 import { runDriverWatchdog } from "./driverWatchdog";
 import { notifyWatchdogResult, processDueRideReminders } from "./notifications";
+import { expirePendingPayments } from "./paymentExpiry";
 import { config } from "../config";
 import { db } from "../db/index";
 import { withAdvisoryLock } from "../lib/advisoryLock";
@@ -35,6 +36,7 @@ async function runTick(): Promise<void> {
         const watchdogResult = await runDriverWatchdog(now);
         await notifyWatchdogResult(watchdogResult);
         await processDueRideReminders(previous, now);
+        await expirePendingPayments(now);
       } catch (cause) {
         logger.error("background tick failed", { err: cause as Error });
       }

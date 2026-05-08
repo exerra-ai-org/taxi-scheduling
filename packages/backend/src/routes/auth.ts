@@ -29,6 +29,8 @@ import { authMiddleware, type JwtPayload } from "../middleware/auth";
 import { createRateLimiter } from "../middleware/rateLimit";
 import { sendMagicLinkEmail, sendPasswordResetEmail } from "../services/email";
 import { broadcastBookingEvent } from "../services/broadcaster";
+import { ensureStripeCustomer } from "../services/stripeCustomer";
+import { logger } from "../lib/logger";
 
 export const authRoutes = new Hono();
 
@@ -199,6 +201,24 @@ authRoutes.post("/register", registerLimiter, async (c) => {
     .insert(users)
     .values({ email, name, phone, role: "customer", passwordHash })
     .returning();
+
+  // Eagerly create the Stripe Customer so the saved-cards page works
+  // immediately and the booking flow never blocks on a customer create.
+  // Best-effort: a Stripe outage must not break signup. Failures are
+  // logged and the customer is created lazily at first booking instead.
+  try {
+    await ensureStripeCustomer({
+      userId: user.id,
+      email: user.email,
+      name: user.name,
+      phone: user.phone,
+    });
+  } catch (cause) {
+    logger.warn("stripe.customer.create_on_register_failed", {
+      userId: user.id,
+      err: cause as Error,
+    });
+  }
 
   // Magic-link registration: send verification email instead of issuing cookie
   if (!password) {

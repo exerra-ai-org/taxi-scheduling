@@ -10,6 +10,7 @@ import {
   count,
 } from "drizzle-orm";
 import { alias } from "drizzle-orm/pg-core";
+import { z } from "zod";
 import type { BookingStatus } from "shared/types";
 import {
   createBookingSchema,
@@ -30,6 +31,8 @@ import {
   driverProfiles,
   reviews,
   incidents,
+  payments,
+  refunds,
 } from "../db/schema";
 import { authMiddleware, type JwtPayload } from "../middleware/auth";
 import { requireRole } from "../middleware/auth";
@@ -55,6 +58,16 @@ import {
 } from "../services/notifications";
 import { broadcastBookingEvent } from "../services/broadcaster";
 import { broadcastBookingChange } from "../services/bookingBroadcast";
+import {
+  createPaymentIntentForBooking,
+  capturePaymentForBooking,
+  cancelBookingPayment,
+  refundBookingPayment,
+  PaymentError,
+  type AdminRefundReason,
+} from "../services/payments";
+import { isStripeEnabled } from "../lib/stripe";
+import { config } from "../config";
 
 export const bookingRoutes = new Hono();
 
@@ -213,6 +226,16 @@ bookingRoutes.post("/", requireRole("customer"), async (c) => {
         }
       }
 
+      // Hold the slot while the customer completes payment. With Stripe
+      // enabled, this expires after `payments.holdMinutes` and the
+      // background job voids the PI + releases the booking. Without
+      // Stripe (legacy/dev), bookings start `unpaid` and the existing
+      // admin flow handles them.
+      const holdExpiresAt = isStripeEnabled()
+        ? new Date(Date.now() + config.payments.holdMinutes * 60_000)
+        : null;
+      const initialPaymentStatus = isStripeEnabled() ? "pending" : "unpaid";
+
       const [created] = await tx
         .insert(bookings)
         .values({
@@ -231,6 +254,8 @@ bookingRoutes.post("/", requireRole("customer"), async (c) => {
           discountPence,
           couponId,
           isAirport: quote.isAirport,
+          paymentStatus: initialPaymentStatus,
+          paymentHoldExpiresAt: holdExpiresAt,
           flightNumber: flightNumber ?? null,
           pickupFlightNumber: pickupFlightNumber ?? null,
           dropoffFlightNumber: dropoffFlightNumber ?? null,
@@ -244,20 +269,50 @@ bookingRoutes.post("/", requireRole("customer"), async (c) => {
       return created;
     });
 
-    runAsyncSideEffect(
-      "notifyBookingCreated",
-      notifyBookingCreated(booking.id),
-    );
+    // With Stripe enabled, defer the "booking created" notification + the
+    // dispatch broadcast until the webhook flips paymentStatus to
+    // `authorized`. We don't want the ops team paged for an unpaid hold.
+    if (!isStripeEnabled()) {
+      runAsyncSideEffect(
+        "notifyBookingCreated",
+        notifyBookingCreated(booking.id),
+      );
+      broadcastBookingEvent([booking.customerId], {
+        type: "booking_created",
+        bookingId: booking.id,
+        customerId: booking.customerId,
+      });
+      return ok(c, { booking, payment: null }, 201);
+    }
 
-    // Tell the customer's own open SSE connections (e.g., booking history
-    // tab) and any admin watching the dispatch board.
-    broadcastBookingEvent([booking.customerId], {
-      type: "booking_created",
-      bookingId: booking.id,
-      customerId: booking.customerId,
-    });
-
-    return ok(c, { booking }, 201);
+    // Stripe enabled: create the PaymentIntent now so the client gets
+    // both the booking row and a clientSecret in one roundtrip. If
+    // Stripe rejects (network, card validation, etc.) we roll back the
+    // booking so the customer doesn't see a phantom row in their
+    // history. The hold-expiry job is a backstop for the case where
+    // the rollback itself fails.
+    try {
+      const payment = await createPaymentIntentForBooking(booking.id);
+      return ok(c, { booking, payment }, 201);
+    } catch (paymentCause) {
+      // Best-effort cleanup. Hold-expiry job will catch anything we miss.
+      try {
+        await db.delete(bookings).where(eq(bookings.id, booking.id));
+      } catch (cleanupCause) {
+        console.error("Failed to roll back booking after PI failure:", {
+          bookingId: booking.id,
+          paymentCause,
+          cleanupCause,
+        });
+      }
+      if (paymentCause instanceof PaymentError) {
+        return err(c, paymentCause.message, paymentCause.status, {
+          code: paymentCause.code,
+        });
+      }
+      console.error("Create payment intent failed:", paymentCause);
+      return err(c, "Could not initialise payment", 502);
+    }
   } catch (cause) {
     if (cause instanceof BookingRequestError) {
       return err(c, cause.message, cause.status);
@@ -469,13 +524,72 @@ bookingRoutes.get("/:id", async (c) => {
     .where(eq(vehicles.class, booking.vehicleClass))
     .limit(1);
 
+  // Admin-only: payment + refund audit trail. Hidden from customer/driver
+  // responses to keep PCI scope tight and avoid leaking internal Stripe ids
+  // back to a customer who already sees their own paymentStatus on the booking row.
+  let paymentTrail: {
+    payments: Array<typeof payments.$inferSelect>;
+    refunds: Array<typeof refunds.$inferSelect>;
+  } | null = null;
+  if (payload.role === "admin") {
+    const [paymentRows, refundRows] = await Promise.all([
+      db
+        .select()
+        .from(payments)
+        .where(eq(payments.bookingId, id))
+        .orderBy(desc(payments.createdAt)),
+      db
+        .select()
+        .from(refunds)
+        .where(eq(refunds.bookingId, id))
+        .orderBy(desc(refunds.createdAt)),
+    ]);
+    paymentTrail = { payments: paymentRows, refunds: refundRows };
+  }
+
   return ok(c, {
     booking: { ...booking, hasReview },
     assignments: enrichedAssignments,
     vehicle: vehicleResult[0] ?? null,
     review: existingReviewData,
+    paymentTrail,
   });
 });
+
+// ── Cancellation preview ───────────────────────────────
+//
+// Returns the policy decision *without* mutating any state. Used by the
+// customer cancel dialog to show the fee/refund amount before they
+// confirm. Idempotent and safe to poll.
+bookingRoutes.get(
+  "/:id/cancel-preview",
+  requireRole("customer", "admin"),
+  async (c) => {
+    const payload = c.get("jwtPayload") as JwtPayload;
+    const id = parseRouteId(c.req.param("id"));
+    if (!id) return err(c, "Invalid booking ID", 400);
+
+    const [booking] = await db
+      .select()
+      .from(bookings)
+      .where(eq(bookings.id, id))
+      .limit(1);
+    if (!booking) return err(c, "Booking not found", 404);
+    if (payload.role === "customer" && booking.customerId !== payload.sub) {
+      return err(c, "Forbidden", 403);
+    }
+
+    const { decideCancellation } = await import(
+      "../services/cancellationPolicy"
+    );
+    const decision = decideCancellation({
+      scheduledAt: booking.scheduledAt,
+      status: booking.status,
+      amountAuthorizedPence: booking.amountAuthorizedPence,
+    });
+    return ok(c, { decision });
+  },
+);
 
 // ── Update Status ──────────────────────────────────────
 
@@ -558,6 +672,21 @@ bookingRoutes.patch(
       .where(eq(bookings.id, id))
       .returning();
 
+    // Auto-capture when the ride completes. Webhook flips paymentStatus
+    // to `captured`; we just need to ask Stripe to move the funds. If
+    // capture fails (Stripe outage, expired auth) we don't roll back the
+    // status flip — admin can retry via /admin/bookings/:id/capture.
+    if (
+      nextStatus === "completed" &&
+      isStripeEnabled() &&
+      updated.paymentStatus === "authorized"
+    ) {
+      runAsyncSideEffect(
+        "capturePaymentForBooking",
+        capturePaymentForBooking(id),
+      );
+    }
+
     runAsyncSideEffect(
       "notifyBookingStatusChanged",
       notifyBookingStatusChanged(id, nextStatus),
@@ -599,9 +728,44 @@ bookingRoutes.patch(
       return err(c, "Forbidden", 403);
     }
 
-    const cancellable: BookingStatus[] = ["scheduled", "assigned"];
-    if (!cancellable.includes(booking.status)) {
+    // Customers can cancel up to (and including) en_route. Admin can
+    // cancel any non-terminal status. Drivers go through fallback flow
+    // and should not hit this endpoint.
+    const customerCancellable: BookingStatus[] = ["scheduled", "assigned"];
+    const adminCancellable: BookingStatus[] = [
+      "scheduled",
+      "assigned",
+      "en_route",
+      "arrived",
+    ];
+    const allowed =
+      payload.role === "admin" ? adminCancellable : customerCancellable;
+    if (!allowed.includes(booking.status)) {
       return err(c, "Booking cannot be cancelled in its current status", 400);
+    }
+
+    // Apply the cancellation policy first (void / partial / full capture)
+    // BEFORE flipping the booking status, so a Stripe failure leaves the
+    // booking in its original state and the customer can retry. Skip
+    // when Stripe is disabled or there's no payment to act on.
+    let cancellationDecision = null;
+    if (isStripeEnabled()) {
+      try {
+        cancellationDecision = await cancelBookingPayment({
+          bookingId: id,
+          scheduledAt: booking.scheduledAt,
+          status: booking.status,
+        });
+      } catch (cause) {
+        if (cause instanceof PaymentError) {
+          return err(c, cause.message, cause.status, { code: cause.code });
+        }
+        c.get("logger")?.error("cancel.payment_failed", {
+          bookingId: id,
+          err: cause as Error,
+        });
+        return err(c, "Could not process cancellation payment", 502);
+      }
     }
 
     const [updated] = await db
@@ -617,7 +781,10 @@ bookingRoutes.patch(
       bookingId: id,
     });
 
-    return ok(c, { booking: updated });
+    return ok(c, {
+      booking: updated,
+      cancellation: cancellationDecision,
+    });
   },
 );
 
@@ -833,6 +1000,70 @@ bookingRoutes.post("/:id/fallback", requireRole("admin"), async (c) => {
     message: "Fallback triggered",
     assignments: updatedAssignments,
   });
+});
+
+// ── Admin Refund ───────────────────────────────────────
+
+const refundReasonValues = [
+  "requested_by_customer",
+  "duplicate",
+  "fraudulent",
+  "service_failure",
+  "route_change",
+  "other",
+] as const;
+
+const refundSchema = z.object({
+  // Omit / null → full remaining refund. We coerce 0 to null so the
+  // service treats "click refund without typing an amount" as full.
+  amountPence: z
+    .number()
+    .int()
+    .positive()
+    .optional()
+    .nullable(),
+  reason: z.enum(refundReasonValues),
+  adminNote: z.string().max(500).optional().nullable(),
+});
+
+bookingRoutes.post("/:id/refund", requireRole("admin"), async (c) => {
+  const payload = c.get("jwtPayload") as JwtPayload;
+  const id = parseRouteId(c.req.param("id"));
+  if (!id) return err(c, "Invalid booking ID", 400);
+
+  if (!isStripeEnabled()) {
+    return err(c, "Payments not configured", 503);
+  }
+
+  const body = await c.req.json().catch(() => null);
+  const parsed = refundSchema.safeParse(body);
+  if (!parsed.success) {
+    return err(c, "Invalid input", 400, parsed.error.flatten());
+  }
+
+  try {
+    const result = await refundBookingPayment({
+      bookingId: id,
+      amountPence: parsed.data.amountPence ?? undefined,
+      reason: parsed.data.reason as AdminRefundReason,
+      adminNote: parsed.data.adminNote ?? undefined,
+      initiatedByUserId: payload.sub,
+    });
+
+    // The webhook (charge.refunded) is the canonical writer for the
+    // booking's amountRefundedPence + paymentStatus. Don't mutate booking
+    // state here — let the webhook reconcile to avoid double-writes.
+    return ok(c, { refund: result });
+  } catch (cause) {
+    if (cause instanceof PaymentError) {
+      return err(c, cause.message, cause.status, { code: cause.code });
+    }
+    c.get("logger")?.error("admin.refund.unhandled", {
+      bookingId: id,
+      err: cause as Error,
+    });
+    return err(c, "Refund failed", 500);
+  }
 });
 
 // ── Driver Location (for customer tracking) ───────

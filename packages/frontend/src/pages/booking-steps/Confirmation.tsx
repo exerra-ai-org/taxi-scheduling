@@ -2,7 +2,7 @@ import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import type { BookingData } from "../BookingFlow";
 import { clearBookingDraft } from "../BookingFlow";
-import { createBooking } from "../../api/bookings";
+import { createBooking, type BookingPaymentInit } from "../../api/bookings";
 import { formatPrice, formatDate } from "../../lib/format";
 import { ApiError } from "../../api/client";
 import { useToast } from "../../context/ToastContext";
@@ -11,6 +11,14 @@ interface Props {
   data: BookingData;
   onBack: () => void;
   onReset: () => void;
+  /** Called when the booking is created and Stripe returns a payment
+   * intent. The parent flow advances to the PaymentStep. If `payment`
+   * is null, payments are disabled — the parent should treat this as
+   * the legacy "booking confirmed" terminal state. */
+  onBookingCreated: (
+    bookingId: number,
+    payment: BookingPaymentInit | null,
+  ) => void;
 }
 
 /**
@@ -33,7 +41,12 @@ function shortAddress(addr: string): string {
   return trimmed.slice(0, 2).join(", ");
 }
 
-export default function Confirmation({ data, onBack, onReset }: Props) {
+export default function Confirmation({
+  data,
+  onBack,
+  onReset,
+  onBookingCreated,
+}: Props) {
   const navigate = useNavigate();
   const toast = useToast();
   const [submitting, setSubmitting] = useState(false);
@@ -45,7 +58,7 @@ export default function Confirmation({ data, onBack, onReset }: Props) {
     setSubmitting(true);
     setError("");
     try {
-      const { booking } = await createBooking({
+      const { booking, payment } = await createBooking({
         pickupAddress: data.pickupAddress,
         dropoffAddress: data.dropoffAddress,
         scheduledAt: scheduledDate.toISOString(),
@@ -58,6 +71,13 @@ export default function Confirmation({ data, onBack, onReset }: Props) {
         pickupFlightNumber: data.pickupFlightNumber || undefined,
         dropoffFlightNumber: data.dropoffFlightNumber || undefined,
       });
+      // Payments enabled → parent moves to PaymentStep with the
+      // clientSecret. Payments disabled → fall back to the legacy
+      // "navigate straight to booking detail" flow.
+      if (payment) {
+        onBookingCreated(booking.id, payment);
+        return;
+      }
       clearBookingDraft();
       toast.success("Booking confirmed");
       navigate(`/bookings/${booking.id}`, { replace: true });
@@ -157,7 +177,9 @@ export default function Confirmation({ data, onBack, onReset }: Props) {
           disabled={submitting}
           className="btn-green flex-1"
         >
-          <span>{submitting ? "Booking..." : "Confirm booking"}</span>
+          <span>
+            {submitting ? "Holding slot…" : "Continue to payment"}
+          </span>
           <span className="btn-icon" aria-hidden="true">
             <span className="btn-icon-glyph">↗</span>
           </span>

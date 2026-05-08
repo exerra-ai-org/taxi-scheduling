@@ -8,11 +8,32 @@ import {
 import { useToast } from "../../context/ToastContext";
 import { formatPrice, formatDate, statusLabel } from "../../lib/format";
 import { SkeletonCard } from "../../components/Skeleton";
+import PaymentStatusBadge from "../../components/PaymentStatusBadge";
 import AlertsBanner from "./AlertsBanner";
 import RideDetail from "./RideDetail";
 import { IconCar, IconRefresh } from "../../components/icons";
 
-type QueueFilter = "attention" | "unassigned" | "soon" | "active" | "all";
+type QueueFilter =
+  | "attention"
+  | "unassigned"
+  | "soon"
+  | "active"
+  | "payment"
+  | "all";
+
+// Bookings the dispatcher needs to chase money on. Doesn't include
+// `pending` (still inside the 15-min checkout hold) or `authorized`
+// (paid, just not captured yet).
+const PAYMENT_ATTENTION_STATUSES = new Set([
+  "unpaid",
+  "requires_action",
+  "failed",
+  "disputed",
+]);
+
+function needsPaymentAttention(booking: Booking) {
+  return PAYMENT_ATTENTION_STATUSES.has(booking.paymentStatus ?? "unpaid");
+}
 
 const ACTIVE_STATUSES = new Set([
   "assigned",
@@ -58,6 +79,7 @@ function queueLabel(filter: QueueFilter) {
     unassigned: "Unassigned",
     soon: "Soon",
     active: "Active",
+    payment: "Payment",
     all: "All",
   };
   return labels[filter];
@@ -92,6 +114,9 @@ export default function RideTimeline() {
   useRealtimeEvent("booking_updated", fetchBookings);
   useRealtimeEvent("drivers_assigned", fetchBookings);
   useRealtimeEvent("booking_cancelled", fetchBookings);
+  // Stripe webhook → SSE: keep the payment column in sync as PIs flow
+  // through authorize → capture → refund without manual refresh.
+  useRealtimeEvent("payment_status_changed", fetchBookings);
   useRealtimeRecovery(fetchBookings);
   // Customer SOS / contact-admin lands here. Surface as a toast and select
   // the affected booking so the dispatcher can act immediately.
@@ -124,7 +149,8 @@ export default function RideTimeline() {
         b.status === "scheduled" ||
         (isStartingSoon(b) && !DONE_STATUSES.has(b.status)),
     ).length;
-    return { attention, unassigned, soon, active, all: bookings.length };
+    const payment = bookings.filter(needsPaymentAttention).length;
+    return { attention, unassigned, soon, active, payment, all: bookings.length };
   }, [bookings]);
 
   const filtered = useMemo(() => {
@@ -136,6 +162,7 @@ export default function RideTimeline() {
           return isStartingSoon(booking) && !DONE_STATUSES.has(booking.status);
         }
         if (filter === "active") return ACTIVE_STATUSES.has(booking.status);
+        if (filter === "payment") return needsPaymentAttention(booking);
         if (filter === "attention") {
           return (
             booking.status === "scheduled" ||
@@ -227,6 +254,7 @@ export default function RideTimeline() {
               "unassigned",
               "soon",
               "active",
+              "payment",
               "all",
             ] as QueueFilter[]
           ).map((option) => (
@@ -298,6 +326,12 @@ export default function RideTimeline() {
                       <span className="admin-ride-meta">
                         <span>{formatDate(booking.scheduledAt)}</span>
                         <span>{formatPrice(booking.pricePence)}</span>
+                        {booking.paymentStatus && (
+                          <PaymentStatusBadge
+                            status={booking.paymentStatus}
+                            compact
+                          />
+                        )}
                         {booking.customerName && (
                           <span>{booking.customerName}</span>
                         )}

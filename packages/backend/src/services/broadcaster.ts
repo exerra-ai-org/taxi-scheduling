@@ -25,6 +25,12 @@ export type BroadcastEvent =
     }
   | { type: "user_updated"; userId: number }
   | { type: "driver_profile_updated"; driverId: number }
+  | {
+      type: "payment_status_changed";
+      bookingId: number;
+      paymentStatus: string;
+      lastErrorMessage?: string | null;
+    }
   | { type: "ping" }
   | { type: "overflow" };
 

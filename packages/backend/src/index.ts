@@ -19,6 +19,8 @@ import { vehicleRoutes } from "./routes/vehicles";
 import { adminRoutes } from "./routes/admin";
 import { uploadRoutes } from "./routes/upload";
 import { eventsRoutes } from "./routes/events";
+import { webhookRoutes } from "./routes/webhooks";
+import { paymentRoutes } from "./routes/payments";
 import { startBackgroundJobs, stopBackgroundJobs } from "./services/jobs";
 import { resolveSafeUploadPath } from "./lib/safeUploadPath";
 import { db, dbClient } from "./db/index";
@@ -56,6 +58,12 @@ app.use(
     referrerPolicy: "strict-origin-when-cross-origin",
   }),
 );
+
+// Stripe webhooks: mounted BEFORE the global body-limit and CORS layers.
+// Signature verification needs the raw, untouched request bytes — any
+// middleware that consumes or re-encodes the body breaks HMAC. CORS is
+// also irrelevant here (server-to-server, no browser origin).
+app.route("/webhooks", webhookRoutes);
 
 // Default body limit. Upload routes opt into a larger ceiling.
 app.use(
@@ -118,6 +126,7 @@ app.route("/fixed-routes", fixedRouteRoutes);
 app.route("/notifications", notificationRoutes);
 app.route("/vehicles", vehicleRoutes);
 app.route("/admin", adminRoutes);
+app.route("/payments", paymentRoutes);
 app.use(
   "/upload/*",
   bodyLimit({
@@ -166,6 +175,7 @@ startBackgroundJobs();
 logger.info("server startup", {
   email: config.email.resendApiKey ? "resend" : "unconfigured",
   push: config.push.publicKey ? "vapid" : "unconfigured",
+  stripe: config.stripe.enabled ? "configured" : "unconfigured",
   corsOrigins: config.cors.origins,
   port: config.server.port,
 });

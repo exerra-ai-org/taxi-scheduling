@@ -1,4 +1,4 @@
-import type { BookingStatus } from "shared/types";
+import type { BookingStatus, PaymentStatus } from "shared/types";
 
 export function formatPrice(pence: number): string {
   return `£${(pence / 100).toFixed(2)}`;
@@ -39,4 +39,41 @@ export function statusColor(status: BookingStatus): string {
     cancelled: "status-cancelled",
   };
   return colors[status] || "status-inactive";
+}
+
+// Plain-English labels for paymentStatus on the booking projection.
+// Tuned for at-a-glance scanning in admin lists, not strict Stripe vocab.
+export function paymentStatusLabel(status: PaymentStatus): string {
+  const labels: Record<PaymentStatus, string> = {
+    unpaid: "Unpaid",
+    pending: "Awaiting card",
+    requires_action: "3DS pending",
+    authorized: "Authorised",
+    captured: "Paid",
+    partially_refunded: "Partial refund",
+    refunded: "Refunded",
+    failed: "Failed",
+    disputed: "Disputed",
+    uncollectible: "Uncollectible",
+  };
+  return labels[status] ?? status;
+}
+
+// Re-uses the existing booking status pill palette so the badges feel
+// part of the same design system. We map by intent (success/warn/danger)
+// rather than introducing new tokens.
+export function paymentStatusColor(status: PaymentStatus): string {
+  const colors: Record<PaymentStatus, string> = {
+    unpaid: "status-inactive",
+    pending: "status-scheduled",
+    requires_action: "status-scheduled",
+    authorized: "status-arrived",
+    captured: "status-completed",
+    partially_refunded: "status-assigned",
+    refunded: "status-inactive",
+    failed: "status-cancelled",
+    disputed: "status-cancelled",
+    uncollectible: "status-cancelled",
+  };
+  return colors[status] ?? "status-inactive";
 }

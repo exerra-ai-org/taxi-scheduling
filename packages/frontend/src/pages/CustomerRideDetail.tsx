@@ -8,6 +8,7 @@ import type { Booking, BookingStatus, DriverLocation } from "shared/types";
 import {
   cancelBooking,
   getBooking,
+  getCancelPreview,
   reportIncident,
   type BookingDetail,
 } from "../api/bookings";
@@ -33,6 +34,7 @@ import {
   IconStar,
   IconX,
 } from "../components/icons";
+import PaymentStatusBadge from "../components/PaymentStatusBadge";
 import MapBackdrop, { type Coords } from "./booking/MapBackdrop";
 import ReviewForm from "./ReviewForm";
 
@@ -231,6 +233,11 @@ export default function CustomerRideDetail() {
   useRealtimeEvent("booking_cancelled", (e) => {
     if (e.bookingId === bookingId) load();
   });
+  // Payment lifecycle: webhook → SSE → refetch the booking so the badge,
+  // capture amount, and refund total reflect Stripe's authoritative state.
+  useRealtimeEvent("payment_status_changed", (e) => {
+    if (e.bookingId === bookingId) load();
+  });
   // Driver vehicle / rating / name changed — refetch only if the assigned
   // primary driver is the affected one.
   useRealtimeEvent("driver_profile_updated", (e) => {
@@ -311,16 +318,37 @@ export default function CustomerRideDetail() {
 
   async function handleCancel() {
     if (!booking) return;
+    // Show the policy decision (fee + refund) BEFORE the customer
+    // confirms. If we can't fetch a preview (Stripe disabled, network),
+    // fall back to a generic confirm.
+    let confirmMessage = "This cannot be undone. Continue?";
+    try {
+      const { decision } = await getCancelPreview(booking.id);
+      if (decision.feePence === 0) {
+        confirmMessage = `${decision.reason} You won't be charged.`;
+      } else if (decision.refundablePence === 0) {
+        confirmMessage = `${decision.reason} You will be charged ${formatPrice(decision.feePence)}.`;
+      } else {
+        confirmMessage = `${decision.reason} A ${formatPrice(decision.feePence)} fee will be charged; ${formatPrice(decision.refundablePence)} will be released back to your card.`;
+      }
+    } catch {
+      // Preview fetch failed — fall through with generic message.
+    }
     const ok = await confirm({
       title: "Cancel booking",
-      message: "This cannot be undone. Continue?",
+      message: confirmMessage,
       confirmLabel: "Cancel ride",
       variant: "danger",
     });
     if (!ok) return;
     try {
-      await cancelBooking(booking.id);
-      toast.success("Booking cancelled");
+      const result = await cancelBooking(booking.id);
+      const fee = result.cancellation?.feePence ?? 0;
+      toast.success(
+        fee > 0
+          ? `Booking cancelled — ${formatPrice(fee)} cancellation fee charged`
+          : "Booking cancelled",
+      );
       load();
     } catch (err) {
       toast.error(err instanceof ApiError ? err.message : "Could not cancel");
@@ -733,6 +761,53 @@ export default function CustomerRideDetail() {
                 {formatPrice(booking.pricePence)}
               </div>
             </div>
+
+            {/* Payment summary — paymentStatus is the source of truth here.
+                Lives below the headline price so the customer always sees
+                refunded/captured state alongside what they were charged. */}
+            {booking.paymentStatus &&
+              booking.paymentStatus !== "unpaid" &&
+              booking.paymentStatus !== "pending" && (
+                <section>
+                  <div className="flex items-center justify-between">
+                    <p className="section-label">Payment</p>
+                    <PaymentStatusBadge status={booking.paymentStatus} />
+                  </div>
+                  <div className="glass-card p-3 space-y-2 mt-2">
+                    {booking.amountCapturedPence > 0 && (
+                      <div className="flex justify-between caption-copy">
+                        <span>Charged</span>
+                        <strong className="tabular-nums">
+                          {formatPrice(booking.amountCapturedPence)}
+                        </strong>
+                      </div>
+                    )}
+                    {booking.amountRefundedPence > 0 && (
+                      <div className="flex justify-between caption-copy">
+                        <span>Refunded to your card</span>
+                        <strong className="tabular-nums text-[var(--color-forest)]">
+                          −{formatPrice(booking.amountRefundedPence)}
+                        </strong>
+                      </div>
+                    )}
+                    {booking.cancellationFeePence > 0 && (
+                      <div className="flex justify-between caption-copy">
+                        <span>Cancellation fee</span>
+                        <strong className="tabular-nums">
+                          {formatPrice(booking.cancellationFeePence)}
+                        </strong>
+                      </div>
+                    )}
+                    {booking.amountRefundedPence > 0 &&
+                      booking.amountCapturedPence > 0 && (
+                        <p className="caption-copy text-[var(--color-mid)]">
+                          Refunds typically take 5–10 business days to appear
+                          on your statement.
+                        </p>
+                      )}
+                  </div>
+                </section>
+              )}
 
             {/* Your review */}
             {booking.status === "completed" && detail?.review && (

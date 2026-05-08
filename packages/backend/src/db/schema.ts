@@ -45,6 +45,40 @@ export const vehicleClassEnum = pgEnum("vehicle_class", [
   "max",
 ]);
 
+// ── Payments ───────────────────────────────────────────
+//
+// Booking-level rollup of where the money is. Driven entirely by Stripe
+// webhooks — never written from a synchronous API response path. See
+// services/payments.ts for the state machine.
+export const paymentStatusEnum = pgEnum("payment_status", [
+  "unpaid", // default; no Stripe object yet
+  "pending", // PI/SI created, awaiting customer action
+  "requires_action", // 3DS or other action required
+  "authorized", // funds held, not captured
+  "captured", // money has moved
+  "partially_refunded",
+  "refunded",
+  "failed",
+  "disputed",
+  "uncollectible", // off-session charge failed permanently
+]);
+
+export const paymentIntentTypeEnum = pgEnum("payment_intent_type", [
+  "payment_intent",
+  "setup_intent",
+]);
+
+export const refundReasonEnum = pgEnum("refund_reason", [
+  "requested_by_customer",
+  "duplicate",
+  "fraudulent",
+  "service_failure",
+  "route_change",
+  "cancellation_full",
+  "cancellation_partial",
+  "other",
+]);
+
 // ── Users ──────────────────────────────────────────────
 
 export const users = pgTable(
@@ -63,6 +97,10 @@ export const users = pgTable(
     invitationToken: text("invitation_token"),
     invitationTokenExpiresAt: timestamp("invitation_token_expires_at"),
     profilePictureUrl: text("profile_picture_url"),
+    // Stripe Customer ID for billing. Created eagerly on customer-role
+    // signup (and on invitation accept if the new account is a customer).
+    // Null for admin/driver accounts — they do not pay.
+    stripeCustomerId: text("stripe_customer_id").unique(),
     createdAt: timestamp("created_at").notNull().defaultNow(),
   },
   (table) => [
@@ -193,6 +231,26 @@ export const bookings = pgTable(
     // and stored as a flat [[lat, lon], ...] array. Avoids re-running
     // OSRM map-matching on every admin view of a finished ride.
     snappedPath: jsonb("snapped_path"),
+    // Payment rollup. Authoritative source is the `payments` table; these
+    // fields are denormalised projections updated by the webhook handler.
+    paymentStatus: paymentStatusEnum("payment_status")
+      .notNull()
+      .default("unpaid"),
+    // Latest active intent. Booking starts with a SetupIntent (long-lead) or
+    // PaymentIntent (≤7d). Re-auth flow may replace this with a new PI id.
+    activePaymentIntentId: text("active_payment_intent_id"),
+    // PaymentMethod attached for off-session re-auth on long-lead bookings.
+    paymentMethodId: text("payment_method_id"),
+    amountAuthorizedPence: integer("amount_authorized_pence")
+      .notNull()
+      .default(0),
+    amountCapturedPence: integer("amount_captured_pence").notNull().default(0),
+    amountRefundedPence: integer("amount_refunded_pence").notNull().default(0),
+    cancellationFeePence: integer("cancellation_fee_pence")
+      .notNull()
+      .default(0),
+    // Hold expiry — if the customer never confirms payment, free the slot.
+    paymentHoldExpiresAt: timestamp("payment_hold_expires_at"),
     createdAt: timestamp("created_at").notNull().defaultNow(),
   },
   (table) => [
@@ -201,6 +259,13 @@ export const bookings = pgTable(
     index("idx_bookings_scheduled_at").on(table.scheduledAt),
     // Watchdog + reminder background jobs filter by (status, scheduled_at).
     index("idx_bookings_status_sched").on(table.status, table.scheduledAt),
+    index("idx_bookings_payment_status").on(table.paymentStatus),
+    // Re-auth job scans (paymentStatus, scheduledAt) for long-lead bookings
+    // approaching the 7-day reauth horizon.
+    index("idx_bookings_pay_status_sched").on(
+      table.paymentStatus,
+      table.scheduledAt,
+    ),
   ],
 );
 
@@ -390,4 +455,123 @@ export const reviews = pgTable(
     // Aggregate rating queries (avg, count) filter by driver_id.
     index("idx_reviews_driver_id").on(table.driverId),
   ],
+);
+
+// ── Payments ──────────────────────────────────────────
+//
+// One row per Stripe PaymentIntent or SetupIntent. A booking can have many
+// payment rows over its lifetime (e.g. SetupIntent at booking time, then a
+// PaymentIntent created at T-6d for long-lead reauth). The most recent
+// authorised/captured row reflects the live charge — the booking's
+// `activePaymentIntentId` points to it for fast lookup.
+export const payments = pgTable(
+  "payments",
+  {
+    id: serial("id").primaryKey(),
+    bookingId: integer("booking_id")
+      .notNull()
+      .references(() => bookings.id),
+    customerId: integer("customer_id")
+      .notNull()
+      .references(() => users.id),
+    stripeIntentId: text("stripe_intent_id").notNull().unique(),
+    intentType: paymentIntentTypeEnum("intent_type").notNull(),
+    status: paymentStatusEnum("status").notNull().default("pending"),
+    amountPence: integer("amount_pence").notNull().default(0),
+    currency: text("currency").notNull().default("gbp"),
+    paymentMethodId: text("payment_method_id"),
+    // Stripe charge id — populated after a successful PI is captured.
+    stripeChargeId: text("stripe_charge_id"),
+    // Last failure reason from Stripe for debugging / customer support.
+    lastErrorCode: text("last_error_code"),
+    lastErrorMessage: text("last_error_message"),
+    // Idempotency key used when the intent was created. Stored so we can
+    // safely retry a stuck create.
+    idempotencyKey: text("idempotency_key"),
+    capturedAt: timestamp("captured_at"),
+    voidedAt: timestamp("voided_at"),
+    createdAt: timestamp("created_at").notNull().defaultNow(),
+    updatedAt: timestamp("updated_at").notNull().defaultNow(),
+  },
+  (table) => [
+    index("idx_payments_booking").on(table.bookingId),
+    index("idx_payments_customer").on(table.customerId),
+    index("idx_payments_status").on(table.status),
+    index("idx_payments_charge").on(table.stripeChargeId),
+  ],
+);
+
+export const refunds = pgTable(
+  "refunds",
+  {
+    id: serial("id").primaryKey(),
+    bookingId: integer("booking_id")
+      .notNull()
+      .references(() => bookings.id),
+    paymentId: integer("payment_id")
+      .notNull()
+      .references(() => payments.id),
+    stripeRefundId: text("stripe_refund_id").notNull().unique(),
+    amountPence: integer("amount_pence").notNull(),
+    reason: refundReasonEnum("reason").notNull(),
+    adminNote: text("admin_note"),
+    // Null when refund originates from a webhook (e.g. dispute auto-refund).
+    initiatedByUserId: integer("initiated_by_user_id").references(
+      () => users.id,
+    ),
+    // Stripe lifecycle: pending → succeeded | failed | canceled
+    status: text("status").notNull().default("pending"),
+    failureReason: text("failure_reason"),
+    createdAt: timestamp("created_at").notNull().defaultNow(),
+  },
+  (table) => [
+    index("idx_refunds_booking").on(table.bookingId),
+    index("idx_refunds_status").on(table.status),
+  ],
+);
+
+export const disputes = pgTable(
+  "disputes",
+  {
+    id: serial("id").primaryKey(),
+    bookingId: integer("booking_id")
+      .notNull()
+      .references(() => bookings.id),
+    paymentId: integer("payment_id")
+      .notNull()
+      .references(() => payments.id),
+    stripeDisputeId: text("stripe_dispute_id").notNull().unique(),
+    amountPence: integer("amount_pence").notNull(),
+    reason: text("reason").notNull(),
+    // Stripe statuses: warning_needs_response, needs_response, under_review,
+    // charge_refunded, won, lost.
+    status: text("status").notNull(),
+    evidenceDueBy: timestamp("evidence_due_by"),
+    evidenceSubmittedAt: timestamp("evidence_submitted_at"),
+    outcome: text("outcome"),
+    createdAt: timestamp("created_at").notNull().defaultNow(),
+    updatedAt: timestamp("updated_at").notNull().defaultNow(),
+  },
+  (table) => [
+    index("idx_disputes_booking").on(table.bookingId),
+    index("idx_disputes_status").on(table.status),
+  ],
+);
+
+// ── Webhook Events ─────────────────────────────────────
+//
+// Idempotency log. Stripe's at-least-once delivery means the same event id
+// can hit the endpoint multiple times; INSERT-then-process gives us a
+// single-source-of-truth on whether work has already been done.
+export const webhookEvents = pgTable(
+  "webhook_events",
+  {
+    stripeEventId: text("stripe_event_id").primaryKey(),
+    type: text("type").notNull(),
+    payload: jsonb("payload").notNull(),
+    receivedAt: timestamp("received_at").notNull().defaultNow(),
+    processedAt: timestamp("processed_at"),
+    processingError: text("processing_error"),
+  },
+  (table) => [index("idx_webhook_events_type").on(table.type)],
 );

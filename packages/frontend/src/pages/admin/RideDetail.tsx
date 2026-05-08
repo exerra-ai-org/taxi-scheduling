@@ -1,8 +1,10 @@
 import { useCallback, useEffect, useState } from "react";
 import type { Booking, BookingStatus } from "shared/types";
+import type { PaymentTrail } from "../../api/bookings";
 import Modal from "../../components/Modal";
 import StatusBadge from "../../components/StatusBadge";
 import DriverAssignmentForm from "./DriverAssignmentForm";
+import AdminPaymentPanel from "./AdminPaymentPanel";
 import {
   getBookingDetail,
   updateBookingStatus,
@@ -43,6 +45,7 @@ export default function RideDetail({
 }: Props) {
   const [booking, setBooking] = useState<Booking | null>(null);
   const [assignments, setAssignments] = useState<Assignment[]>([]);
+  const [paymentTrail, setPaymentTrail] = useState<PaymentTrail | null>(null);
   const [loading, setLoading] = useState(false);
   const { confirm: confirmAction, dialogProps } = useConfirm();
   const toast = useToast();
@@ -54,6 +57,7 @@ export default function RideDetail({
       const data = await getBookingDetail(bookingId);
       setBooking(data.booking);
       setAssignments(data.assignments);
+      setPaymentTrail(data.paymentTrail ?? null);
     } catch {
       // handle error silently
     } finally {
@@ -65,6 +69,7 @@ export default function RideDetail({
     if (!bookingId) {
       setBooking(null);
       setAssignments([]);
+      setPaymentTrail(null);
       return;
     }
     fetchDetail();
@@ -79,6 +84,9 @@ export default function RideDetail({
     if (e.bookingId === bookingId) fetchDetail();
   });
   useRealtimeEvent("booking_cancelled", (e) => {
+    if (e.bookingId === bookingId) fetchDetail();
+  });
+  useRealtimeEvent("payment_status_changed", (e) => {
     if (e.bookingId === bookingId) fetchDetail();
   });
   // Customer name/phone or driver vehicle info — refetch if the user is
@@ -179,6 +187,19 @@ export default function RideDetail({
             </div>
           </div>
         </div>
+
+        <AdminPaymentPanel
+          booking={booking}
+          paymentTrail={paymentTrail}
+          onRefunded={() => {
+            // Optimistic refresh — webhook will fire shortly after and
+            // promote the refund row from `pending` to `succeeded`. We
+            // re-fetch immediately so the dispatcher sees the new line
+            // item without waiting for the SSE event.
+            fetchDetail();
+            onUpdated();
+          }}
+        />
 
         {assignments.length > 0 && (
           <div className="admin-detail-section">

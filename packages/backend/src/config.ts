@@ -7,6 +7,8 @@ validateRuntimeConfig({
   nodeEnv,
   jwtSecret: process.env.JWT_SECRET,
   databaseUrl: process.env.DATABASE_URL,
+  stripeSecretKey: process.env.STRIPE_SECRET_KEY,
+  stripeWebhookSecret: process.env.STRIPE_WEBHOOK_SECRET,
 });
 
 const dbPool = readDbPoolConfig(process.env);
@@ -103,6 +105,46 @@ export const config = {
     url: (process.env.OSRM_URL || "https://router.project-osrm.org").replace(
       /\/$/,
       "",
+    ),
+  },
+
+  // Stripe billing. All keys optional at boot — feature is gated by
+  // `stripe.enabled`. configValidation enforces both-or-neither in prod.
+  stripe: {
+    enabled: !!process.env.STRIPE_SECRET_KEY,
+    secretKey: process.env.STRIPE_SECRET_KEY || "",
+    webhookSecret: process.env.STRIPE_WEBHOOK_SECRET || "",
+    publishableKey: process.env.STRIPE_PUBLISHABLE_KEY || "",
+    apiVersion: (process.env.STRIPE_API_VERSION || "2024-11-20.acacia") as any,
+    currency: (process.env.STRIPE_CURRENCY || "gbp").toLowerCase(),
+  },
+
+  payments: {
+    // Stripe authorisations expire at ~7 days. We re-auth at T-6d using a
+    // saved PaymentMethod off-session. Bookings created within this horizon
+    // can use a single PaymentIntent end-to-end.
+    authHorizonDays: Math.max(
+      1,
+      Number(process.env.PAYMENT_AUTH_HORIZON_DAYS) || 6,
+    ),
+    // Hold the booking slot while the customer completes the Payment Element.
+    holdMinutes: Math.max(5, Number(process.env.PAYMENT_HOLD_MINUTES) || 15),
+    // Cancellation policy windows (hours before scheduled pickup).
+    fullRefundHours: Math.max(
+      0,
+      Number(process.env.CANCEL_FULL_REFUND_HOURS) || 24,
+    ),
+    partialRefundHours: Math.max(
+      0,
+      Number(process.env.CANCEL_PARTIAL_REFUND_HOURS) || 6,
+    ),
+    // Percentage of fare retained as cancellation fee in the partial window.
+    partialCancellationPercent: Math.min(
+      100,
+      Math.max(
+        0,
+        Number(process.env.CANCEL_PARTIAL_PERCENT) || 50,
+      ),
     ),
   },
 
