@@ -579,9 +579,8 @@ bookingRoutes.get(
       return err(c, "Forbidden", 403);
     }
 
-    const { decideCancellation } = await import(
-      "../services/cancellationPolicy"
-    );
+    const { decideCancellation } =
+      await import("../services/cancellationPolicy");
     const decision = decideCancellation({
       scheduledAt: booking.scheduledAt,
       status: booking.status,
@@ -1016,12 +1015,7 @@ const refundReasonValues = [
 const refundSchema = z.object({
   // Omit / null → full remaining refund. We coerce 0 to null so the
   // service treats "click refund without typing an amount" as full.
-  amountPence: z
-    .number()
-    .int()
-    .positive()
-    .optional()
-    .nullable(),
+  amountPence: z.number().int().positive().optional().nullable(),
   reason: z.enum(refundReasonValues),
   adminNote: z.string().max(500).optional().nullable(),
 });

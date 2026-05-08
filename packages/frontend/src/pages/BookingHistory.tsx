@@ -186,10 +186,7 @@ export default function BookingHistory() {
                     b.paymentStatus !== "unpaid" &&
                     b.paymentStatus !== "pending" &&
                     b.paymentStatus !== "captured" && (
-                      <PaymentStatusBadge
-                        status={b.paymentStatus}
-                        compact
-                      />
+                      <PaymentStatusBadge status={b.paymentStatus} compact />
                     )}
                   <div className="metric-value text-[24px] leading-none">
                     {formatPrice(b.pricePence)}

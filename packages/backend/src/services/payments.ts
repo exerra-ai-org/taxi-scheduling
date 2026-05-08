@@ -21,9 +21,16 @@ import { eq } from "drizzle-orm";
 import { db } from "../db/index";
 import { bookings, payments, refunds, users } from "../db/schema";
 import { config } from "../config";
-import { getStripe, idempotencyKeyFor, classifyStripeError } from "../lib/stripe";
+import {
+  getStripe,
+  idempotencyKeyFor,
+  classifyStripeError,
+} from "../lib/stripe";
 import { ensureStripeCustomer } from "./stripeCustomer";
-import { decideCancellation, type CancellationDecision } from "./cancellationPolicy";
+import {
+  decideCancellation,
+  type CancellationDecision,
+} from "./cancellationPolicy";
 import { logger } from "../lib/logger";
 import type { BookingStatus } from "shared/types";
 
@@ -308,9 +315,11 @@ export async function capturePaymentForBooking(
   if (!booking) {
     throw new PaymentError("Booking not found", "not_found", 404);
   }
-  if (booking.paymentStatus === "captured" ||
-      booking.paymentStatus === "refunded" ||
-      booking.paymentStatus === "partially_refunded") {
+  if (
+    booking.paymentStatus === "captured" ||
+    booking.paymentStatus === "refunded" ||
+    booking.paymentStatus === "partially_refunded"
+  ) {
     // Already captured (or beyond) — no-op.
     return;
   }
@@ -394,8 +403,10 @@ export async function cancelBookingPayment(input: {
   if (!booking) throw new PaymentError("Booking not found", "not_found", 404);
 
   // No payment authorised → policy is moot. Just void any pending hold.
-  if (booking.paymentStatus !== "authorized" &&
-      booking.paymentStatus !== "captured") {
+  if (
+    booking.paymentStatus !== "authorized" &&
+    booking.paymentStatus !== "captured"
+  ) {
     if (
       booking.paymentStatus === "pending" ||
       booking.paymentStatus === "requires_action"
@@ -533,11 +544,7 @@ export async function refundBookingPayment(input: {
     );
   }
   if (!booking.activePaymentIntentId) {
-    throw new PaymentError(
-      "Booking has no payment intent",
-      "no_intent",
-      409,
-    );
+    throw new PaymentError("Booking has no payment intent", "no_intent", 409);
   }
 
   const refundable = booking.amountCapturedPence - booking.amountRefundedPence;
@@ -658,4 +665,3 @@ export async function refundBookingPayment(input: {
     remainingRefundablePence: refundable - requested,
   };
 }
-

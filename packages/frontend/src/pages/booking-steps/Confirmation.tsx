@@ -177,9 +177,7 @@ export default function Confirmation({
           disabled={submitting}
           className="btn-green flex-1"
         >
-          <span>
-            {submitting ? "Holding slot…" : "Continue to payment"}
-          </span>
+          <span>{submitting ? "Holding slot…" : "Continue to payment"}</span>
           <span className="btn-icon" aria-hidden="true">
             <span className="btn-icon-glyph">↗</span>
           </span>

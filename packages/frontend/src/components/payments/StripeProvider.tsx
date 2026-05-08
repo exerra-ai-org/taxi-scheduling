@@ -35,7 +35,10 @@ export default function StripeProvider({
   clientSecret,
   children,
 }: Props) {
-  const promise = useMemo(() => stripePromise(publishableKey), [publishableKey]);
+  const promise = useMemo(
+    () => stripePromise(publishableKey),
+    [publishableKey],
+  );
 
   return (
     <Elements

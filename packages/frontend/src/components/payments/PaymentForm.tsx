@@ -46,13 +46,11 @@ export default function PaymentForm({
     setSubmitting(true);
     setError(null);
 
-    const { error: confirmError, paymentIntent } = await stripe.confirmPayment(
-      {
-        elements,
-        confirmParams: { return_url: returnUrl },
-        redirect: "if_required",
-      },
-    );
+    const { error: confirmError, paymentIntent } = await stripe.confirmPayment({
+      elements,
+      confirmParams: { return_url: returnUrl },
+      redirect: "if_required",
+    });
 
     if (confirmError) {
       // card_error / validation_error are safe to show; everything else
@@ -124,9 +122,8 @@ export default function PaymentForm({
       </div>
 
       <p className="text-[11px] leading-snug text-[var(--color-muted,#737373)]">
-        Your card will be authorised now and charged when the ride is
-        completed. Cancellations more than 24 hours before pickup are
-        refunded in full.
+        Your card will be authorised now and charged when the ride is completed.
+        Cancellations more than 24 hours before pickup are refunded in full.
       </p>
     </form>
   );

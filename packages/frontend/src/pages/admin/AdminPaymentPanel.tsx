@@ -56,8 +56,7 @@ export default function AdminPaymentPanel({
   const [submitting, setSubmitting] = useState(false);
   const toast = useToast();
 
-  const refundable =
-    booking.amountCapturedPence - booking.amountRefundedPence;
+  const refundable = booking.amountCapturedPence - booking.amountRefundedPence;
   const canRefund =
     refundable > 0 &&
     (booking.paymentStatus === "captured" ||
@@ -66,24 +65,25 @@ export default function AdminPaymentPanel({
   const refunds = paymentTrail?.refunds ?? [];
 
   const summaryRows = useMemo(
-    () => [
-      booking.amountAuthorizedPence > 0 && {
-        label: "Authorised",
-        value: formatPrice(booking.amountAuthorizedPence),
-      },
-      booking.amountCapturedPence > 0 && {
-        label: "Captured",
-        value: formatPrice(booking.amountCapturedPence),
-      },
-      booking.amountRefundedPence > 0 && {
-        label: "Refunded",
-        value: `−${formatPrice(booking.amountRefundedPence)}`,
-      },
-      booking.cancellationFeePence > 0 && {
-        label: "Cancellation fee",
-        value: formatPrice(booking.cancellationFeePence),
-      },
-    ].filter(Boolean) as { label: string; value: string }[],
+    () =>
+      [
+        booking.amountAuthorizedPence > 0 && {
+          label: "Authorised",
+          value: formatPrice(booking.amountAuthorizedPence),
+        },
+        booking.amountCapturedPence > 0 && {
+          label: "Captured",
+          value: formatPrice(booking.amountCapturedPence),
+        },
+        booking.amountRefundedPence > 0 && {
+          label: "Refunded",
+          value: `−${formatPrice(booking.amountRefundedPence)}`,
+        },
+        booking.cancellationFeePence > 0 && {
+          label: "Cancellation fee",
+          value: formatPrice(booking.cancellationFeePence),
+        },
+      ].filter(Boolean) as { label: string; value: string }[],
     [booking],
   );
 
@@ -205,12 +205,11 @@ export default function AdminPaymentPanel({
         <div className="space-y-4">
           <div>
             <p className="caption-copy">
-              Refundable balance:{" "}
-              <strong>{formatPrice(refundable)}</strong>
+              Refundable balance: <strong>{formatPrice(refundable)}</strong>
             </p>
             <p className="caption-copy">
-              Refunds go back to the customer's original card and typically
-              take 5–10 business days to appear.
+              Refunds go back to the customer's original card and typically take
+              5–10 business days to appear.
             </p>
           </div>
 

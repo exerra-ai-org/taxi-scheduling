@@ -150,7 +150,14 @@ export default function RideTimeline() {
         (isStartingSoon(b) && !DONE_STATUSES.has(b.status)),
     ).length;
     const payment = bookings.filter(needsPaymentAttention).length;
-    return { attention, unassigned, soon, active, payment, all: bookings.length };
+    return {
+      attention,
+      unassigned,
+      soon,
+      active,
+      payment,
+      all: bookings.length,
+    };
   }, [bookings]);
 
   const filtered = useMemo(() => {

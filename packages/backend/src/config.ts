@@ -141,10 +141,7 @@ export const config = {
     // Percentage of fare retained as cancellation fee in the partial window.
     partialCancellationPercent: Math.min(
       100,
-      Math.max(
-        0,
-        Number(process.env.CANCEL_PARTIAL_PERCENT) || 50,
-      ),
+      Math.max(0, Number(process.env.CANCEL_PARTIAL_PERCENT) || 50),
     ),
   },
 

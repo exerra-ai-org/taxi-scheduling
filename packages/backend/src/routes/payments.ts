@@ -16,7 +16,11 @@ import { and, eq } from "drizzle-orm";
 import { db } from "../db/index";
 import { bookings, payments } from "../db/schema";
 import { config } from "../config";
-import { authMiddleware, requireRole, type JwtPayload } from "../middleware/auth";
+import {
+  authMiddleware,
+  requireRole,
+  type JwtPayload,
+} from "../middleware/auth";
 import { createRateLimiter } from "../middleware/rateLimit";
 import { ok, err } from "../lib/response";
 import { isStripeEnabled } from "../lib/stripe";

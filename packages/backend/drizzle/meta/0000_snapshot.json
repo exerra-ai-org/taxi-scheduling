@@ -335,12 +335,8 @@
           "name": "bookings_customer_id_users_id_fk",
           "tableFrom": "bookings",
           "tableTo": "users",
-          "columnsFrom": [
-            "customer_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["customer_id"],
+          "columnsTo": ["id"],
           "onDelete": "no action",
           "onUpdate": "no action"
         },
@@ -348,12 +344,8 @@
           "name": "bookings_pickup_zone_id_zones_id_fk",
           "tableFrom": "bookings",
           "tableTo": "zones",
-          "columnsFrom": [
-            "pickup_zone_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["pickup_zone_id"],
+          "columnsTo": ["id"],
           "onDelete": "no action",
           "onUpdate": "no action"
         },
@@ -361,12 +353,8 @@
           "name": "bookings_dropoff_zone_id_zones_id_fk",
           "tableFrom": "bookings",
           "tableTo": "zones",
-          "columnsFrom": [
-            "dropoff_zone_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["dropoff_zone_id"],
+          "columnsTo": ["id"],
           "onDelete": "no action",
           "onUpdate": "no action"
         },
@@ -374,12 +362,8 @@
           "name": "bookings_fixed_route_id_fixed_routes_id_fk",
           "tableFrom": "bookings",
           "tableTo": "fixed_routes",
-          "columnsFrom": [
-            "fixed_route_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["fixed_route_id"],
+          "columnsTo": ["id"],
           "onDelete": "no action",
           "onUpdate": "no action"
         },
@@ -387,12 +371,8 @@
           "name": "bookings_coupon_id_coupons_id_fk",
           "tableFrom": "bookings",
           "tableTo": "coupons",
-          "columnsFrom": [
-            "coupon_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["coupon_id"],
+          "columnsTo": ["id"],
           "onDelete": "no action",
           "onUpdate": "no action"
         }
@@ -459,9 +439,7 @@
         "coupons_code_unique": {
           "name": "coupons_code_unique",
           "nullsNotDistinct": false,
-          "columns": [
-            "code"
-          ]
+          "columns": ["code"]
         }
       },
       "policies": {},
@@ -584,12 +562,8 @@
           "name": "disputes_booking_id_bookings_id_fk",
           "tableFrom": "disputes",
           "tableTo": "bookings",
-          "columnsFrom": [
-            "booking_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["booking_id"],
+          "columnsTo": ["id"],
           "onDelete": "no action",
           "onUpdate": "no action"
         },
@@ -597,12 +571,8 @@
           "name": "disputes_payment_id_payments_id_fk",
           "tableFrom": "disputes",
           "tableTo": "payments",
-          "columnsFrom": [
-            "payment_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["payment_id"],
+          "columnsTo": ["id"],
           "onDelete": "no action",
           "onUpdate": "no action"
         }
@@ -612,9 +582,7 @@
         "disputes_stripe_dispute_id_unique": {
           "name": "disputes_stripe_dispute_id_unique",
           "nullsNotDistinct": false,
-          "columns": [
-            "stripe_dispute_id"
-          ]
+          "columns": ["stripe_dispute_id"]
         }
       },
       "policies": {},
@@ -729,12 +697,8 @@
           "name": "driver_assignments_booking_id_bookings_id_fk",
           "tableFrom": "driver_assignments",
           "tableTo": "bookings",
-          "columnsFrom": [
-            "booking_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["booking_id"],
+          "columnsTo": ["id"],
           "onDelete": "no action",
           "onUpdate": "no action"
         },
@@ -742,12 +706,8 @@
           "name": "driver_assignments_driver_id_users_id_fk",
           "tableFrom": "driver_assignments",
           "tableTo": "users",
-          "columnsFrom": [
-            "driver_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["driver_id"],
+          "columnsTo": ["id"],
           "onDelete": "no action",
           "onUpdate": "no action"
         }
@@ -856,12 +816,8 @@
           "name": "driver_heartbeats_booking_id_bookings_id_fk",
           "tableFrom": "driver_heartbeats",
           "tableTo": "bookings",
-          "columnsFrom": [
-            "booking_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["booking_id"],
+          "columnsTo": ["id"],
           "onDelete": "no action",
           "onUpdate": "no action"
         },
@@ -869,12 +825,8 @@
           "name": "driver_heartbeats_driver_id_users_id_fk",
           "tableFrom": "driver_heartbeats",
           "tableTo": "users",
-          "columnsFrom": [
-            "driver_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["driver_id"],
+          "columnsTo": ["id"],
           "onDelete": "no action",
           "onUpdate": "no action"
         }
@@ -967,12 +919,8 @@
           "name": "driver_location_points_booking_id_bookings_id_fk",
           "tableFrom": "driver_location_points",
           "tableTo": "bookings",
-          "columnsFrom": [
-            "booking_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["booking_id"],
+          "columnsTo": ["id"],
           "onDelete": "no action",
           "onUpdate": "no action"
         },
@@ -980,12 +928,8 @@
           "name": "driver_location_points_driver_id_users_id_fk",
           "tableFrom": "driver_location_points",
           "tableTo": "users",
-          "columnsFrom": [
-            "driver_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["driver_id"],
+          "columnsTo": ["id"],
           "onDelete": "no action",
           "onUpdate": "no action"
         }
@@ -1067,12 +1011,8 @@
           "name": "driver_presence_driver_id_users_id_fk",
           "tableFrom": "driver_presence",
           "tableTo": "users",
-          "columnsFrom": [
-            "driver_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["driver_id"],
+          "columnsTo": ["id"],
           "onDelete": "no action",
           "onUpdate": "no action"
         }
@@ -1143,12 +1083,8 @@
           "name": "driver_profiles_driver_id_users_id_fk",
           "tableFrom": "driver_profiles",
           "tableTo": "users",
-          "columnsFrom": [
-            "driver_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["driver_id"],
+          "columnsTo": ["id"],
           "onDelete": "no action",
           "onUpdate": "no action"
         }
@@ -1288,12 +1224,8 @@
           "name": "incidents_booking_id_bookings_id_fk",
           "tableFrom": "incidents",
           "tableTo": "bookings",
-          "columnsFrom": [
-            "booking_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["booking_id"],
+          "columnsTo": ["id"],
           "onDelete": "no action",
           "onUpdate": "no action"
         },
@@ -1301,12 +1233,8 @@
           "name": "incidents_reporter_id_users_id_fk",
           "tableFrom": "incidents",
           "tableTo": "users",
-          "columnsFrom": [
-            "reporter_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["reporter_id"],
+          "columnsTo": ["id"],
           "onDelete": "no action",
           "onUpdate": "no action"
         }
@@ -1354,9 +1282,7 @@
         "mile_rates_vehicle_class_unique": {
           "name": "mile_rates_vehicle_class_unique",
           "nullsNotDistinct": false,
-          "columns": [
-            "vehicle_class"
-          ]
+          "columns": ["vehicle_class"]
         }
       },
       "policies": {},
@@ -1405,12 +1331,8 @@
           "name": "notification_events_booking_id_bookings_id_fk",
           "tableFrom": "notification_events",
           "tableTo": "bookings",
-          "columnsFrom": [
-            "booking_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["booking_id"],
+          "columnsTo": ["id"],
           "onDelete": "no action",
           "onUpdate": "no action"
         },
@@ -1418,12 +1340,8 @@
           "name": "notification_events_user_id_users_id_fk",
           "tableFrom": "notification_events",
           "tableTo": "users",
-          "columnsFrom": [
-            "user_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["user_id"],
+          "columnsTo": ["id"],
           "onDelete": "no action",
           "onUpdate": "no action"
         }
@@ -1433,9 +1351,7 @@
         "notification_events_event_key_unique": {
           "name": "notification_events_event_key_unique",
           "nullsNotDistinct": false,
-          "columns": [
-            "event_key"
-          ]
+          "columns": ["event_key"]
         }
       },
       "policies": {},
@@ -1506,12 +1422,8 @@
           "name": "notification_subscriptions_user_id_users_id_fk",
           "tableFrom": "notification_subscriptions",
           "tableTo": "users",
-          "columnsFrom": [
-            "user_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["user_id"],
+          "columnsTo": ["id"],
           "onDelete": "no action",
           "onUpdate": "no action"
         }
@@ -1521,9 +1433,7 @@
         "notification_subscriptions_endpoint_unique": {
           "name": "notification_subscriptions_endpoint_unique",
           "nullsNotDistinct": false,
-          "columns": [
-            "endpoint"
-          ]
+          "columns": ["endpoint"]
         }
       },
       "policies": {},
@@ -1711,12 +1621,8 @@
           "name": "payments_booking_id_bookings_id_fk",
           "tableFrom": "payments",
           "tableTo": "bookings",
-          "columnsFrom": [
-            "booking_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["booking_id"],
+          "columnsTo": ["id"],
           "onDelete": "no action",
           "onUpdate": "no action"
         },
@@ -1724,12 +1630,8 @@
           "name": "payments_customer_id_users_id_fk",
           "tableFrom": "payments",
           "tableTo": "users",
-          "columnsFrom": [
-            "customer_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["customer_id"],
+          "columnsTo": ["id"],
           "onDelete": "no action",
           "onUpdate": "no action"
         }
@@ -1739,9 +1641,7 @@
         "payments_stripe_intent_id_unique": {
           "name": "payments_stripe_intent_id_unique",
           "nullsNotDistinct": false,
-          "columns": [
-            "stripe_intent_id"
-          ]
+          "columns": ["stripe_intent_id"]
         }
       },
       "policies": {},
@@ -1859,12 +1759,8 @@
           "name": "refunds_booking_id_bookings_id_fk",
           "tableFrom": "refunds",
           "tableTo": "bookings",
-          "columnsFrom": [
-            "booking_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["booking_id"],
+          "columnsTo": ["id"],
           "onDelete": "no action",
           "onUpdate": "no action"
         },
@@ -1872,12 +1768,8 @@
           "name": "refunds_payment_id_payments_id_fk",
           "tableFrom": "refunds",
           "tableTo": "payments",
-          "columnsFrom": [
-            "payment_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["payment_id"],
+          "columnsTo": ["id"],
           "onDelete": "no action",
           "onUpdate": "no action"
         },
@@ -1885,12 +1777,8 @@
           "name": "refunds_initiated_by_user_id_users_id_fk",
           "tableFrom": "refunds",
           "tableTo": "users",
-          "columnsFrom": [
-            "initiated_by_user_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["initiated_by_user_id"],
+          "columnsTo": ["id"],
           "onDelete": "no action",
           "onUpdate": "no action"
         }
@@ -1900,9 +1788,7 @@
         "refunds_stripe_refund_id_unique": {
           "name": "refunds_stripe_refund_id_unique",
           "nullsNotDistinct": false,
-          "columns": [
-            "stripe_refund_id"
-          ]
+          "columns": ["stripe_refund_id"]
         }
       },
       "policies": {},
@@ -2000,12 +1886,8 @@
           "name": "reviews_booking_id_bookings_id_fk",
           "tableFrom": "reviews",
           "tableTo": "bookings",
-          "columnsFrom": [
-            "booking_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["booking_id"],
+          "columnsTo": ["id"],
           "onDelete": "no action",
           "onUpdate": "no action"
         },
@@ -2013,12 +1895,8 @@
           "name": "reviews_customer_id_users_id_fk",
           "tableFrom": "reviews",
           "tableTo": "users",
-          "columnsFrom": [
-            "customer_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["customer_id"],
+          "columnsTo": ["id"],
           "onDelete": "no action",
           "onUpdate": "no action"
         },
@@ -2026,12 +1904,8 @@
           "name": "reviews_driver_id_users_id_fk",
           "tableFrom": "reviews",
           "tableTo": "users",
-          "columnsFrom": [
-            "driver_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["driver_id"],
+          "columnsTo": ["id"],
           "onDelete": "no action",
           "onUpdate": "no action"
         }
@@ -2208,16 +2082,12 @@
         "users_email_unique": {
           "name": "users_email_unique",
           "nullsNotDistinct": false,
-          "columns": [
-            "email"
-          ]
+          "columns": ["email"]
         },
         "users_stripe_customer_id_unique": {
           "name": "users_stripe_customer_id_unique",
           "nullsNotDistinct": false,
-          "columns": [
-            "stripe_customer_id"
-          ]
+          "columns": ["stripe_customer_id"]
         }
       },
       "policies": {},
@@ -2279,9 +2149,7 @@
         "vehicles_class_unique": {
           "name": "vehicles_class_unique",
           "nullsNotDistinct": false,
-          "columns": [
-            "class"
-          ]
+          "columns": ["class"]
         }
       },
       "policies": {},
@@ -2424,12 +2292,8 @@
           "name": "zone_pricing_from_zone_id_zones_id_fk",
           "tableFrom": "zone_pricing",
           "tableTo": "zones",
-          "columnsFrom": [
-            "from_zone_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["from_zone_id"],
+          "columnsTo": ["id"],
           "onDelete": "no action",
           "onUpdate": "no action"
         },
@@ -2437,12 +2301,8 @@
           "name": "zone_pricing_to_zone_id_zones_id_fk",
           "tableFrom": "zone_pricing",
           "tableTo": "zones",
-          "columnsFrom": [
-            "to_zone_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["to_zone_id"],
+          "columnsTo": ["id"],
           "onDelete": "no action",
           "onUpdate": "no action"
         }
@@ -2501,9 +2361,7 @@
         "zones_name_unique": {
           "name": "zones_name_unique",
           "nullsNotDistinct": false,
-          "columns": [
-            "name"
-          ]
+          "columns": ["name"]
         }
       },
       "policies": {},
@@ -2528,26 +2386,17 @@
     "public.discount_type": {
       "name": "discount_type",
       "schema": "public",
-      "values": [
-        "fixed",
-        "percentage"
-      ]
+      "values": ["fixed", "percentage"]
     },
     "public.driver_assignment_role": {
       "name": "driver_assignment_role",
       "schema": "public",
-      "values": [
-        "primary",
-        "backup"
-      ]
+      "values": ["primary", "backup"]
     },
     "public.payment_intent_type": {
       "name": "payment_intent_type",
       "schema": "public",
-      "values": [
-        "payment_intent",
-        "setup_intent"
-      ]
+      "values": ["payment_intent", "setup_intent"]
     },
     "public.payment_status": {
       "name": "payment_status",
@@ -2582,20 +2431,12 @@
     "public.user_role": {
       "name": "user_role",
       "schema": "public",
-      "values": [
-        "customer",
-        "admin",
-        "driver"
-      ]
+      "values": ["customer", "admin", "driver"]
     },
     "public.vehicle_class": {
       "name": "vehicle_class",
       "schema": "public",
-      "values": [
-        "regular",
-        "comfort",
-        "max"
-      ]
+      "values": ["regular", "comfort", "max"]
     }
   },
   "schemas": {},

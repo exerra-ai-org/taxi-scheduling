@@ -801,8 +801,8 @@ export default function CustomerRideDetail() {
                     {booking.amountRefundedPence > 0 &&
                       booking.amountCapturedPence > 0 && (
                         <p className="caption-copy text-[var(--color-mid)]">
-                          Refunds typically take 5–10 business days to appear
-                          on your statement.
+                          Refunds typically take 5–10 business days to appear on
+                          your statement.
                         </p>
                       )}
                   </div>

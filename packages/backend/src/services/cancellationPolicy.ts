@@ -81,7 +81,8 @@ export function decideCancellation(input: DecideInput): CancellationDecision {
   // Inside the partial window — keep configured percentage.
   if (hoursUntilPickup >= config.payments.partialRefundHours) {
     const feePence = Math.round(
-      (input.amountAuthorizedPence * config.payments.partialCancellationPercent) /
+      (input.amountAuthorizedPence *
+        config.payments.partialCancellationPercent) /
         100,
     );
     return {

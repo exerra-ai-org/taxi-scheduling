@@ -61,9 +61,7 @@ const HANDLERS: Record<string, WebhookHandler> = {
   "charge.dispute.updated": logOnly("charge.dispute.updated"),
   "charge.dispute.closed": logOnly("charge.dispute.closed"),
   "charge.dispute.funds_withdrawn": logOnly("charge.dispute.funds_withdrawn"),
-  "charge.dispute.funds_reinstated": logOnly(
-    "charge.dispute.funds_reinstated",
-  ),
+  "charge.dispute.funds_reinstated": logOnly("charge.dispute.funds_reinstated"),
 
   // ── Payment Methods (phase 8) ──
   "payment_method.attached": logOnly("payment_method.attached"),
@@ -75,8 +73,7 @@ function logOnly(label: string): WebhookHandler {
     log.info("stripe.webhook.handled", {
       type: label,
       eventId: event.id,
-      objectId:
-        (event.data?.object as { id?: string } | undefined)?.id ?? null,
+      objectId: (event.data?.object as { id?: string } | undefined)?.id ?? null,
       stub: true,
     });
   };
@@ -207,9 +204,12 @@ async function handleCaptured(event: Stripe.Event, log: Logger) {
   const refs = readBookingMeta(intent, log);
   if (!refs) return;
 
-  const charge = (intent as Stripe.PaymentIntent & { latest_charge?: string | Stripe.Charge | null }).latest_charge;
-  const chargeId =
-    typeof charge === "string" ? charge : (charge?.id ?? null);
+  const charge = (
+    intent as Stripe.PaymentIntent & {
+      latest_charge?: string | Stripe.Charge | null;
+    }
+  ).latest_charge;
+  const chargeId = typeof charge === "string" ? charge : (charge?.id ?? null);
   const capturedPence = intent.amount_received ?? intent.amount;
 
   await db.transaction(async (tx) => {
@@ -325,7 +325,11 @@ async function handleChargeRefunded(event: Stripe.Event, log: Logger) {
   }
 
   const [paymentRow] = await db
-    .select({ id: payments.id, bookingId: payments.bookingId, customerId: payments.customerId })
+    .select({
+      id: payments.id,
+      bookingId: payments.bookingId,
+      customerId: payments.customerId,
+    })
     .from(payments)
     .where(eq(payments.stripeIntentId, intentId))
     .limit(1);

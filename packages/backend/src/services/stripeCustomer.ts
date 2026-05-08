@@ -95,9 +95,7 @@ export async function syncStripeCustomer(
     await stripe.customers.update(user.stripeCustomerId, {
       ...(updates.email !== undefined ? { email: updates.email } : {}),
       ...(updates.name !== undefined ? { name: updates.name } : {}),
-      ...(updates.phone !== undefined
-        ? { phone: updates.phone ?? "" }
-        : {}),
+      ...(updates.phone !== undefined ? { phone: updates.phone ?? "" } : {}),
     });
   } catch (cause) {
     logger.warn("stripe.customer.sync_failed", {
