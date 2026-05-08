@@ -17,7 +17,7 @@
  * this with the SetupIntent + off-session re-auth path.
  */
 
-import { eq } from "drizzle-orm";
+import { eq, sum } from "drizzle-orm";
 import { db } from "../db/index";
 import { bookings, payments, refunds, users } from "../db/schema";
 import { config } from "../config";
@@ -32,6 +32,7 @@ import {
   type CancellationDecision,
 } from "./cancellationPolicy";
 import { logger } from "../lib/logger";
+import { broadcastBookingEvent } from "./broadcaster";
 import type { BookingStatus } from "shared/types";
 
 export class PaymentError extends Error {
@@ -632,36 +633,94 @@ export async function refundBookingPayment(input: {
     throw new PaymentError(classified.message, classified.code, 502);
   }
 
-  // Persist a pending refunds row. The webhook handler is the single
-  // writer for the terminal status + `bookings.amountRefundedPence` —
-  // it uses onConflictDoNothing so this insert is safe even if the
-  // webhook beats us to it.
-  await db
-    .insert(refunds)
-    .values({
-      bookingId: input.bookingId,
-      paymentId: payment.id,
-      stripeRefundId: refund.id,
-      amountPence: refund.amount ?? requested,
-      reason: input.reason,
-      adminNote: input.adminNote,
-      initiatedByUserId: input.initiatedByUserId,
-      status: refund.status ?? "pending",
-    })
-    .onConflictDoNothing({ target: refunds.stripeRefundId });
+  // Persist refunds row + project totals onto the booking in a single
+  // transaction.
+  //
+  // The `charge.refunded` webhook is still the canonical reconciler, but
+  // applying the projection here means:
+  //   - the UI flips to Refunded immediately (webhook latency / loss
+  //     no longer leaves the dispatcher staring at a stale "Paid" pill),
+  //   - a missing or mis-configured webhook subscription doesn't strand
+  //     the booking in an inconsistent state.
+  //
+  // Both writers (this path + the webhook) are idempotent because:
+  //   - refunds.stripeRefundId is UNIQUE (onConflictDoNothing),
+  //   - amountRefundedPence is recomputed from the refunds table, not
+  //     incremented, so re-running yields the same value.
+  const refundAmount = refund.amount ?? requested;
+  const refundStatus = refund.status ?? "pending";
+
+  await db.transaction(async (tx) => {
+    await tx
+      .insert(refunds)
+      .values({
+        bookingId: input.bookingId,
+        paymentId: payment.id,
+        stripeRefundId: refund.id,
+        amountPence: refundAmount,
+        reason: input.reason,
+        adminNote: input.adminNote,
+        initiatedByUserId: input.initiatedByUserId,
+        status: refundStatus,
+      })
+      .onConflictDoNothing({ target: refunds.stripeRefundId });
+
+    // Sum of all non-failed refund amounts for this booking. We exclude
+    // `failed`/`canceled` to avoid letting a Stripe rejection inflate the
+    // refunded total.
+    // Treat anything Stripe hasn't outright failed as outstanding.
+    // `pending` refunds will become `succeeded` via the webhook. If they
+    // fail, the webhook handler rolls the projection back to `captured`.
+    const [totals] = await tx
+      .select({ succeededPence: sum(refunds.amountPence) })
+      .from(refunds)
+      .where(eq(refunds.bookingId, input.bookingId));
+
+    const totalRefundedPence = Number(totals?.succeededPence ?? 0);
+    const newPaymentStatus =
+      totalRefundedPence >= booking.amountCapturedPence
+        ? "refunded"
+        : totalRefundedPence > 0
+          ? "partially_refunded"
+          : booking.paymentStatus;
+
+    await tx
+      .update(bookings)
+      .set({
+        amountRefundedPence: totalRefundedPence,
+        paymentStatus: newPaymentStatus,
+      })
+      .where(eq(bookings.id, input.bookingId));
+
+    await tx
+      .update(payments)
+      .set({ status: newPaymentStatus, updatedAt: new Date() })
+      .where(eq(payments.id, payment.id));
+  });
+
+  // Push the new state to any open customer / admin tabs without waiting
+  // for the (possibly missing) webhook. The webhook still fires the same
+  // event later — clients de-dupe via React state on bookingId, so a
+  // second emit is a harmless no-op.
+  broadcastBookingEvent([booking.customerId], {
+    type: "payment_status_changed",
+    bookingId: input.bookingId,
+    paymentStatus:
+      refundAmount >= refundable ? "refunded" : "partially_refunded",
+  });
 
   logger.info("payments.refund_created", {
     bookingId: input.bookingId,
     refundId: refund.id,
-    amountPence: requested,
+    amountPence: refundAmount,
     reason: input.reason,
     initiatedByUserId: input.initiatedByUserId,
   });
 
   return {
     refundId: refund.id,
-    amountPence: refund.amount ?? requested,
-    status: refund.status ?? "pending",
-    remainingRefundablePence: refundable - requested,
+    amountPence: refundAmount,
+    status: refundStatus,
+    remainingRefundablePence: refundable - refundAmount,
   };
 }
