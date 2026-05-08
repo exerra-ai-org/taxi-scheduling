@@ -167,8 +167,11 @@ export async function createPaymentIntentForBooking(
         currency: config.stripe.currency,
         customer: stripeCustomerId,
         capture_method: "manual",
-        // Lets the Payment Element offer Apple Pay / Google Pay / Link.
-        automatic_payment_methods: { enabled: true },
+        // Card-only for now. To re-enable wallets (Apple Pay, Google
+        // Pay, Link) and other methods, swap this back to
+        // `automatic_payment_methods: { enabled: true }` and toggle the
+        // ones you want in Stripe Dashboard → Settings → Payment methods.
+        payment_method_types: ["card"],
         metadata: {
           bookingId: String(bookingId),
           customerId: String(booking.customerId),
