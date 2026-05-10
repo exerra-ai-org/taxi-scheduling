@@ -176,9 +176,7 @@ function VehicleCard({
         </div>
       )}
 
-      {s.error && (
-        <div className="alert alert-error text-sm">{s.error}</div>
-      )}
+      {s.error && <div className="alert alert-error text-sm">{s.error}</div>}
 
       <button
         onClick={handleSave}

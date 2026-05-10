@@ -108,8 +108,11 @@ function MapController({
 
 export default function LandingMap({ data, onNext }: Props) {
   const formRef = useRef<HTMLFormElement>(null);
-  const { handleRef, isOpen: sheetOpen, setIsOpen: setSheetOpen } =
-    useBottomSheet(formRef);
+  const {
+    handleRef,
+    isOpen: sheetOpen,
+    setIsOpen: setSheetOpen,
+  } = useBottomSheet(formRef);
   const [pickup, setPickup] = useState(data.pickupAddress || "");
   const [pickupLat, setPickupLat] = useState<number | undefined>(
     data.pickupLat,
@@ -304,108 +307,108 @@ export default function LandingMap({ data, onNext }: Props) {
           <div className="sheet-handle-pill" />
         </div>
         <div className="space-y-5 p-6">
-        <div>
-          <p className="section-label">New Booking</p>
-          <h1 className="mt-4 text-[40px] font-bold leading-none tracking-[-0.04em] text-[var(--color-dark)]">
-            Book your ride
-          </h1>
-          <p className="caption-copy mt-2">
-            Enter your locations or click on the map
-          </p>
-        </div>
-
-        <div>
-          <label className="field-label mb-2 block">Pickup</label>
-          <div className="relative">
-            <AddressAutocomplete
-              value={pickup}
-              onChange={(addr, coords) => {
-                setPickup(addr);
-                setPickupLat(coords?.lat);
-                setPickupLon(coords?.lon);
-              }}
-              required
-              placeholder="e.g. Heathrow Airport"
-              className="input-glass w-full pr-12"
-            />
-            <button
-              type="button"
-              onClick={() =>
-                setActiveField(activeField === "pickup" ? null : "pickup")
-              }
-              title="Pick on map"
-              className={`icon-chip absolute right-2 top-1/2 -translate-y-1/2 ${activeField === "pickup" ? "icon-chip-active" : ""}`}
-            >
-              <IconMapPin className="w-4 h-4" />
-            </button>
-          </div>
-        </div>
-
-        <div>
-          <label className="field-label mb-2 block">Drop-off</label>
-          <div className="relative">
-            <AddressAutocomplete
-              value={dropoff}
-              onChange={(addr, coords) => {
-                setDropoff(addr);
-                setDropoffLat(coords?.lat);
-                setDropoffLon(coords?.lon);
-              }}
-              required
-              placeholder="e.g. Central London"
-              className="input-glass w-full pr-12"
-            />
-            <button
-              type="button"
-              onClick={() =>
-                setActiveField(activeField === "dropoff" ? null : "dropoff")
-              }
-              title="Pick on map"
-              className={`icon-chip absolute right-2 top-1/2 -translate-y-1/2 ${activeField === "dropoff" ? "icon-chip-active" : ""}`}
-            >
-              <IconMapPin className="w-4 h-4" />
-            </button>
-          </div>
-        </div>
-
-        {activeField && (
-          <div className="alert alert-info flex items-center gap-2 animate-fade-in">
-            <IconMapPin className="w-4 h-4 shrink-0" />
-            Click the map to set your{" "}
-            {activeField === "pickup" ? "pickup" : "drop-off"}
-          </div>
-        )}
-
-        <div className="grid grid-cols-2 gap-3">
           <div>
-            <label className="field-label mb-2 block">Date</label>
-            <input
-              type="date"
-              value={date}
-              onChange={(e) => setDate(e.target.value)}
-              required
-              min={today}
-              className="input-glass"
-            />
+            <p className="section-label">New Booking</p>
+            <h1 className="mt-4 text-[40px] font-bold leading-none tracking-[-0.04em] text-[var(--color-dark)]">
+              Book your ride
+            </h1>
+            <p className="caption-copy mt-2">
+              Enter your locations or click on the map
+            </p>
           </div>
-          <div>
-            <label className="field-label mb-2 block">Time</label>
-            <input
-              type="time"
-              value={time}
-              onChange={(e) => setTime(e.target.value)}
-              required
-              className="input-glass"
-            />
-          </div>
-        </div>
 
-        <button type="submit" className="btn-primary w-full">
-          <span>Get Quote</span>
-          <span className="btn-icon">
-            <span className="btn-icon-glyph">↗</span>
-          </span>
-        </button>
+          <div>
+            <label className="field-label mb-2 block">Pickup</label>
+            <div className="relative">
+              <AddressAutocomplete
+                value={pickup}
+                onChange={(addr, coords) => {
+                  setPickup(addr);
+                  setPickupLat(coords?.lat);
+                  setPickupLon(coords?.lon);
+                }}
+                required
+                placeholder="e.g. Heathrow Airport"
+                className="input-glass w-full pr-12"
+              />
+              <button
+                type="button"
+                onClick={() =>
+                  setActiveField(activeField === "pickup" ? null : "pickup")
+                }
+                title="Pick on map"
+                className={`icon-chip absolute right-2 top-1/2 -translate-y-1/2 ${activeField === "pickup" ? "icon-chip-active" : ""}`}
+              >
+                <IconMapPin className="w-4 h-4" />
+              </button>
+            </div>
+          </div>
+
+          <div>
+            <label className="field-label mb-2 block">Drop-off</label>
+            <div className="relative">
+              <AddressAutocomplete
+                value={dropoff}
+                onChange={(addr, coords) => {
+                  setDropoff(addr);
+                  setDropoffLat(coords?.lat);
+                  setDropoffLon(coords?.lon);
+                }}
+                required
+                placeholder="e.g. Central London"
+                className="input-glass w-full pr-12"
+              />
+              <button
+                type="button"
+                onClick={() =>
+                  setActiveField(activeField === "dropoff" ? null : "dropoff")
+                }
+                title="Pick on map"
+                className={`icon-chip absolute right-2 top-1/2 -translate-y-1/2 ${activeField === "dropoff" ? "icon-chip-active" : ""}`}
+              >
+                <IconMapPin className="w-4 h-4" />
+              </button>
+            </div>
+          </div>
+
+          {activeField && (
+            <div className="alert alert-info flex items-center gap-2 animate-fade-in">
+              <IconMapPin className="w-4 h-4 shrink-0" />
+              Click the map to set your{" "}
+              {activeField === "pickup" ? "pickup" : "drop-off"}
+            </div>
+          )}
+
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="field-label mb-2 block">Date</label>
+              <input
+                type="date"
+                value={date}
+                onChange={(e) => setDate(e.target.value)}
+                required
+                min={today}
+                className="input-glass"
+              />
+            </div>
+            <div>
+              <label className="field-label mb-2 block">Time</label>
+              <input
+                type="time"
+                value={time}
+                onChange={(e) => setTime(e.target.value)}
+                required
+                className="input-glass"
+              />
+            </div>
+          </div>
+
+          <button type="submit" className="btn-primary w-full">
+            <span>Get Quote</span>
+            <span className="btn-icon">
+              <span className="btn-icon-glyph">↗</span>
+            </span>
+          </button>
         </div>
       </form>
     </div>

@@ -138,7 +138,6 @@ export function RideDetailSkeleton() {
         </div>
       </section>
 
-
       {/* Details */}
       <section>
         <div className="skeleton h-3 w-16 mb-2" />

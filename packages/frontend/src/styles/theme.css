@@ -2432,7 +2432,6 @@
   box-shadow: 0 8px 18px rgb(152 254 0 / 0.22);
 }
 
-
 .ride-detail-grid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));

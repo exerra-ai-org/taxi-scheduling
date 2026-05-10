@@ -73,7 +73,10 @@ ReactDOM.createRoot(document.getElementById("root")!).render(
                   <Route path="/admin/live-map" element={<LiveDriversMap />} />
                   <Route path="/admin/coupons" element={<CouponManagement />} />
                   <Route path="/admin/incidents" element={<IncidentInbox />} />
-                  <Route path="/admin/vehicles" element={<VehicleManagement />} />
+                  <Route
+                    path="/admin/vehicles"
+                    element={<VehicleManagement />}
+                  />
                   <Route path="/admin/profile" element={<ProfilePage />} />
                 </Route>
 

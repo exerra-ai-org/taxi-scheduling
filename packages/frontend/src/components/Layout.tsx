@@ -231,8 +231,16 @@ export default function Layout() {
       {!user && (
         <nav className="fixed inset-x-0 bottom-0 z-40 border-t border-[var(--color-border)] bg-[rgb(249_249_249_/_0.96)] backdrop-blur md:hidden safe-area-inset-bottom">
           <div className="flex items-center justify-around px-2 py-2">
-            <NavItem to="/about" icon={<IconMapPin className="w-5 h-5" />} label="About" />
-            <NavItem to="/login" icon={<IconUser className="w-5 h-5" />} label="Sign in" />
+            <NavItem
+              to="/about"
+              icon={<IconMapPin className="w-5 h-5" />}
+              label="About"
+            />
+            <NavItem
+              to="/login"
+              icon={<IconUser className="w-5 h-5" />}
+              label="Sign in"
+            />
           </div>
         </nav>
       )}

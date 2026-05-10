@@ -3,7 +3,13 @@ import { Link } from "react-router-dom";
 
 function BrandStar({ size = 18 }: { size?: number }) {
   return (
-    <svg width={size} height={size} viewBox="0 0 16 16" fill="currentColor" aria-hidden="true">
+    <svg
+      width={size}
+      height={size}
+      viewBox="0 0 16 16"
+      fill="currentColor"
+      aria-hidden="true"
+    >
       <path d="M8 0 L10.5 5.5 L16 8 L10.5 10.5 L8 16 L5.5 10.5 L0 8 L5.5 5.5 Z" />
     </svg>
   );
@@ -177,7 +183,11 @@ export default function About() {
           if (!hTrack || !hSection) return;
 
           gsap.set(hTrack, { display: "flex", width: "300vw" });
-          gsap.set(".h-panel", { flexShrink: 0, width: "100vw", height: "100vh" });
+          gsap.set(".h-panel", {
+            flexShrink: 0,
+            width: "100vw",
+            height: "100vh",
+          });
 
           const scrollDist = () => hTrack.scrollWidth - window.innerWidth;
 
@@ -206,7 +216,6 @@ export default function About() {
 
   return (
     <div ref={rootRef} className="about-page">
-
       {/* ── 1. HERO ── */}
       <section
         className="about-hero relative flex h-screen items-end overflow-hidden"
@@ -244,7 +253,10 @@ export default function About() {
               style={{ fontSize: "clamp(52px, 9vw, 120px)", color: SURFACE }}
             >
               {["Every", "journey,", "handled."].map((w) => (
-                <span key={w} className="hero-word mr-[0.18em] inline-block last:mr-0">
+                <span
+                  key={w}
+                  className="hero-word mr-[0.18em] inline-block last:mr-0"
+                >
                   {w}
                 </span>
               ))}
@@ -274,26 +286,49 @@ export default function About() {
       >
         <p
           className="font-bold leading-[1.1] tracking-[-0.035em]"
-          style={{ fontSize: "clamp(26px, 4vw, 58px)", color: INK, maxWidth: "18em" }}
+          style={{
+            fontSize: "clamp(26px, 4vw, 58px)",
+            color: INK,
+            maxWidth: "18em",
+          }}
           aria-label={`${MANIFESTO_PLAIN} ${MANIFESTO_LIME}`}
         >
           {/* Plain segment — words wrapped in nowrap so browser only breaks at spaces */}
           {MANIFESTO_PLAIN.split(" ").map((word, wi) => (
-            <span key={wi} style={{ display: "inline-block", whiteSpace: "nowrap" }}>
+            <span
+              key={wi}
+              style={{ display: "inline-block", whiteSpace: "nowrap" }}
+            >
               {word.split("").map((char, ci) => (
-                <span key={ci} className="m-char" style={{ display: "inline-block" }}>
+                <span
+                  key={ci}
+                  className="m-char"
+                  style={{ display: "inline-block" }}
+                >
                   {char}
                 </span>
               ))}
               {/* Space after word — sits outside the nowrap wrapper so line-wrap can happen here */}
-              <span className="m-char" style={{ display: "inline-block" }}>&nbsp;</span>
+              <span className="m-char" style={{ display: "inline-block" }}>
+                &nbsp;
+              </span>
             </span>
           ))}
           {/* Lime segment on its own line — force break then nowrap the whole phrase */}
           <br />
-          <span style={{ display: "inline-block", whiteSpace: "nowrap", color: LIME }}>
+          <span
+            style={{
+              display: "inline-block",
+              whiteSpace: "nowrap",
+              color: LIME,
+            }}
+          >
             {MANIFESTO_LIME.split("").map((char, i) => (
-              <span key={i} className="m-char" style={{ display: "inline-block" }}>
+              <span
+                key={i}
+                className="m-char"
+                style={{ display: "inline-block" }}
+              >
                 {char}
               </span>
             ))}
@@ -308,23 +343,32 @@ export default function About() {
       >
         <div className="mx-auto grid max-w-6xl grid-cols-1 items-center gap-12 md:grid-cols-2 md:gap-20">
           <div className="story-text space-y-6">
-            <p className="mono-label" style={{ color: MUTED }}>/ Our story</p>
+            <p className="mono-label" style={{ color: MUTED }}>
+              / Our story
+            </p>
             <h2
               className="font-bold leading-[1.05] tracking-[-0.035em]"
               style={{ fontSize: "clamp(28px, 3vw, 44px)", color: INK }}
             >
               Built on the belief that reliable isn't a luxury.
             </h2>
-            <p className="text-[17px] leading-[1.7]" style={{ color: MID, maxWidth: "52ch" }}>
+            <p
+              className="text-[17px] leading-[1.7]"
+              style={{ color: MID, maxWidth: "52ch" }}
+            >
               LondonTaxi started with a straightforward observation: business
-              travellers and families booking airport transfers were being let down by
-              services that treated reliability as optional. We started small, local, and
-              deliberate. Every driver vetted. Every vehicle maintained. Every booking
-              personally tracked.
+              travellers and families booking airport transfers were being let
+              down by services that treated reliability as optional. We started
+              small, local, and deliberate. Every driver vetted. Every vehicle
+              maintained. Every booking personally tracked.
             </p>
-            <p className="text-[17px] leading-[1.7]" style={{ color: MID, maxWidth: "52ch" }}>
-              That hasn't changed. What's changed is the technology behind it, the team
-              operating it, and the number of people who depend on us when it counts.
+            <p
+              className="text-[17px] leading-[1.7]"
+              style={{ color: MID, maxWidth: "52ch" }}
+            >
+              That hasn't changed. What's changed is the technology behind it,
+              the team operating it, and the number of people who depend on us
+              when it counts.
             </p>
           </div>
 
@@ -363,7 +407,10 @@ export default function About() {
                 </p>
                 <h2
                   className="font-bold leading-[1.05] tracking-[-0.03em]"
-                  style={{ fontSize: "clamp(28px, 3.5vw, 48px)", color: SURFACE }}
+                  style={{
+                    fontSize: "clamp(28px, 3.5vw, 48px)",
+                    color: SURFACE,
+                  }}
                 >
                   {panel.label}
                 </h2>
@@ -393,15 +440,21 @@ export default function About() {
         />
         <div
           className="absolute inset-0"
-          style={{ background: `linear-gradient(to top, ${INK}dd 0%, transparent 60%)` }}
+          style={{
+            background: `linear-gradient(to top, ${INK}dd 0%, transparent 60%)`,
+          }}
         />
         <div className="relative z-10 px-8 pb-14 md:px-20 md:pb-20">
-          <p className="mono-label mb-4" style={{ color: LIME }}>/ The fleet</p>
+          <p className="mono-label mb-4" style={{ color: LIME }}>
+            / The fleet
+          </p>
           <h2
             className="font-bold leading-[0.95] tracking-[-0.04em]"
             style={{ fontSize: "clamp(36px, 5.5vw, 72px)", color: SURFACE }}
           >
-            One standard.<br />No exceptions.
+            One standard.
+            <br />
+            No exceptions.
           </h2>
         </div>
       </section>
@@ -411,7 +464,9 @@ export default function About() {
         className="about-numbers px-8 py-32 md:px-20 md:py-52"
         style={{ background: SURFACE }}
       >
-        <p className="mono-label mb-14" style={{ color: MUTED }}>/ By the numbers</p>
+        <p className="mono-label mb-14" style={{ color: MUTED }}>
+          / By the numbers
+        </p>
         <div className="space-y-1">
           {STATS.map((line, i) => (
             <p
@@ -435,12 +490,16 @@ export default function About() {
       >
         <div className="cta-content flex flex-col items-start gap-10">
           <div>
-            <p className="mono-label mb-5" style={{ color: "#ffffff30" }}>/ Start here</p>
+            <p className="mono-label mb-5" style={{ color: "#ffffff30" }}>
+              / Start here
+            </p>
             <h2
               className="font-bold leading-[0.95] tracking-[-0.04em]"
               style={{ fontSize: "clamp(40px, 7vw, 96px)", color: SURFACE }}
             >
-              Ready when<br />you are.
+              Ready when
+              <br />
+              you are.
             </h2>
           </div>
           <Link to="/book" className="btn-green">

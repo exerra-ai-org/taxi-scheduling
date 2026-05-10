@@ -197,8 +197,11 @@ export default function BookingFlow() {
 
   // Measure panel size for map fit padding (so the route never sits under the panel)
   const panelRef = useRef<HTMLDivElement>(null);
-  const { handleRef, isOpen: sheetOpen, setIsOpen: setSheetOpen } =
-    useBottomSheet(panelRef);
+  const {
+    handleRef,
+    isOpen: sheetOpen,
+    setIsOpen: setSheetOpen,
+  } = useBottomSheet(panelRef);
 
   // Auto-open the sheet when advancing beyond step 1 on mobile.
   const didMountRef = useRef(false);
@@ -288,7 +291,9 @@ export default function BookingFlow() {
         ref={panelRef}
         className={`floating-panel booking-flow-panel${sheetOpen ? " sheet-open" : ""}`}
         data-anchor={step === 1 ? "center" : "right"}
-        style={isDesktop && contentHeight ? { height: contentHeight } : undefined}
+        style={
+          isDesktop && contentHeight ? { height: contentHeight } : undefined
+        }
       >
         <div
           ref={handleRef}
