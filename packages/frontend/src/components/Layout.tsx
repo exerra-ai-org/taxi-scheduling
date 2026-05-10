@@ -18,19 +18,27 @@ import {
   IconMapPin,
 } from "./icons";
 
-/**
- * Brand: a dark monogram chip with a lime "TC" + a tightly-tracked wordmark.
- * The chip mirrors the P/D markers used in the route block (same dark square,
- * same Roboto Mono letterform), so the brand feels native to the product
- * rather than glued on top.
- */
+function BrandStar({ size = 16 }: { size?: number }) {
+  return (
+    <svg
+      width={size}
+      height={size}
+      viewBox="0 0 16 16"
+      fill="currentColor"
+      aria-hidden="true"
+    >
+      <path d="M8 0 L10.5 5.5 L16 8 L10.5 10.5 L8 16 L5.5 10.5 L0 8 L5.5 5.5 Z" />
+    </svg>
+  );
+}
+
 function Brand() {
   return (
-    <Link to="/" className="brand-link" aria-label="London Luton Taxi, home">
+    <Link to="/" className="brand-link" aria-label="LondonTaxi, home">
       <span className="brand-mark" aria-hidden="true">
-        TC
+        <BrandStar />
       </span>
-      <span className="brand-wordmark hidden sm:inline">London Luton Taxi</span>
+      <span className="brand-wordmark hidden sm:inline">LondonTaxi</span>
     </Link>
   );
 }

@@ -1,5 +1,13 @@
 import { useLayoutEffect, useRef } from "react";
 import { Link } from "react-router-dom";
+
+function BrandStar({ size = 18 }: { size?: number }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 16 16" fill="currentColor" aria-hidden="true">
+      <path d="M8 0 L10.5 5.5 L16 8 L10.5 10.5 L8 16 L5.5 10.5 L0 8 L5.5 5.5 Z" />
+    </svg>
+  );
+}
 import gsap from "gsap";
 import { ScrollTrigger } from "gsap/ScrollTrigger";
 
@@ -225,9 +233,11 @@ export default function About() {
 
         <div className="relative z-10 w-full px-8 pb-16 md:px-20 md:pb-24">
           <div className="max-w-5xl">
-            <span className="brand-mark mb-8 block w-fit" aria-hidden="true">TC</span>
+            <span className="brand-mark mb-8 block w-fit" aria-hidden="true">
+              <BrandStar />
+            </span>
             <p className="mono-label mb-5" style={{ color: MUTED }}>
-              LONDON LUTON TAXI
+              LONDONTAXI
             </p>
             <h1
               className="font-bold leading-[0.9] tracking-[-0.04em]"
@@ -243,7 +253,7 @@ export default function About() {
               className="mt-7 max-w-sm text-[17px] font-medium leading-[1.6] tracking-[-0.01em]"
               style={{ color: MUTED }}
             >
-              Premium transfers across the UK, dispatched from Luton Airport.
+              Premium transfers across the UK.
             </p>
           </div>
         </div>
@@ -306,7 +316,7 @@ export default function About() {
               Built on the belief that reliable isn't a luxury.
             </h2>
             <p className="text-[17px] leading-[1.7]" style={{ color: MID, maxWidth: "52ch" }}>
-              London Luton Taxi started with a straightforward observation: business
+              LondonTaxi started with a straightforward observation: business
               travellers and families booking airport transfers were being let down by
               services that treated reliability as optional. We started small, local, and
               deliberate. Every driver vetted. Every vehicle maintained. Every booking
