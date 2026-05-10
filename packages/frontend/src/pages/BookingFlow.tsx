@@ -20,6 +20,7 @@ import Confirmation from "./booking-steps/Confirmation";
 import PaymentStep from "./booking-steps/PaymentStep";
 import type { BookingPaymentInit } from "../api/bookings";
 import type { VehicleClass } from "shared/types";
+import { useBottomSheet } from "../hooks/useBottomSheet";
 
 export interface BookingData {
   pickupAddress: string;
@@ -190,8 +191,25 @@ export default function BookingFlow() {
       ? { lat: data.dropoffLat, lon: data.dropoffLon }
       : null;
 
+  const isDesktop =
+    typeof window !== "undefined" &&
+    window.matchMedia("(min-width: 810px)").matches;
+
   // Measure panel size for map fit padding (so the route never sits under the panel)
   const panelRef = useRef<HTMLDivElement>(null);
+  const { handleRef, isOpen: sheetOpen, setIsOpen: setSheetOpen } =
+    useBottomSheet(panelRef);
+
+  // Auto-open the sheet when advancing beyond step 1 on mobile.
+  const didMountRef = useRef(false);
+  useEffect(() => {
+    if (!didMountRef.current) {
+      didMountRef.current = true;
+      return;
+    }
+    if (!isDesktop) setSheetOpen(true);
+  }, [step]); // eslint-disable-line react-hooks/exhaustive-deps
+
   const [panelSize, setPanelSize] = useState({ width: 0, height: 0 });
   useEffect(() => {
     if (!panelRef.current) return;
@@ -233,12 +251,6 @@ export default function BookingFlow() {
       setContentHeight(contentRef.current.scrollHeight);
     }
   }, [step]);
-
-  // Reserve right-edge padding on desktop (panel sits right or center) and
-  // bottom padding on mobile (panel docks as a bottom sheet).
-  const isDesktop =
-    typeof window !== "undefined" &&
-    window.matchMedia("(min-width: 810px)").matches;
   const obstruct = isDesktop
     ? { top: 80, left: 60, right: panelSize.width + 48, bottom: 60 }
     : { top: 60, left: 40, right: 40, bottom: panelSize.height + 32 };
@@ -274,14 +286,24 @@ export default function BookingFlow() {
           morphs height as steps change (height tracks the inner wrapper). */}
       <div
         ref={panelRef}
-        className="floating-panel booking-flow-panel"
+        className={`floating-panel booking-flow-panel${sheetOpen ? " sheet-open" : ""}`}
         data-anchor={step === 1 ? "center" : "right"}
-        style={contentHeight ? { height: contentHeight } : undefined}
+        style={isDesktop && contentHeight ? { height: contentHeight } : undefined}
       >
+        <div
+          ref={handleRef}
+          className="sheet-handle"
+          aria-hidden="true"
+          onClick={() => setSheetOpen((v) => !v)}
+        >
+          <div className="sheet-handle-pill" />
+        </div>
         <div ref={contentRef} className="booking-flow-panel-inner">
-          <div className="mb-5">
-            <StepProgress step={step} total={7} labels={STEP_LABELS} />
-          </div>
+          {isDesktop && (
+            <div className="mb-5">
+              <StepProgress step={step} total={7} labels={STEP_LABELS} />
+            </div>
+          )}
 
           <div
             key={step}

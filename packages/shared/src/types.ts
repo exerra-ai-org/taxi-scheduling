@@ -63,6 +63,13 @@ export interface Vehicle {
   imageUrl: string | null;
 }
 
+export interface MileRate {
+  id: number;
+  vehicleClass: VehicleClass;
+  baseFarePence: number;
+  ratePerMilePence: number;
+}
+
 export interface FixedRoute {
   id: number;
   name: string;

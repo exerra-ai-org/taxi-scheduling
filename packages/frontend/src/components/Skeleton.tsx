@@ -138,19 +138,6 @@ export function RideDetailSkeleton() {
         </div>
       </section>
 
-      {/* Timeline */}
-      <section>
-        <div className="skeleton h-3 w-20 mb-2" />
-        <ol className="ride-detail-timeline">
-          {Array.from({ length: 5 }).map((_, i) => (
-            <li key={i} className="ride-detail-timeline-step">
-              <div className="ride-detail-timeline-dot" />
-              {i < 4 && <div className="ride-detail-timeline-line" />}
-            </li>
-          ))}
-        </ol>
-        <div className="skeleton h-3 w-20 mx-auto mt-2.5" />
-      </section>
 
       {/* Details */}
       <section>

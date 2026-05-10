@@ -37,9 +37,7 @@ export default function PriceDisplay({ data, onNext, onBack }: Props) {
         </div>
         {data.routeType === "mile" && data.distanceMiles != null && (
           <div className="caption-copy mt-3">
-            {data.distanceMiles.toFixed(1)} mi @{" "}
-            {formatPrice(data.ratePerMilePence ?? 0)}/mi + base{" "}
-            {formatPrice(data.baseFarePence ?? 0)}
+            {data.distanceMiles.toFixed(1)} mi
           </div>
         )}
         {data.isAirport && (

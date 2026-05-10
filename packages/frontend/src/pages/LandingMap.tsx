@@ -1,4 +1,5 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
+import { useBottomSheet } from "../hooks/useBottomSheet";
 import {
   MapContainer,
   TileLayer,
@@ -106,6 +107,9 @@ function MapController({
 }
 
 export default function LandingMap({ data, onNext }: Props) {
+  const formRef = useRef<HTMLFormElement>(null);
+  const { handleRef, isOpen: sheetOpen, setIsOpen: setSheetOpen } =
+    useBottomSheet(formRef);
   const [pickup, setPickup] = useState(data.pickupAddress || "");
   const [pickupLat, setPickupLat] = useState<number | undefined>(
     data.pickupLat,
@@ -287,9 +291,19 @@ export default function LandingMap({ data, onNext }: Props) {
       )}
 
       <form
+        ref={formRef}
         onSubmit={handleSubmit}
-        className="floating-panel absolute left-1/2 top-1/2 z-[1001] mx-4 w-full max-w-lg -translate-x-1/2 -translate-y-1/2 space-y-5 p-6 pointer-events-auto animate-scale-in"
+        className={`floating-panel landing-form-panel absolute left-1/2 top-1/2 z-[1001] mx-4 w-full max-w-lg -translate-x-1/2 -translate-y-1/2 pointer-events-auto animate-scale-in${sheetOpen ? " sheet-open" : ""}`}
       >
+        <div
+          ref={handleRef}
+          className="sheet-handle"
+          aria-hidden="true"
+          onClick={() => setSheetOpen((v) => !v)}
+        >
+          <div className="sheet-handle-pill" />
+        </div>
+        <div className="space-y-5 p-6">
         <div>
           <p className="section-label">New Booking</p>
           <h1 className="mt-4 text-[40px] font-bold leading-none tracking-[-0.04em] text-[var(--color-dark)]">
@@ -392,6 +406,7 @@ export default function LandingMap({ data, onNext }: Props) {
             <span className="btn-icon-glyph">↗</span>
           </span>
         </button>
+        </div>
       </form>
     </div>
   );

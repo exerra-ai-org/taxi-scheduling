@@ -44,20 +44,6 @@ const TRACKABLE: BookingStatus[] = [
   "arrived",
   "in_progress",
 ];
-const TIMELINE: { key: BookingStatus; label: string }[] = [
-  { key: "scheduled", label: "Your ride has been booked" },
-  { key: "assigned", label: "Driver has been assigned" },
-  { key: "en_route", label: "Driver is en route to you" },
-  { key: "arrived", label: "Driver has arrived and is waiting" },
-  { key: "in_progress", label: "Your ride is in progress" },
-  { key: "completed", label: "The ride has been completed" },
-];
-
-function timelineIndex(status: BookingStatus): number {
-  if (status === "cancelled") return -1;
-  return TIMELINE.findIndex((s) => s.key === status);
-}
-
 function shortName(addr: string): string {
   if (!addr) return "";
   return addr.split(",")[0].trim();
@@ -398,8 +384,6 @@ export default function CustomerRideDetail() {
     );
   }
 
-  const tIdx = timelineIndex(booking.status);
-  const isCancelled = booking.status === "cancelled";
   const canCancel =
     booking.status === "scheduled" || booking.status === "assigned";
   const canReview =
@@ -667,47 +651,6 @@ export default function CustomerRideDetail() {
                 <div className="caption-copy inline-flex items-center gap-2 py-1">
                   <IconCar className="h-4 w-4" />
                   Awaiting driver assignment.
-                </div>
-              )}
-            </section>
-
-            {/* Timeline */}
-            <section>
-              <p className="section-label">Progress</p>
-              <ol className="ride-detail-timeline" aria-label="Ride progress">
-                {TIMELINE.map(({ key }, i) => {
-                  const isComplete = i < tIdx;
-                  const isActive = i === tIdx;
-                  const isLast = i === TIMELINE.length - 1;
-                  return (
-                    <li key={key} className="ride-detail-timeline-step">
-                      <div
-                        className={`ride-detail-timeline-dot ${isComplete ? "is-complete" : isActive ? "is-active" : ""}`}
-                        aria-current={isActive ? "step" : undefined}
-                      >
-                        {isComplete ? <IconCheck className="h-3 w-3" /> : i + 1}
-                      </div>
-                      {!isLast && (
-                        <div
-                          className={`ride-detail-timeline-line ${isComplete ? "is-complete" : ""}`}
-                          aria-hidden="true"
-                        />
-                      )}
-                    </li>
-                  );
-                })}
-              </ol>
-              {tIdx >= 0 && (
-                <div
-                  key={TIMELINE[tIdx]?.key}
-                  className="ride-detail-timeline-current animate-fade-in"
-                >
-                  {TIMELINE[tIdx]?.label}
-                </div>
-              )}
-              {isCancelled && (
-                <div className="alert alert-error mt-2 text-[13px]">
-                  This booking was cancelled.
                 </div>
               )}
             </section>

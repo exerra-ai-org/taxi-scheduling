@@ -19,6 +19,16 @@ export const userRoleEnum = z.enum(["customer", "admin", "driver"]);
 
 export const vehicleClassSchema = z.enum(["regular", "comfort", "max"]);
 
+export const updateVehicleSchema = z.object({
+  passengerCapacity: z.number().int().min(1).max(20).optional(),
+  baggageCapacity: z.number().int().min(0).max(20).optional(),
+});
+
+export const updateMileRateSchema = z.object({
+  baseFarePence: z.number().int().min(0).optional(),
+  ratePerMilePence: z.number().int().min(0).optional(),
+});
+
 export const createBookingSchema = z.object({
   pickupAddress: z.string().min(1),
   dropoffAddress: z.string().min(1),

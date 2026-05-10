@@ -1951,24 +1951,190 @@
   transform: translate(0, -50%);
 }
 
+/* ── Drag handle (hidden on desktop, shown on mobile) ─────────────────────── */
+
+.sheet-handle {
+  display: none;
+  padding: 10px 0 8px;
+  cursor: grab;
+  touch-action: none;
+  flex-shrink: 0;
+}
+
+.sheet-handle-pill {
+  width: 36px;
+  height: 4px;
+  border-radius: 2px;
+  background: var(--color-border-light);
+  margin: 0 auto;
+}
+
+/* ── Mobile bottom drawer ─────────────────────────────────────────────────── */
+
 @media (max-width: 809px) {
+  .sheet-handle {
+    display: block;
+  }
+
   .booking-flow-panel,
   .booking-flow-panel[data-anchor="center"],
   .booking-flow-panel[data-anchor="right"] {
     top: auto;
-    /* respects iOS home-indicator safe area */
-    bottom: max(0.75rem, env(safe-area-inset-bottom));
-    left: 0.75rem;
-    right: 0.75rem;
-    width: auto;
-    max-height: calc(100dvh - 140px);
-    transform: none;
+    bottom: calc(64px + env(safe-area-inset-bottom, 0px));
+    left: 0;
+    right: 0;
+    width: 100%;
+    max-width: 100%;
+    border-radius: 20px 20px 0 0;
+    max-height: calc(100dvh - 300px);
+    /* peek: only PEEK_HEIGHT (80px) visible above the nav */
+    transform: translateY(calc(100% - 80px));
+    transition: transform 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+    overflow: visible; /* autocomplete dropdowns must escape the panel */
   }
 
-  /* Inner wrapper mirrors the panel's mobile cap so its scroll boundary
-     matches the visible panel, not a desktop-sized cap. */
+  .booking-flow-panel.sheet-open {
+    transform: translateY(0);
+  }
+
+  /* Suppress the floating-panel hover lift — touch devices don't hover,
+     but a desktop browser at narrow width would fight the sheet transform. */
+  .booking-flow-panel:hover {
+    transform: translateY(calc(100% - 80px));
+    box-shadow: var(--shadow-overlay);
+  }
+
+  .booking-flow-panel.sheet-open:hover {
+    transform: translateY(0);
+  }
+
   .booking-flow-panel-inner {
-    max-height: calc(100dvh - 140px);
+    max-height: calc(100dvh - 300px - 36px);
+    overflow-y: auto;
+  }
+
+  /* LandingMap form — same drawer behaviour */
+  .landing-form-panel {
+    top: auto !important;
+    bottom: calc(64px + env(safe-area-inset-bottom, 0px)) !important;
+    left: 0 !important;
+    right: 0 !important;
+    width: 100% !important;
+    max-width: 100% !important;
+    border-radius: 20px 20px 0 0 !important;
+    max-height: calc(100dvh - 300px);
+    transform: translateY(calc(100% - 80px)) !important;
+    transition: transform 0.4s cubic-bezier(0.16, 1, 0.3, 1) !important;
+    overflow: visible !important;
+  }
+
+  .landing-form-panel.sheet-open {
+    transform: translateY(0) !important;
+  }
+
+  .landing-form-panel:hover {
+    transform: translateY(calc(100% - 80px)) !important;
+    box-shadow: var(--shadow-overlay);
+  }
+
+  .landing-form-panel.sheet-open:hover {
+    transform: translateY(0) !important;
+  }
+
+  .landing-form-panel.animate-scale-in {
+    animation: none;
+  }
+}
+
+@media (max-width: 809px) and (prefers-reduced-motion: reduce) {
+  .booking-flow-panel,
+  .landing-form-panel {
+    transition: none !important;
+  }
+}
+
+/* ── Mobile panel compaction — no scroll needed ───────────────────────────── */
+
+@media (max-width: 809px) {
+  /* Inputs: 8px shorter */
+  .booking-flow-panel-inner .ds-input,
+  .booking-flow-panel-inner .input-glass,
+  .landing-form-panel .ds-input,
+  .landing-form-panel .input-glass {
+    min-height: 40px;
+    padding: 8px 12px;
+  }
+
+  /* Buttons: 8px shorter */
+  .booking-flow-panel-inner .btn-primary,
+  .booking-flow-panel-inner .btn-secondary,
+  .booking-flow-panel-inner .btn-green,
+  .landing-form-panel .btn-primary,
+  .landing-form-panel .btn-secondary,
+  .landing-form-panel .btn-green {
+    min-height: 44px;
+    font-size: 16px;
+  }
+
+  /* Step headings */
+  .booking-flow-panel-inner h2 {
+    font-size: 18px;
+    line-height: 1.2;
+  }
+
+  /* Big price number in PriceDisplay */
+  .booking-flow-panel-inner .metric-value {
+    font-size: 36px !important;
+  }
+
+  /* Inter-element gaps within steps */
+  .booking-flow-panel-inner .space-y-4 > :not([hidden]) ~ :not([hidden]),
+  .booking-flow-panel-inner .space-y-3 > :not([hidden]) ~ :not([hidden]) {
+    margin-top: 10px;
+  }
+
+  /* Card padding inside the panel */
+  .booking-flow-panel-inner .page-card,
+  .booking-flow-panel-inner .page-card-muted {
+    padding: 12px !important;
+  }
+
+  /* Map-click hint is irrelevant when the drawer is open */
+  .booking-flow-panel-inner .alert-info {
+    display: none;
+  }
+
+  /* Airport flight labels: keep the input, drop the labelled header */
+  .journey-flight-slot .field-label {
+    display: none;
+  }
+  .journey-flight-slot input {
+    margin-top: 4px;
+  }
+
+  /* Vehicle rows: remove SVG glyph, tighten padding */
+  .booking-flow-panel-inner .vehicle-row-glyph {
+    display: none;
+  }
+  .booking-flow-panel-inner .vehicle-row {
+    padding: 10px 12px;
+    gap: 8px;
+  }
+
+  /* "Start over" link in Confirmation — unnecessary on mobile */
+  .booking-flow-panel-inner .subtle-link.block {
+    display: none;
+  }
+
+  /* LandingMap: hide the sub-caption, compact the heading and spacing */
+  .landing-form-panel h1 {
+    font-size: 26px;
+  }
+  .landing-form-panel .caption-copy {
+    display: none;
+  }
+  .landing-form-panel .space-y-5 > :not([hidden]) ~ :not([hidden]) {
+    margin-top: 12px;
   }
 }
 
@@ -2266,83 +2432,6 @@
   box-shadow: 0 8px 18px rgb(152 254 0 / 0.22);
 }
 
-.ride-detail-timeline {
-  display: flex;
-  align-items: flex-start;
-  gap: 0;
-  margin-top: 6px;
-  list-style: none;
-  padding: 0;
-}
-
-.ride-detail-timeline-step {
-  flex: 1 1 0;
-  position: relative;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  min-width: 0;
-}
-
-.ride-detail-timeline-dot {
-  width: 26px;
-  height: 26px;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  border-radius: 999px;
-  border: 1px solid var(--color-border-light);
-  background: var(--color-surface);
-  font-family: var(--font-mono);
-  font-size: 11px;
-  color: var(--color-muted);
-  position: relative;
-  z-index: 1;
-  transition:
-    background-color 0.4s cubic-bezier(0.2, 1, 0.3, 1),
-    border-color 0.4s cubic-bezier(0.2, 1, 0.3, 1),
-    color 0.4s cubic-bezier(0.2, 1, 0.3, 1),
-    transform 0.4s cubic-bezier(0.2, 1, 0.3, 1);
-}
-
-.ride-detail-timeline-dot.is-active {
-  background: var(--color-dark);
-  border-color: var(--color-dark);
-  color: var(--color-surface);
-  transform: scale(1.08);
-}
-
-.ride-detail-timeline-dot.is-complete {
-  background: var(--color-green);
-  border-color: var(--color-green);
-  color: var(--color-dark);
-}
-
-.ride-detail-timeline-line {
-  position: absolute;
-  top: 13px;
-  left: 50%;
-  width: 100%;
-  height: 1px;
-  background: var(--color-border);
-  z-index: 0;
-  transition: background-color 0.4s cubic-bezier(0.2, 1, 0.3, 1);
-}
-
-.ride-detail-timeline-line.is-complete {
-  background: var(--color-green);
-}
-
-.ride-detail-timeline-current {
-  margin-top: 10px;
-  font-family: var(--font-mono);
-  font-size: 11px;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-  color: var(--color-dark);
-  font-weight: 700;
-  text-align: center;
-}
 
 .ride-detail-grid {
   display: grid;

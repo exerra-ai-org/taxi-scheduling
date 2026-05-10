@@ -1,3 +1,7 @@
+if (import.meta.env.DEV) {
+  import("react-grab");
+}
+
 import React from "react";
 import ReactDOM from "react-dom/client";
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
@@ -18,11 +22,13 @@ import BookingFlow from "./pages/BookingFlow";
 import BookingHistory from "./pages/BookingHistory";
 import CustomerRideDetail from "./pages/CustomerRideDetail";
 
+import About from "./pages/About";
 import RideTimeline from "./pages/admin/RideTimeline";
 import DriverManagement from "./pages/admin/DriverManagement";
 import CouponManagement from "./pages/admin/CouponManagement";
 import LiveDriversMap from "./pages/admin/LiveDriversMap";
 import IncidentInbox from "./pages/admin/IncidentInbox";
+import VehicleManagement from "./pages/admin/VehicleManagement";
 
 import MyRides from "./pages/driver/MyRides";
 import DriverProfile from "./pages/driver/Profile";
@@ -48,6 +54,7 @@ ReactDOM.createRoot(document.getElementById("root")!).render(
                 />
                 <Route path="/" element={<BookingFlow />} />
                 <Route path="/book" element={<BookingFlow />} />
+                <Route path="/about" element={<About />} />
 
                 {/* Customer */}
                 <Route element={<ProtectedRoute roles={["customer"]} />}>
@@ -66,6 +73,7 @@ ReactDOM.createRoot(document.getElementById("root")!).render(
                   <Route path="/admin/live-map" element={<LiveDriversMap />} />
                   <Route path="/admin/coupons" element={<CouponManagement />} />
                   <Route path="/admin/incidents" element={<IncidentInbox />} />
+                  <Route path="/admin/vehicles" element={<VehicleManagement />} />
                   <Route path="/admin/profile" element={<ProfilePage />} />
                 </Route>
 

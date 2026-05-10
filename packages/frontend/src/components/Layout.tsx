@@ -151,6 +151,8 @@ export default function Layout() {
   const path = location.pathname;
   const isImmersivePage =
     path === "/" || path === "/book" || /^\/bookings\/\d+$/.test(path);
+  const isFullBleedPage = path === "/about";
+  const hideBottomNav = /^\/bookings\/\d+$/.test(path);
 
   async function handleLogout() {
     await logout();
@@ -164,6 +166,7 @@ export default function Layout() {
           <Brand />
 
           <div className="hidden md:flex items-center gap-1">
+            <DesktopNavItem to="/about" label="About" />
             {user?.role === "customer" && (
               <>
                 <DesktopNavItem to="/" label="Book" end />
@@ -177,6 +180,7 @@ export default function Layout() {
                 <DesktopNavItem to="/admin/live-map" label="Live map" />
                 <DesktopNavItem to="/admin/incidents" label="Incidents" />
                 <DesktopNavItem to="/admin/coupons" label="Coupons" />
+                <DesktopNavItem to="/admin/vehicles" label="Vehicles" />
               </>
             )}
             {user?.role === "driver" && (
@@ -212,11 +216,20 @@ export default function Layout() {
         </div>
       </nav>
 
-      <main className={isImmersivePage ? "" : "app-main"}>
+      <main className={isImmersivePage || isFullBleedPage ? "" : "app-main"}>
         <Outlet />
       </main>
 
-      {user && !isImmersivePage && (
+      {!user && (
+        <nav className="fixed inset-x-0 bottom-0 z-40 border-t border-[var(--color-border)] bg-[rgb(249_249_249_/_0.96)] backdrop-blur md:hidden safe-area-inset-bottom">
+          <div className="flex items-center justify-around px-2 py-2">
+            <NavItem to="/about" icon={<IconMapPin className="w-5 h-5" />} label="About" />
+            <NavItem to="/login" icon={<IconUser className="w-5 h-5" />} label="Sign in" />
+          </div>
+        </nav>
+      )}
+
+      {user && !hideBottomNav && (
         <nav className="fixed inset-x-0 bottom-0 z-40 border-t border-[var(--color-border)] bg-[rgb(249_249_249_/_0.96)] backdrop-blur md:hidden safe-area-inset-bottom">
           <div className="flex items-center justify-around px-2 py-2">
             {user.role === "customer" && (
@@ -264,6 +277,11 @@ export default function Layout() {
                   to="/admin/coupons"
                   icon={<IconTicket className="w-5 h-5" />}
                   label="Coupons"
+                />
+                <NavItem
+                  to="/admin/vehicles"
+                  icon={<IconCar className="w-5 h-5" />}
+                  label="Vehicles"
                 />
               </>
             )}
