@@ -18,6 +18,7 @@ import {
 } from "../db/schema";
 import { config } from "../config";
 import { evaluatePickupDwell } from "../services/geofence";
+import { getSettingBool, getSettingInt } from "../services/appSettings";
 import { notifyBookingStatusChanged } from "../services/notifications";
 import {
   authMiddleware,
@@ -180,24 +181,29 @@ driverRoutes.post(
 
     let nextGeofenceSince: Date | null = null;
     let shouldArrive = false;
-    if (
-      lat != null &&
-      lon != null &&
-      ride.status === "en_route" &&
-      config.geofence.autoArrive
-    ) {
-      const dwell = evaluatePickupDwell({
-        driverLat: lat,
-        driverLon: lon,
-        pickupLat: ride.pickupLat,
-        pickupLon: ride.pickupLon,
-        previousSince: previousHb[0]?.pickupGeofenceSince ?? null,
-        now,
-        radiusM: config.geofence.pickupRadiusM,
-        dwellMs: config.geofence.pickupDwellMs,
-      });
-      nextGeofenceSince = dwell.nextSince;
-      shouldArrive = dwell.shouldArrive;
+    if (lat != null && lon != null && ride.status === "en_route") {
+      // Admin-tunable: auto-arrive only fires when the toggle is on. Reads
+      // are issued in parallel; the DB lookup is sub-millisecond and only
+      // happens on heartbeats where the rider is en_route.
+      const [autoArrive, radiusM, dwellMs] = await Promise.all([
+        getSettingBool("geofenceAutoArrive"),
+        getSettingInt("geofencePickupRadiusM"),
+        getSettingInt("geofencePickupDwellMs"),
+      ]);
+      if (autoArrive) {
+        const dwell = evaluatePickupDwell({
+          driverLat: lat,
+          driverLon: lon,
+          pickupLat: ride.pickupLat,
+          pickupLon: ride.pickupLon,
+          previousSince: previousHb[0]?.pickupGeofenceSince ?? null,
+          now,
+          radiusM,
+          dwellMs,
+        });
+        nextGeofenceSince = dwell.nextSince;
+        shouldArrive = dwell.shouldArrive;
+      }
     }
 
     const [heartbeat] = await db

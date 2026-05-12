@@ -7,6 +7,10 @@ export type Settings = {
   waitingRatePence: string;
   waitingIncrementMinutes: string;
   noShowAfterMinutes: string;
+  // Geofence
+  geofenceAutoArrive: string; // 'true' | 'false'
+  geofencePickupRadiusM: string;
+  geofencePickupDwellMs: string;
 };
 
 export type PublicSettings = Pick<
