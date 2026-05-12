@@ -13,10 +13,7 @@ import {
   markCustomerArrived,
   type BookingDetail,
 } from "../api/bookings";
-import {
-  getPublicSettings,
-  type PublicSettings,
-} from "../api/settings";
+import { getPublicSettings, type PublicSettings } from "../api/settings";
 import { ApiError } from "../api/client";
 import {
   formatDate,

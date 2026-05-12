@@ -7,10 +7,7 @@ import { api, ApiError } from "../../api/client";
 import { useConfirm } from "../../hooks/useConfirm";
 import { useToast } from "../../context/ToastContext";
 import { IconMapPin } from "../../components/icons";
-import {
-  markNoShow,
-  markCashCollected,
-} from "../../api/bookings";
+import { markNoShow, markCashCollected } from "../../api/bookings";
 import { getPublicSettings } from "../../api/settings";
 
 interface Props {

@@ -44,8 +44,8 @@ export default function Terms() {
           3. Waiting time &amp; no-shows
         </h2>
         <p className="text-sm leading-6">
-          A 30-minute free waiting period applies once the driver has arrived
-          at the pickup location. After that, a waiting fee accrues at £2 per 5
+          A 30-minute free waiting period applies once the driver has arrived at
+          the pickup location. After that, a waiting fee accrues at £2 per 5
           minutes. If the passenger does not present themselves within the
           no-show threshold the booking may be cancelled and the full fare and
           waiting fee become payable.
@@ -58,8 +58,8 @@ export default function Terms() {
         </h2>
         <p className="text-sm leading-6">
           Cancellation fees depend on how close to pickup the cancellation is
-          requested. See the booking confirmation for the policy applied to
-          your ride.
+          requested. See the booking confirmation for the policy applied to your
+          ride.
         </p>
       </section>
 
@@ -68,9 +68,9 @@ export default function Terms() {
           5. Conduct
         </h2>
         <p className="text-sm leading-6">
-          Abusive, threatening or unsafe behaviour towards drivers or staff
-          will result in the booking being terminated without refund and the
-          account suspended.
+          Abusive, threatening or unsafe behaviour towards drivers or staff will
+          result in the booking being terminated without refund and the account
+          suspended.
         </p>
       </section>
 
@@ -96,8 +96,8 @@ export default function Terms() {
       </section>
 
       <p className="mt-12 text-xs text-[var(--color-muted)]">
-        Last updated: replace this date with the effective date of the
-        finalised terms.
+        Last updated: replace this date with the effective date of the finalised
+        terms.
       </p>
     </div>
   );

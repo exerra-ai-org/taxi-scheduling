@@ -58,8 +58,7 @@ export default function Confirmation({
 
   const scheduledDate = new Date(`${data.date}T${data.time}`);
   const msUntilPickup = scheduledDate.getTime() - Date.now();
-  const cardAllowed =
-    msUntilPickup <= CARD_HORIZON_DAYS * 24 * 60 * 60 * 1000;
+  const cardAllowed = msUntilPickup <= CARD_HORIZON_DAYS * 24 * 60 * 60 * 1000;
   const [paymentMethod, setPaymentMethod] = useState<"card" | "cash">(
     cardAllowed ? "card" : "cash",
   );
