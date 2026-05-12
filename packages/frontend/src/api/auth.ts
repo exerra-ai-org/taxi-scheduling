@@ -38,7 +38,7 @@ export function login(
 export function register(
   email: string,
   name: string,
-  opts: { phone?: string; password?: string },
+  opts: { phone?: string; password?: string; termsAccepted: true },
 ) {
   return api.post<{ user: AuthUser } | { magicLinkSent: true }>(
     "/auth/register",

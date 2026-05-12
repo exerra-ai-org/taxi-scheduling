@@ -21,6 +21,7 @@ import AcceptInvitation from "./pages/AcceptInvitation";
 import BookingFlow from "./pages/BookingFlow";
 import BookingHistory from "./pages/BookingHistory";
 import CustomerRideDetail from "./pages/CustomerRideDetail";
+import Terms from "./pages/Terms";
 
 import About from "./pages/About";
 import RideTimeline from "./pages/admin/RideTimeline";
@@ -29,6 +30,7 @@ import CouponManagement from "./pages/admin/CouponManagement";
 import LiveDriversMap from "./pages/admin/LiveDriversMap";
 import IncidentInbox from "./pages/admin/IncidentInbox";
 import VehicleManagement from "./pages/admin/VehicleManagement";
+import AdminSettings from "./pages/admin/Settings";
 
 import MyRides from "./pages/driver/MyRides";
 import DriverProfile from "./pages/driver/Profile";
@@ -55,6 +57,7 @@ ReactDOM.createRoot(document.getElementById("root")!).render(
                 <Route path="/" element={<BookingFlow />} />
                 <Route path="/book" element={<BookingFlow />} />
                 <Route path="/about" element={<About />} />
+                <Route path="/terms" element={<Terms />} />
 
                 {/* Customer */}
                 <Route element={<ProtectedRoute roles={["customer"]} />}>
@@ -77,6 +80,7 @@ ReactDOM.createRoot(document.getElementById("root")!).render(
                     path="/admin/vehicles"
                     element={<VehicleManagement />}
                   />
+                  <Route path="/admin/settings" element={<AdminSettings />} />
                   <Route path="/admin/profile" element={<ProfilePage />} />
                 </Route>
 

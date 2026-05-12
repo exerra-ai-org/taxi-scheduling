@@ -41,6 +41,10 @@ function shortAddress(addr: string): string {
   return trimmed.slice(0, 2).join(", ");
 }
 
+// Long-lead bookings beyond this many days must use the cash flow —
+// Stripe card authorisations expire at ~7d so we cannot hold the fare.
+const CARD_HORIZON_DAYS = 6;
+
 export default function Confirmation({
   data,
   onBack,
@@ -53,6 +57,15 @@ export default function Confirmation({
   const [error, setError] = useState("");
 
   const scheduledDate = new Date(`${data.date}T${data.time}`);
+  const msUntilPickup = scheduledDate.getTime() - Date.now();
+  const cardAllowed =
+    msUntilPickup <= CARD_HORIZON_DAYS * 24 * 60 * 60 * 1000;
+  const [paymentMethod, setPaymentMethod] = useState<"card" | "cash">(
+    cardAllowed ? "card" : "cash",
+  );
+  const depositPence =
+    paymentMethod === "cash" ? Math.ceil(data.finalPricePence * 0.25) : 0;
+  const balanceDuePence = Math.max(0, data.finalPricePence - depositPence);
 
   async function handleConfirm() {
     setSubmitting(true);
@@ -70,6 +83,7 @@ export default function Confirmation({
         couponCode: data.couponCode,
         pickupFlightNumber: data.pickupFlightNumber || undefined,
         dropoffFlightNumber: data.dropoffFlightNumber || undefined,
+        paymentMethod,
       });
       // Payments enabled → parent moves to PaymentStep with the
       // clientSecret. Payments disabled → fall back to the legacy
@@ -154,6 +168,60 @@ export default function Confirmation({
         {data.isAirport && (
           <div className="pt-2">
             <span className="ds-tag tag-airport">AIRPORT TRANSFER</span>
+          </div>
+        )}
+      </div>
+
+      <div className="page-card p-5 space-y-3">
+        <p className="section-label">/ Payment method</p>
+        {!cardAllowed && (
+          <p className="caption-copy">
+            Card payments are only available within {CARD_HORIZON_DAYS} days of
+            pickup. This booking will use the cash flow.
+          </p>
+        )}
+        <div className="flex gap-2">
+          <button
+            type="button"
+            disabled={!cardAllowed || submitting}
+            onClick={() => setPaymentMethod("card")}
+            className={`flex-1 rounded-lg border px-3 py-3 text-left text-sm transition-colors ${
+              paymentMethod === "card"
+                ? "border-white bg-white text-black"
+                : "border-neutral-700 bg-transparent text-neutral-300 hover:border-neutral-500"
+            } ${!cardAllowed ? "cursor-not-allowed opacity-50" : ""}`}
+          >
+            <span className="block font-semibold">Pay by card</span>
+            <span className="block text-xs opacity-80">
+              Full fare authorised now
+            </span>
+          </button>
+          <button
+            type="button"
+            disabled={submitting}
+            onClick={() => setPaymentMethod("cash")}
+            className={`flex-1 rounded-lg border px-3 py-3 text-left text-sm transition-colors ${
+              paymentMethod === "cash"
+                ? "border-white bg-white text-black"
+                : "border-neutral-700 bg-transparent text-neutral-300 hover:border-neutral-500"
+            }`}
+          >
+            <span className="block font-semibold">Pay by cash</span>
+            <span className="block text-xs opacity-80">
+              25% deposit now, balance in person
+            </span>
+          </button>
+        </div>
+        {paymentMethod === "cash" && (
+          <div className="space-y-1 border-t border-neutral-800 pt-3 text-sm">
+            <div className="data-pair">
+              <span>DEPOSIT NOW (CARD)</span>
+              <span>{formatPrice(depositPence)}</span>
+            </div>
+            <div className="data-pair">
+              <span>BALANCE DUE (CASH)</span>
+              <span>{formatPrice(balanceDuePence)}</span>
+            </div>
           </div>
         )}
       </div>

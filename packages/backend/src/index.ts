@@ -21,6 +21,7 @@ import { uploadRoutes } from "./routes/upload";
 import { eventsRoutes } from "./routes/events";
 import { webhookRoutes } from "./routes/webhooks";
 import { paymentRoutes } from "./routes/payments";
+import { settingsRoutes } from "./routes/settings";
 import { startBackgroundJobs, stopBackgroundJobs } from "./services/jobs";
 import { resolveSafeUploadPath } from "./lib/safeUploadPath";
 import { db, dbClient } from "./db/index";
@@ -127,6 +128,7 @@ app.route("/notifications", notificationRoutes);
 app.route("/vehicles", vehicleRoutes);
 app.route("/admin", adminRoutes);
 app.route("/payments", paymentRoutes);
+app.route("/settings", settingsRoutes);
 app.use(
   "/upload/*",
   bodyLimit({

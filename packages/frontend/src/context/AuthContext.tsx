@@ -29,7 +29,7 @@ interface AuthContextType {
   register: (
     email: string,
     name: string,
-    opts: { phone?: string; password?: string },
+    opts: { phone?: string; password?: string; termsAccepted: true },
   ) => Promise<AuthUser | { magicLinkSent: true }>;
   requestMagicLink: (email: string) => Promise<{ message: string }>;
   verifyMagicLink: (token: string) => Promise<AuthUser>;
@@ -122,7 +122,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     async (
       email: string,
       name: string,
-      opts: { phone?: string; password?: string },
+      opts: { phone?: string; password?: string; termsAccepted: true },
     ) => {
       const data = await authApi.register(email, name, opts);
       if ("user" in data) {

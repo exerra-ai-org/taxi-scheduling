@@ -31,6 +31,10 @@ FROM oven/bun:1.2 AS install
   EXPOSE 3000                                                                                 
   ENV NODE_ENV=production
                                                                                                
-  # Migrations run on every container start (idempotent).                                     
-  WORKDIR /app/packages/backend                              
-  CMD ["sh", "-c", "bunx drizzle-kit migrate && bun run src/index.ts"]
+  # Migrations run on every container start. The runner is idempotent
+  # (each SQL file uses IF NOT EXISTS / DO blocks) and serialised across
+  # replicas via a Postgres advisory lock inside migrate.ts. If migrations
+  # fail the container exits non-zero so the orchestrator does not start
+  # serving traffic from a half-migrated DB.
+  WORKDIR /app/packages/backend
+  CMD ["sh", "-c", "bun run src/db/migrate.ts && bun run src/index.ts"]

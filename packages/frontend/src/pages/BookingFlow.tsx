@@ -49,6 +49,10 @@ export interface BookingData {
   couponCode?: string;
   discountPence: number;
   finalPricePence: number;
+
+  // Selected on the Confirmation step. `cash` charges a 25% deposit via
+  // Stripe and the balance is collected in person.
+  paymentMethod?: "card" | "cash";
 }
 
 const STORAGE_KEY = "taxi.booking.draft";

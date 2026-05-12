@@ -96,8 +96,8 @@ export async function createPaymentIntentForBooking(
     );
   }
 
-  const totalPence = booking.pricePence - booking.discountPence;
-  if (totalPence <= 0) {
+  const netPence = booking.pricePence - booking.discountPence;
+  if (netPence <= 0) {
     throw new PaymentError(
       "Booking total must be greater than zero",
       "invalid_amount",
@@ -105,18 +105,27 @@ export async function createPaymentIntentForBooking(
     );
   }
 
-  // Phase 2 guard: long-lead bookings require SetupIntent + delayed
-  // authorisation, which lands in phase 4. Stripe authorisations expire
-  // at ~7 days, so a PI created today for a 14-day-out pickup would be
-  // voided before we could capture.
-  const horizonMs = config.payments.authHorizonDays * MS_PER_DAY;
-  const msUntilPickup = booking.scheduledAt.getTime() - Date.now();
-  if (msUntilPickup > horizonMs) {
-    throw new PaymentError(
-      `Bookings more than ${config.payments.authHorizonDays} days in advance are temporarily unavailable for online payment. Please contact support to book by phone.`,
-      "horizon_exceeded",
-      400,
-    );
+  // Cash bookings charge a 25% deposit via Stripe now; the balance is
+  // collected in person and stamped on `cashCollectedAt` at completion.
+  // Card bookings charge the full fare and are subject to the auth-horizon
+  // guard (Stripe authorisations expire ~7d).
+  const isCash = booking.paymentMethod === "cash";
+  const totalPence = isCash
+    ? booking.depositPence > 0
+      ? booking.depositPence
+      : Math.ceil(netPence * 0.25)
+    : netPence;
+
+  if (!isCash) {
+    const horizonMs = config.payments.authHorizonDays * MS_PER_DAY;
+    const msUntilPickup = booking.scheduledAt.getTime() - Date.now();
+    if (msUntilPickup > horizonMs) {
+      throw new PaymentError(
+        `Card payments are only available within ${config.payments.authHorizonDays} days of pickup. Please choose pay-by-cash to hold this booking with a 25% deposit.`,
+        "horizon_exceeded",
+        400,
+      );
+    }
   }
 
   // Look up the customer's Stripe id; create lazily if signup-time
@@ -176,6 +185,8 @@ export async function createPaymentIntentForBooking(
           bookingId: String(bookingId),
           customerId: String(booking.customerId),
           scheduledAt: booking.scheduledAt.toISOString(),
+          paymentMethod: booking.paymentMethod,
+          cashDeposit: isCash ? "true" : "false",
         },
         description: `Booking #${bookingId} — ${booking.pickupAddress.split(",")[0]} → ${booking.dropoffAddress.split(",")[0]}`,
         // Stripe sends a paid receipt automatically when this is set; we

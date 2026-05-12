@@ -19,7 +19,6 @@ import {
   reportIncidentSchema,
   BOOKING_MIN_HOURS_STANDARD,
   BOOKING_MIN_HOURS_LONDON,
-  BOOKING_MAX_DAYS,
 } from "shared/validation";
 import { db } from "../db/index";
 import {
@@ -68,6 +67,9 @@ import {
 } from "../services/payments";
 import { isStripeEnabled } from "../lib/stripe";
 import { config } from "../config";
+import { computeWaitingFeeFor } from "../services/waitingFee";
+import { getSettingInt } from "../services/appSettings";
+import { dispatchReceipt } from "../services/receiptDispatcher";
 
 export const bookingRoutes = new Hono();
 
@@ -153,6 +155,7 @@ bookingRoutes.post("/", requireRole("customer"), async (c) => {
     pickupFlightNumber,
     dropoffFlightNumber,
     vehicleClass,
+    paymentMethod,
   } = parsed.data;
   const scheduledDate = new Date(scheduledAt);
   const now = new Date();
@@ -188,16 +191,9 @@ bookingRoutes.post("/", requireRole("customer"), async (c) => {
     return err(c, `Booking must be at least ${minHours} hours in advance`, 400);
   }
 
-  const maxTime = new Date(
-    now.getTime() + BOOKING_MAX_DAYS * 24 * 60 * 60 * 1000,
-  );
-  if (scheduledDate > maxTime) {
-    return err(
-      c,
-      `Booking cannot be more than ${BOOKING_MAX_DAYS} days in advance`,
-      400,
-    );
-  }
+  // No upper bound on how far ahead a booking may be scheduled.
+  // Long-lead bookings beyond the Stripe auth horizon are funnelled into
+  // the cash flow (25% deposit now, balance in person).
 
   try {
     const booking = await db.transaction(async (tx) => {
@@ -236,6 +232,14 @@ bookingRoutes.post("/", requireRole("customer"), async (c) => {
         : null;
       const initialPaymentStatus = isStripeEnabled() ? "pending" : "unpaid";
 
+      // Cash bookings: 25% upfront via Stripe, balance collected in person.
+      // Round deposit UP so we never short the platform on small fares.
+      const netPence = finalPrice - discountPence;
+      const depositPence =
+        paymentMethod === "cash" ? Math.ceil(netPence * 0.25) : 0;
+      const balanceDuePence =
+        paymentMethod === "cash" ? Math.max(0, netPence - depositPence) : 0;
+
       const [created] = await tx
         .insert(bookings)
         .values({
@@ -263,6 +267,9 @@ bookingRoutes.post("/", requireRole("customer"), async (c) => {
           distanceMiles: quote.distanceMiles ?? null,
           ratePerMilePence: quote.ratePerMilePence ?? null,
           baseFarePence: quote.baseFarePence ?? null,
+          paymentMethod,
+          depositPence,
+          balanceDuePence,
         })
         .returning();
 
@@ -665,9 +672,25 @@ bookingRoutes.patch(
       return ok(c, { booking });
     }
 
+    // Side-effect stamps tied to status transitions.
+    //   • arrived      → record when the driver hit the pickup, starting
+    //                    the waiting clock.
+    //   • in_progress  → freeze the waiting clock and persist any fee
+    //                    accrued since arrival (subject to the free window).
+    const statusSideEffects: Partial<typeof bookings.$inferInsert> = {
+      status: nextStatus,
+    };
+    if (nextStatus === "arrived" && !booking.driverArrivedAt) {
+      statusSideEffects.driverArrivedAt = new Date();
+    }
+    if (nextStatus === "in_progress") {
+      const fee = await computeWaitingFeeFor(booking);
+      statusSideEffects.waitingFeePence = fee;
+    }
+
     const [updated] = await db
       .update(bookings)
-      .set({ status: nextStatus })
+      .set(statusSideEffects)
       .where(eq(bookings.id, id))
       .returning();
 
@@ -683,6 +706,13 @@ bookingRoutes.patch(
       runAsyncSideEffect(
         "capturePaymentForBooking",
         capturePaymentForBooking(id),
+      );
+    }
+
+    if (nextStatus === "completed") {
+      runAsyncSideEffect(
+        "dispatchFinalReceipt",
+        dispatchReceipt(id, "final"),
       );
     }
 
@@ -1214,3 +1244,207 @@ bookingRoutes.post("/:id/incident", requireRole("customer"), async (c) => {
 
   return ok(c, { incident }, 201);
 });
+
+// ── Customer "I'm here" ───────────────────────────────
+//
+// Caps the waiting-fee meter. Customer-only. Only valid while the driver
+// has already marked arrived (status=arrived). Idempotent — second call
+// is a no-op so a double-tap doesn't move the timestamp.
+bookingRoutes.post(
+  "/:id/customer-arrived",
+  requireRole("customer"),
+  async (c) => {
+    const payload = c.get("jwtPayload") as JwtPayload;
+    const id = parseRouteId(c.req.param("id"));
+    if (!id) return err(c, "Invalid booking ID", 400);
+
+    const [booking] = await db
+      .select()
+      .from(bookings)
+      .where(eq(bookings.id, id))
+      .limit(1);
+    if (!booking) return err(c, "Booking not found", 404);
+    if (booking.customerId !== payload.sub) return err(c, "Forbidden", 403);
+
+    if (booking.status !== "arrived") {
+      return err(
+        c,
+        "You can only confirm arrival once the driver has marked arrived.",
+        400,
+      );
+    }
+    if (booking.customerArrivedAt) {
+      return ok(c, { booking });
+    }
+
+    const now = new Date();
+    const fee = await computeWaitingFeeFor({
+      driverArrivedAt: booking.driverArrivedAt,
+      customerArrivedAt: now,
+    });
+
+    const [updated] = await db
+      .update(bookings)
+      .set({ customerArrivedAt: now, waitingFeePence: fee })
+      .where(eq(bookings.id, id))
+      .returning();
+
+    await broadcastBookingChange(id, {
+      type: "customer_arrived",
+      bookingId: id,
+      customerArrivedAt: now.toISOString(),
+      waitingFeePence: fee,
+    });
+
+    return ok(c, { booking: updated });
+  },
+);
+
+// ── Mark No-Show ──────────────────────────────────────
+//
+// Driver or admin can mark a booking as no-show after the configured
+// grace window has elapsed past driver arrival without the customer
+// confirming presence or the ride starting. The full fare + accumulated
+// waiting fee remain owed. Admin can later reverse via refund tooling.
+bookingRoutes.post(
+  "/:id/no-show",
+  requireRole("driver", "admin"),
+  async (c) => {
+    const payload = c.get("jwtPayload") as JwtPayload;
+    const id = parseRouteId(c.req.param("id"));
+    if (!id) return err(c, "Invalid booking ID", 400);
+
+    const [booking] = await db
+      .select()
+      .from(bookings)
+      .where(eq(bookings.id, id))
+      .limit(1);
+    if (!booking) return err(c, "Booking not found", 404);
+
+    if (payload.role === "driver") {
+      const [assignment] = await db
+        .select({ id: driverAssignments.id })
+        .from(driverAssignments)
+        .where(
+          and(
+            eq(driverAssignments.bookingId, id),
+            eq(driverAssignments.driverId, payload.sub),
+            eq(driverAssignments.isActive, true),
+            eq(driverAssignments.role, "primary"),
+          ),
+        )
+        .limit(1);
+      if (!assignment) {
+        return err(c, "Only the active primary driver can mark no-show", 403);
+      }
+    }
+
+    if (booking.status !== "arrived") {
+      return err(c, "No-show is only valid from status=arrived", 400);
+    }
+    if (booking.noShowAt) {
+      return ok(c, { booking });
+    }
+    if (!booking.driverArrivedAt) {
+      return err(c, "Driver arrival timestamp missing", 400);
+    }
+
+    const minMinutes = await getSettingInt("noShowAfterMinutes");
+    const elapsedMin =
+      (Date.now() - booking.driverArrivedAt.getTime()) / 60_000;
+    if (elapsedMin < minMinutes) {
+      return err(
+        c,
+        `No-show can only be marked after ${minMinutes} minutes from arrival.`,
+        400,
+      );
+    }
+
+    const now = new Date();
+    const fee = await computeWaitingFeeFor({
+      driverArrivedAt: booking.driverArrivedAt,
+      customerArrivedAt: now,
+    });
+
+    const [updated] = await db
+      .update(bookings)
+      .set({
+        noShowAt: now,
+        waitingFeePence: fee,
+        status: "cancelled",
+      })
+      .where(eq(bookings.id, id))
+      .returning();
+
+    // Capture the full authorised amount so the customer pays for the
+    // no-show. Cash bookings only hold the deposit, which is captured here.
+    if (isStripeEnabled() && updated.paymentStatus === "authorized") {
+      runAsyncSideEffect(
+        "capturePaymentForBooking",
+        capturePaymentForBooking(id),
+      );
+    }
+
+    await broadcastBookingChange(id, {
+      type: "booking_updated",
+      bookingId: id,
+      status: "cancelled",
+    });
+
+    return ok(c, { booking: updated });
+  },
+);
+
+// ── Mark Cash Collected ───────────────────────────────
+//
+// For cash bookings: driver or admin confirms the in-person balance was
+// handed over. Stamps cashCollectedAt + clears balanceDuePence.
+bookingRoutes.post(
+  "/:id/cash-collected",
+  requireRole("driver", "admin"),
+  async (c) => {
+    const payload = c.get("jwtPayload") as JwtPayload;
+    const id = parseRouteId(c.req.param("id"));
+    if (!id) return err(c, "Invalid booking ID", 400);
+
+    const [booking] = await db
+      .select()
+      .from(bookings)
+      .where(eq(bookings.id, id))
+      .limit(1);
+    if (!booking) return err(c, "Booking not found", 404);
+
+    if (booking.paymentMethod !== "cash") {
+      return err(c, "Booking is not a cash booking", 400);
+    }
+    if (booking.cashCollectedAt) {
+      return ok(c, { booking });
+    }
+
+    if (payload.role === "driver") {
+      const [assignment] = await db
+        .select({ id: driverAssignments.id })
+        .from(driverAssignments)
+        .where(
+          and(
+            eq(driverAssignments.bookingId, id),
+            eq(driverAssignments.driverId, payload.sub),
+            eq(driverAssignments.isActive, true),
+            eq(driverAssignments.role, "primary"),
+          ),
+        )
+        .limit(1);
+      if (!assignment) {
+        return err(c, "Only the active primary driver can mark collected", 403);
+      }
+    }
+
+    const [updated] = await db
+      .update(bookings)
+      .set({ cashCollectedAt: new Date(), balanceDuePence: 0 })
+      .where(eq(bookings.id, id))
+      .returning();
+
+    return ok(c, { booking: updated });
+  },
+);

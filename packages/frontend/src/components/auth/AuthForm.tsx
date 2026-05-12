@@ -3,13 +3,11 @@ import { Link } from "react-router-dom";
 import { useAuth } from "../../context/AuthContext";
 import { ApiError } from "../../api/client";
 import type { AuthUser } from "../../api/auth";
-import type { UserRole } from "shared/types";
+
+type Tab = "sign-in" | "sign-up";
 
 type Mode =
-  | { kind: "email" }
-  | { kind: "password"; role: UserRole; name?: string }
-  | { kind: "customer-login"; name?: string; hasPassword: boolean }
-  | { kind: "register" }
+  | { kind: "form"; tab: Tab }
   | { kind: "magic-link-sent" }
   | { kind: "magic-link-verify" };
 
@@ -17,7 +15,7 @@ interface Props {
   /** Called once a user is signed in. The caller decides what to do next
    *  (navigate, close modal, etc.). */
   onSuccess: (user: AuthUser) => void;
-  /** If provided, the email step is pre-filled. */
+  /** If provided, the email is pre-filled. */
   initialEmail?: string;
   /** Pre-filled magic-link token (e.g., from URL ?token=...). When set,
    *  AuthForm enters magic-link-verify on mount. */
@@ -27,6 +25,8 @@ interface Props {
   showResetLink?: boolean;
   /** Compact heading omitted when the host (modal) provides its own. */
   showHeader?: boolean;
+  /** Which tab opens first. */
+  initialTab?: Tab;
 }
 
 export default function AuthForm({
@@ -35,26 +35,31 @@ export default function AuthForm({
   initialToken,
   showResetLink = true,
   showHeader = true,
+  initialTab = "sign-in",
 }: Props) {
-  const { checkEmail, login, register, requestMagicLink, verifyMagicLink } =
-    useAuth();
+  const { login, register, requestMagicLink, verifyMagicLink } = useAuth();
 
   const [email, setEmail] = useState(initialEmail);
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
   const [phone, setPhone] = useState("");
   const [name, setName] = useState("");
+  const [termsAccepted, setTermsAccepted] = useState(false);
   const [magicToken, setMagicToken] = useState(initialToken ?? "");
   const [mode, setMode] = useState<Mode>(
-    initialToken ? { kind: "magic-link-verify" } : { kind: "email" },
+    initialToken
+      ? { kind: "magic-link-verify" }
+      : { kind: "form", tab: initialTab },
   );
-  const [error, setError] = useState("");
-  const [busy, setBusy] = useState(false);
+  const [signInMethod, setSignInMethod] = useState<"password" | "magic-link">(
+    "password",
+  );
   const [registerMethod, setRegisterMethod] = useState<
     "password" | "magic-link"
   >("password");
+  const [error, setError] = useState("");
+  const [busy, setBusy] = useState(false);
 
-  // If we mount with a token from the URL, kick off verification.
   useEffect(() => {
     if (initialToken) {
       void handleVerifyMagicLink(initialToken);
@@ -62,76 +67,25 @@ export default function AuthForm({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  function reset() {
-    setMode({ kind: "email" });
+  function switchTab(tab: Tab) {
+    setError("");
     setPassword("");
     setConfirmPassword("");
-    setPhone("");
-    setName("");
-    setMagicToken("");
-    setError("");
-    setRegisterMethod("password");
+    setMode({ kind: "form", tab });
   }
 
-  async function submitEmail(e: React.FormEvent) {
+  async function handleSignIn(e: React.FormEvent) {
     e.preventDefault();
-    if (!email) return;
     setError("");
     setBusy(true);
     try {
-      const result = await checkEmail(email);
-      if (!result.exists) {
-        setMode({ kind: "register" });
-      } else if (result.role === "customer") {
-        setMode({
-          kind: "customer-login",
-          name: result.name,
-          hasPassword: !!result.hasPassword,
-        });
-      } else {
-        setMode({ kind: "password", role: result.role!, name: result.name });
-      }
-    } catch (err) {
-      setError(
-        err instanceof ApiError ? err.message : "Could not look up email",
-      );
-    } finally {
-      setBusy(false);
-    }
-  }
-
-  async function submitCredential(e: React.FormEvent) {
-    e.preventDefault();
-    setError("");
-
-    if (mode.kind === "register" && registerMethod === "password") {
-      if (password !== confirmPassword) {
-        setError("Passwords do not match");
+      if (signInMethod === "magic-link") {
+        await requestMagicLink(email);
+        setMode({ kind: "magic-link-sent" });
         return;
       }
-    }
-
-    setBusy(true);
-    try {
-      let signed: AuthUser | undefined;
-      if (mode.kind === "password") {
-        signed = await login(email, { password });
-      } else if (mode.kind === "customer-login") {
-        signed = await login(email, { password });
-      } else if (mode.kind === "register") {
-        const result = await register(email, name, {
-          phone: phone || undefined,
-          password: registerMethod === "password" ? password : undefined,
-        });
-        if ("magicLinkSent" in result) {
-          setMode({ kind: "magic-link-sent" });
-          return;
-        }
-        signed = result;
-      } else {
-        return;
-      }
-      if (signed) onSuccess(signed);
+      const signed = await login(email, { password });
+      onSuccess(signed);
     } catch (err) {
       setError(err instanceof ApiError ? err.message : "Sign-in failed");
     } finally {
@@ -139,16 +93,32 @@ export default function AuthForm({
     }
   }
 
-  async function handleSendMagicLink() {
+  async function handleSignUp(e: React.FormEvent) {
+    e.preventDefault();
     setError("");
+    if (!termsAccepted) {
+      setError("You must accept the terms to create an account.");
+      return;
+    }
+    if (registerMethod === "password" && password !== confirmPassword) {
+      setError("Passwords do not match");
+      return;
+    }
+
     setBusy(true);
     try {
-      await requestMagicLink(email);
-      setMode({ kind: "magic-link-sent" });
+      const result = await register(email, name, {
+        phone: phone || undefined,
+        password: registerMethod === "password" ? password : undefined,
+        termsAccepted: true,
+      });
+      if ("magicLinkSent" in result) {
+        setMode({ kind: "magic-link-sent" });
+        return;
+      }
+      onSuccess(result);
     } catch (err) {
-      setError(
-        err instanceof ApiError ? err.message : "Could not send magic link",
-      );
+      setError(err instanceof ApiError ? err.message : "Sign-up failed");
     } finally {
       setBusy(false);
     }
@@ -169,9 +139,114 @@ export default function AuthForm({
     }
   }
 
-  const showCredential = mode.kind !== "email";
-  const greetName =
-    (mode.kind === "password" || mode.kind === "customer-login") && mode.name;
+  async function handleResendMagicLink() {
+    setError("");
+    setBusy(true);
+    try {
+      await requestMagicLink(email);
+    } catch (err) {
+      setError(
+        err instanceof ApiError ? err.message : "Could not resend magic link",
+      );
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  // ── Magic-link sub-views ─────────────────────────────────────────────
+  if (mode.kind === "magic-link-sent") {
+    return (
+      <div className="animate-fade-in space-y-5">
+        {showHeader && (
+          <div>
+            <p className="section-label">Account</p>
+            <h2 className="text-[26px] font-bold leading-tight tracking-[-0.04em] text-[var(--color-dark)]">
+              Check your email
+            </h2>
+            <p className="caption-copy mt-1">
+              We sent a sign-in link to {email}.
+            </p>
+          </div>
+        )}
+        {error && (
+          <div className="alert alert-error" role="alert">
+            {error}
+          </div>
+        )}
+        <p className="text-sm text-[var(--color-muted)]">
+          Click the link in your email to sign in. The link expires in 15
+          minutes.
+        </p>
+        <div>
+          <label className="field-label mb-2 block">
+            / Or paste your token
+          </label>
+          <input
+            type="text"
+            value={magicToken}
+            onChange={(e) => setMagicToken(e.target.value)}
+            className="ds-input"
+            placeholder="Paste token from email"
+          />
+        </div>
+        <button
+          type="button"
+          disabled={busy || !magicToken}
+          className="btn-primary w-full"
+          onClick={() => handleVerifyMagicLink()}
+        >
+          <span>{busy ? "Verifying..." : "Verify token"}</span>
+          <span className="btn-icon" aria-hidden="true">
+            <span className="btn-icon-glyph">↗</span>
+          </span>
+        </button>
+        <button
+          type="button"
+          disabled={busy}
+          className="subtle-link block w-full text-center"
+          onClick={handleResendMagicLink}
+        >
+          Resend magic link
+        </button>
+        <button
+          type="button"
+          className="subtle-link block w-full text-center"
+          onClick={() => switchTab("sign-in")}
+        >
+          Back to sign in
+        </button>
+      </div>
+    );
+  }
+
+  if (mode.kind === "magic-link-verify") {
+    return (
+      <div className="animate-fade-in space-y-4">
+        {!error && (
+          <p className="text-sm text-[var(--color-muted)]">
+            Verifying your magic link...
+          </p>
+        )}
+        {error && (
+          <>
+            <div className="alert alert-error" role="alert">
+              {error}
+            </div>
+            <button
+              type="button"
+              className="subtle-link block w-full text-center"
+              onClick={() => switchTab("sign-in")}
+            >
+              Back to sign in
+            </button>
+          </>
+        )}
+      </div>
+    );
+  }
+
+  // ── Tabbed forms ─────────────────────────────────────────────────────
+  const isSignIn = mode.tab === "sign-in";
 
   return (
     <div className="animate-fade-in">
@@ -179,29 +254,41 @@ export default function AuthForm({
         <div className="mb-6">
           <p className="section-label">Account</p>
           <h2 className="text-[26px] font-bold leading-tight tracking-[-0.04em] text-[var(--color-dark)]">
-            {mode.kind === "register"
-              ? "Create your account"
-              : mode.kind === "magic-link-sent"
-                ? "Check your email"
-                : mode.kind === "magic-link-verify"
-                  ? "Verifying..."
-                  : "Welcome"}
+            {isSignIn ? "Welcome back" : "Create your account"}
           </h2>
           <p className="caption-copy mt-1">
-            {mode.kind === "email"
-              ? "We'll match the email to your account."
-              : mode.kind === "register"
-                ? "Choose how you'd like to sign in."
-                : mode.kind === "magic-link-sent"
-                  ? `We sent a sign-in link to ${email}.`
-                  : mode.kind === "magic-link-verify"
-                    ? "Checking your magic link..."
-                    : greetName
-                      ? `Signing in as ${greetName}.`
-                      : "Confirm it's you."}
+            {isSignIn
+              ? "Sign in to continue."
+              : "Just a few details to get started."}
           </p>
         </div>
       )}
+
+      {/* Tab switcher */}
+      <div className="mb-5 flex gap-2 rounded-lg border border-neutral-700 bg-neutral-900/30 p-1">
+        <button
+          type="button"
+          className={`flex-1 rounded-md px-3 py-2 text-sm font-medium transition-colors ${
+            isSignIn
+              ? "bg-white text-black"
+              : "bg-transparent text-neutral-300 hover:text-white"
+          }`}
+          onClick={() => switchTab("sign-in")}
+        >
+          Sign in
+        </button>
+        <button
+          type="button"
+          className={`flex-1 rounded-md px-3 py-2 text-sm font-medium transition-colors ${
+            !isSignIn
+              ? "bg-white text-black"
+              : "bg-transparent text-neutral-300 hover:text-white"
+          }`}
+          onClick={() => switchTab("sign-up")}
+        >
+          Sign up
+        </button>
+      </div>
 
       {error && (
         <div className="alert alert-error mb-5" role="alert">
@@ -209,78 +296,8 @@ export default function AuthForm({
         </div>
       )}
 
-      {/* Magic link sent confirmation */}
-      {mode.kind === "magic-link-sent" && (
-        <div className="space-y-5">
-          <p className="text-sm text-[var(--color-muted)]">
-            Click the link in your email to sign in. The link expires in 15
-            minutes.
-          </p>
-          <div>
-            <label className="field-label mb-2 block">
-              / Or paste your token
-            </label>
-            <input
-              type="text"
-              value={magicToken}
-              onChange={(e) => setMagicToken(e.target.value)}
-              className="ds-input"
-              placeholder="Paste token from email"
-            />
-          </div>
-          <button
-            type="button"
-            disabled={busy || !magicToken}
-            className="btn-primary w-full"
-            onClick={() => handleVerifyMagicLink()}
-          >
-            <span>{busy ? "Verifying..." : "Verify token"}</span>
-            <span className="btn-icon" aria-hidden="true">
-              <span className="btn-icon-glyph">↗</span>
-            </span>
-          </button>
-          <button
-            type="button"
-            disabled={busy}
-            className="subtle-link block w-full text-center"
-            onClick={() => handleSendMagicLink()}
-          >
-            Resend magic link
-          </button>
-          <button
-            type="button"
-            className="subtle-link block w-full text-center"
-            onClick={reset}
-          >
-            Use a different email
-          </button>
-        </div>
-      )}
-
-      {/* Magic link verify (from URL token) */}
-      {mode.kind === "magic-link-verify" && !error && (
-        <p className="text-sm text-[var(--color-muted)]">
-          Verifying your magic link...
-        </p>
-      )}
-      {mode.kind === "magic-link-verify" && error && (
-        <div className="space-y-4">
-          <button
-            type="button"
-            className="subtle-link block w-full text-center"
-            onClick={reset}
-          >
-            Back to login
-          </button>
-        </div>
-      )}
-
-      {/* Main forms */}
-      {mode.kind !== "magic-link-sent" && mode.kind !== "magic-link-verify" && (
-        <form
-          onSubmit={showCredential ? submitCredential : submitEmail}
-          className="space-y-5"
-        >
+      {isSignIn ? (
+        <form onSubmit={handleSignIn} className="space-y-5">
           <div>
             <label className="field-label mb-2 block">/ Email</label>
             <input
@@ -288,31 +305,156 @@ export default function AuthForm({
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               required
-              autoFocus={mode.kind === "email"}
-              disabled={showCredential || busy}
+              autoFocus
               className="ds-input"
               placeholder="you@domain.com"
             />
           </div>
 
-          {/* Staff password login */}
-          {mode.kind === "password" && (
-            <div className="animate-slide-up">
+          <div>
+            <label className="field-label mb-2 block">/ Method</label>
+            <div className="flex gap-2">
+              <button
+                type="button"
+                className={`flex-1 rounded-lg border px-3 py-2 text-sm transition-colors ${
+                  signInMethod === "password"
+                    ? "border-white bg-white text-black"
+                    : "border-neutral-700 bg-transparent text-neutral-400 hover:border-neutral-500"
+                }`}
+                onClick={() => setSignInMethod("password")}
+              >
+                Password
+              </button>
+              <button
+                type="button"
+                className={`flex-1 rounded-lg border px-3 py-2 text-sm transition-colors ${
+                  signInMethod === "magic-link"
+                    ? "border-white bg-white text-black"
+                    : "border-neutral-700 bg-transparent text-neutral-400 hover:border-neutral-500"
+                }`}
+                onClick={() => setSignInMethod("magic-link")}
+              >
+                Email link
+              </button>
+            </div>
+          </div>
+
+          {signInMethod === "password" && (
+            <div className="animate-slide-up space-y-2">
               <label className="field-label mb-2 block">/ Password</label>
               <input
                 type="password"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 required
-                autoFocus
                 className="ds-input"
                 placeholder="••••••••"
               />
+              {showResetLink && (
+                <Link
+                  to="/reset-password"
+                  className="subtle-link block text-sm"
+                >
+                  Forgot password?
+                </Link>
+              )}
             </div>
           )}
 
-          {/* Customer login — always show password field with fallback options */}
-          {mode.kind === "customer-login" && (
+          {signInMethod === "magic-link" && (
+            <p className="animate-slide-up text-sm text-[var(--color-muted)]">
+              We'll email you a one-time sign-in link — no password needed.
+            </p>
+          )}
+
+          <button type="submit" disabled={busy} className="btn-primary w-full">
+            <span>
+              {busy
+                ? signInMethod === "magic-link"
+                  ? "Sending..."
+                  : "Signing in..."
+                : signInMethod === "magic-link"
+                  ? "Send sign-in link"
+                  : "Sign in"}
+            </span>
+            <span className="btn-icon" aria-hidden="true">
+              <span className="btn-icon-glyph">↗</span>
+            </span>
+          </button>
+        </form>
+      ) : (
+        <form onSubmit={handleSignUp} className="space-y-5">
+          <div>
+            <label className="field-label mb-2 block">/ Full name</label>
+            <input
+              type="text"
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              required
+              autoFocus
+              className="ds-input"
+              placeholder="Jane Doe"
+            />
+          </div>
+
+          <div>
+            <label className="field-label mb-2 block">/ Email</label>
+            <input
+              type="email"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              required
+              className="ds-input"
+              placeholder="you@domain.com"
+            />
+          </div>
+
+          <div>
+            <label className="field-label mb-2 block">
+              / Phone{" "}
+              <span className="text-[var(--color-muted)] font-normal">
+                (optional)
+              </span>
+            </label>
+            <input
+              type="tel"
+              value={phone}
+              onChange={(e) => setPhone(e.target.value)}
+              minLength={6}
+              className="ds-input"
+              placeholder="07700 000000"
+            />
+          </div>
+
+          <div>
+            <label className="field-label mb-2 block">/ Sign-in method</label>
+            <div className="flex gap-2">
+              <button
+                type="button"
+                className={`flex-1 rounded-lg border px-3 py-2 text-sm transition-colors ${
+                  registerMethod === "password"
+                    ? "border-white bg-white text-black"
+                    : "border-neutral-700 bg-transparent text-neutral-400 hover:border-neutral-500"
+                }`}
+                onClick={() => setRegisterMethod("password")}
+              >
+                Password
+              </button>
+              <button
+                type="button"
+                className={`flex-1 rounded-lg border px-3 py-2 text-sm transition-colors ${
+                  registerMethod === "magic-link"
+                    ? "border-white bg-white text-black"
+                    : "border-neutral-700 bg-transparent text-neutral-400 hover:border-neutral-500"
+                }`}
+                onClick={() => setRegisterMethod("magic-link")}
+              >
+                Email link
+              </button>
+            </div>
+          </div>
+
+          {registerMethod === "password" && (
             <div className="animate-slide-up space-y-5">
               <div>
                 <label className="field-label mb-2 block">/ Password</label>
@@ -321,165 +463,67 @@ export default function AuthForm({
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
                   required
-                  autoFocus
+                  minLength={8}
                   className="ds-input"
-                  placeholder="••••••••"
+                  placeholder="Min. 8 characters"
                 />
               </div>
-              <div className="flex items-center justify-between gap-4">
-                {showResetLink ? (
-                  <Link to="/reset-password" className="subtle-link text-sm">
-                    Forgot password?
-                  </Link>
-                ) : (
-                  <span />
-                )}
-                <button
-                  type="button"
-                  className="subtle-link text-sm"
-                  disabled={busy}
-                  onClick={() => handleSendMagicLink()}
-                >
-                  Use email link instead
-                </button>
-              </div>
-            </div>
-          )}
-
-          {/* Registration form */}
-          {mode.kind === "register" && (
-            <div className="animate-slide-up space-y-5">
               <div>
-                <label className="field-label mb-2 block">/ Full name</label>
+                <label className="field-label mb-2 block">
+                  / Confirm password
+                </label>
                 <input
-                  type="text"
-                  value={name}
-                  onChange={(e) => setName(e.target.value)}
+                  type="password"
+                  value={confirmPassword}
+                  onChange={(e) => setConfirmPassword(e.target.value)}
                   required
-                  autoFocus
+                  minLength={8}
                   className="ds-input"
-                  placeholder="Jane Doe"
+                  placeholder="Re-enter your password"
                 />
               </div>
-
-              <div>
-                <label className="field-label mb-2 block">
-                  / Phone{" "}
-                  <span className="text-[var(--color-muted)] font-normal">
-                    (optional)
-                  </span>
-                </label>
-                <input
-                  type="tel"
-                  value={phone}
-                  onChange={(e) => setPhone(e.target.value)}
-                  minLength={6}
-                  className="ds-input"
-                  placeholder="07700 000000"
-                />
-              </div>
-
-              {/* Auth method toggle */}
-              <div>
-                <label className="field-label mb-2 block">
-                  / Sign-in method
-                </label>
-                <div className="flex gap-2">
-                  <button
-                    type="button"
-                    className={`flex-1 rounded-lg border px-3 py-2 text-sm transition-colors ${
-                      registerMethod === "password"
-                        ? "border-white bg-white text-black"
-                        : "border-neutral-700 bg-transparent text-neutral-400 hover:border-neutral-500"
-                    }`}
-                    onClick={() => setRegisterMethod("password")}
-                  >
-                    Password
-                  </button>
-                  <button
-                    type="button"
-                    className={`flex-1 rounded-lg border px-3 py-2 text-sm transition-colors ${
-                      registerMethod === "magic-link"
-                        ? "border-white bg-white text-black"
-                        : "border-neutral-700 bg-transparent text-neutral-400 hover:border-neutral-500"
-                    }`}
-                    onClick={() => setRegisterMethod("magic-link")}
-                  >
-                    Email link
-                  </button>
-                </div>
-              </div>
-
-              {registerMethod === "password" && (
-                <div className="animate-slide-up space-y-5">
-                  <div>
-                    <label className="field-label mb-2 block">/ Password</label>
-                    <input
-                      type="password"
-                      value={password}
-                      onChange={(e) => setPassword(e.target.value)}
-                      required
-                      minLength={8}
-                      className="ds-input"
-                      placeholder="Min. 8 characters"
-                    />
-                  </div>
-                  <div>
-                    <label className="field-label mb-2 block">
-                      / Confirm password
-                    </label>
-                    <input
-                      type="password"
-                      value={confirmPassword}
-                      onChange={(e) => setConfirmPassword(e.target.value)}
-                      required
-                      minLength={8}
-                      className="ds-input"
-                      placeholder="Re-enter your password"
-                    />
-                  </div>
-                </div>
-              )}
-
-              {registerMethod === "magic-link" && (
-                <p className="animate-slide-up text-sm text-[var(--color-muted)]">
-                  We'll send a sign-in link to your email each time you log in —
-                  no password needed.
-                </p>
-              )}
             </div>
           )}
+
+          {registerMethod === "magic-link" && (
+            <p className="animate-slide-up text-sm text-[var(--color-muted)]">
+              We'll send a sign-in link to your email each time you log in — no
+              password needed.
+            </p>
+          )}
+
+          <label className="flex items-start gap-3 text-sm text-[var(--color-mid)]">
+            <input
+              type="checkbox"
+              checked={termsAccepted}
+              onChange={(e) => setTermsAccepted(e.target.checked)}
+              required
+              className="mt-1 h-4 w-4 accent-[var(--color-green)]"
+            />
+            <span>
+              I agree to the{" "}
+              <Link
+                to="/terms"
+                target="_blank"
+                rel="noreferrer"
+                className="subtle-link"
+              >
+                Terms &amp; Conditions
+              </Link>
+              .
+            </span>
+          </label>
 
           <button
             type="submit"
-            disabled={busy}
-            className={`${mode.kind === "register" ? "btn-green" : "btn-primary"} w-full`}
+            disabled={busy || !termsAccepted}
+            className="btn-green w-full"
           >
-            <span>
-              {busy
-                ? mode.kind === "email"
-                  ? "Checking..."
-                  : "Signing in..."
-                : mode.kind === "email"
-                  ? "Continue"
-                  : mode.kind === "register"
-                    ? "Create account"
-                    : "Sign in"}
-            </span>
+            <span>{busy ? "Creating..." : "Create account"}</span>
             <span className="btn-icon" aria-hidden="true">
               <span className="btn-icon-glyph">↗</span>
             </span>
           </button>
-
-          {showCredential && (
-            <button
-              type="button"
-              className="subtle-link block w-full text-center"
-              onClick={reset}
-            >
-              Use a different email
-            </button>
-          )}
         </form>
       )}
     </div>

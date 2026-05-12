@@ -99,6 +99,22 @@ export interface RefundResult {
   remainingRefundablePence: number;
 }
 
+export function markCustomerArrived(bookingId: number) {
+  return api.post<{ booking: Booking }>(
+    `/bookings/${bookingId}/customer-arrived`,
+  );
+}
+
+export function markNoShow(bookingId: number) {
+  return api.post<{ booking: Booking }>(`/bookings/${bookingId}/no-show`);
+}
+
+export function markCashCollected(bookingId: number) {
+  return api.post<{ booking: Booking }>(
+    `/bookings/${bookingId}/cash-collected`,
+  );
+}
+
 export function refundBooking(
   id: number,
   input: {
@@ -122,6 +138,7 @@ export interface CreateBookingInput {
   couponCode?: string;
   pickupFlightNumber?: string;
   dropoffFlightNumber?: string;
+  paymentMethod?: "card" | "cash";
 }
 
 export interface BookingPaymentInit {

@@ -29,6 +29,11 @@ export const updateMileRateSchema = z.object({
   ratePerMilePence: z.number().int().min(0).optional(),
 });
 
+export const paymentMethodSchema = z.enum(["card", "cash"]);
+// Cash bookings collect a fixed % of fare as a Stripe deposit and the
+// rest in person. Anchored here so frontend + backend agree.
+export const CASH_DEPOSIT_PERCENT = 25;
+
 export const createBookingSchema = z.object({
   pickupAddress: z.string().min(1),
   dropoffAddress: z.string().min(1),
@@ -42,6 +47,9 @@ export const createBookingSchema = z.object({
   pickupFlightNumber: z.string().max(10).optional(),
   dropoffFlightNumber: z.string().max(10).optional(),
   vehicleClass: vehicleClassSchema.default("regular"),
+  // Defaults to card. `cash` switches the Stripe charge to a 25% deposit
+  // and lifts the auth-horizon guard for long-lead bookings.
+  paymentMethod: paymentMethodSchema.default("card"),
 });
 
 export const loginSchema = z.object({
@@ -59,6 +67,11 @@ export const registerSchema = z.object({
   name: z.string().min(1),
   phone: z.string().min(6).optional(),
   password: z.string().min(8).optional(),
+  // Required from the sign-up form. Must be literal true so an unchecked
+  // checkbox can never bypass the gate.
+  termsAccepted: z.literal(true, {
+    errorMap: () => ({ message: "You must accept the terms to continue" }),
+  }),
 });
 
 export const magicLinkRequestSchema = z.object({

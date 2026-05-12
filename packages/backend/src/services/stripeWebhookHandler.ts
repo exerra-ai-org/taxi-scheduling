@@ -20,6 +20,7 @@ import { bookings, payments, refunds } from "../db/schema";
 import type { Logger } from "../lib/logger";
 import { broadcastBookingEvent } from "./broadcaster";
 import { notifyBookingCreated } from "./notifications";
+import { dispatchReceipt } from "./receiptDispatcher";
 
 export type WebhookHandler = (
   event: Stripe.Event,
@@ -187,6 +188,9 @@ async function handleAuthorized(event: Stripe.Event, log: Logger) {
     bookingId: refs.bookingId,
     paymentStatus: "authorized",
   });
+  // Booking is locked → email a confirmation receipt PDF to the customer
+  // and all admins. Best-effort; failures logged inside the dispatcher.
+  void dispatchReceipt(refs.bookingId, "confirmation");
   log.info("stripe.webhook.pi.authorized", {
     bookingId: refs.bookingId,
     intentId: intent.id,

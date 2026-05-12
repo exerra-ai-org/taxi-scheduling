@@ -45,6 +45,14 @@ export const vehicleClassEnum = pgEnum("vehicle_class", [
   "max",
 ]);
 
+// `card`  — Stripe end-to-end (existing flow).
+// `cash`  — 25% deposit via Stripe, balance paid in cash to the driver.
+//           Required for long-lead bookings beyond the Stripe auth horizon.
+export const paymentMethodEnum = pgEnum("booking_payment_method", [
+  "card",
+  "cash",
+]);
+
 // ── Payments ───────────────────────────────────────────
 //
 // Booking-level rollup of where the money is. Driven entirely by Stripe
@@ -101,6 +109,9 @@ export const users = pgTable(
     // signup (and on invitation accept if the new account is a customer).
     // Null for admin/driver accounts — they do not pay.
     stripeCustomerId: text("stripe_customer_id").unique(),
+    // Stamped when the user accepts terms during sign-up. Null for legacy
+    // accounts created before T&C enforcement.
+    termsAcceptedAt: timestamp("terms_accepted_at"),
     createdAt: timestamp("created_at").notNull().defaultNow(),
   },
   (table) => [
@@ -251,6 +262,27 @@ export const bookings = pgTable(
       .default(0),
     // Hold expiry — if the customer never confirms payment, free the slot.
     paymentHoldExpiresAt: timestamp("payment_hold_expires_at"),
+    // Card (default, existing behaviour) or cash (25% deposit + balance on
+    // pickup). Cash bypasses the Stripe auth-horizon guard, so long-lead
+    // bookings are funnelled here.
+    paymentMethod: paymentMethodEnum("payment_method")
+      .notNull()
+      .default("card"),
+    // Cash bookings only. 25% of total charged via Stripe up front;
+    // balance collected in person and stamped via `cashCollectedAt`.
+    depositPence: integer("deposit_pence").notNull().default(0),
+    balanceDuePence: integer("balance_due_pence").notNull().default(0),
+    cashCollectedAt: timestamp("cash_collected_at"),
+    // Driver-side arrival (status -> arrived) timestamp. Starts the
+    // 30-min-free waiting clock. Promoted out of the status enum so the
+    // fee math has a stable anchor independent of subsequent transitions.
+    driverArrivedAt: timestamp("driver_arrived_at"),
+    // Customer pressed "I'm here". Caps the waiting timer.
+    customerArrivedAt: timestamp("customer_arrived_at"),
+    // Computed at ride start (or no-show). 30 min free, then 200p / 5 min.
+    waitingFeePence: integer("waiting_fee_pence").notNull().default(0),
+    // Stamped when driver/admin marks the customer no-show.
+    noShowAt: timestamp("no_show_at"),
     createdAt: timestamp("created_at").notNull().defaultNow(),
   },
   (table) => [
@@ -557,6 +589,18 @@ export const disputes = pgTable(
     index("idx_disputes_status").on(table.status),
   ],
 );
+
+// ── App Settings ───────────────────────────────────────
+//
+// Single-row-per-key kv store for runtime-tunable values that the admin
+// panel exposes (contact phone, emergency number, waiting-fee dials, etc.).
+// Strings only — coerce on read. Keep the surface tiny on purpose; bigger
+// config goes in code/env, not here.
+export const appSettings = pgTable("app_settings", {
+  key: text("key").primaryKey(),
+  value: text("value").notNull(),
+  updatedAt: timestamp("updated_at").notNull().defaultNow(),
+});
 
 // ── Webhook Events ─────────────────────────────────────
 //

@@ -10,8 +10,13 @@ import {
   getBooking,
   getCancelPreview,
   reportIncident,
+  markCustomerArrived,
   type BookingDetail,
 } from "../api/bookings";
+import {
+  getPublicSettings,
+  type PublicSettings,
+} from "../api/settings";
 import { ApiError } from "../api/client";
 import {
   formatDate,
@@ -166,6 +171,98 @@ function IncidentModal({ type, onClose, onSubmit }: IncidentModalProps) {
   );
 }
 
+// ── Arrived panel ─────────────────────────────────────────────────────────────
+//
+// Shown when status=arrived. Surfaces the live waiting-fee meter and the
+// "I'm here" CTA that caps the meter + alerts the driver. Fee math mirrors
+// the server (30 free min, then 200p per 5 min) so the user sees the same
+// amount the backend will persist.
+
+const FREE_MIN = 30;
+const RATE_PENCE = 200;
+const INCREMENT_MIN = 5;
+
+interface ArrivedPanelProps {
+  booking: CustomerBookingExtra;
+  nowTick: number;
+  onCustomerArrived: () => Promise<void>;
+}
+
+function computeFee(driverArrivedAt: Date, now: number): number {
+  const minutes = (now - driverArrivedAt.getTime()) / 60_000;
+  const billable = minutes - FREE_MIN;
+  if (billable <= 0) return 0;
+  return Math.ceil(billable / INCREMENT_MIN) * RATE_PENCE;
+}
+
+function ArrivedPanel({
+  booking,
+  nowTick,
+  onCustomerArrived,
+}: ArrivedPanelProps) {
+  const driverArrived = booking.driverArrivedAt
+    ? new Date(booking.driverArrivedAt)
+    : null;
+  const customerArrived = booking.customerArrivedAt
+    ? new Date(booking.customerArrivedAt)
+    : null;
+
+  const referenceMs = customerArrived?.getTime() ?? nowTick;
+  const liveFee = driverArrived ? computeFee(driverArrived, referenceMs) : 0;
+  const minutesElapsed = driverArrived
+    ? Math.max(0, (referenceMs - driverArrived.getTime()) / 60_000)
+    : 0;
+  const inFreeWindow = minutesElapsed < FREE_MIN;
+  const minutesUntilCharge = Math.max(0, FREE_MIN - minutesElapsed);
+
+  return (
+    <div className="space-y-3">
+      <p className="caption-copy text-[var(--color-mid)]">
+        Your driver is waiting at the pickup point.
+      </p>
+
+      {driverArrived && (
+        <div className="glass-card p-3">
+          <p className="section-label">/ Waiting</p>
+          <div className="mt-1 flex items-baseline justify-between">
+            <span className="text-[20px] font-bold tracking-[-0.02em]">
+              {inFreeWindow
+                ? `${minutesUntilCharge.toFixed(0)} min free`
+                : `${formatPrice(liveFee)} fee`}
+            </span>
+            <span className="caption-copy text-[var(--color-muted)]">
+              {minutesElapsed.toFixed(0)} min since arrival
+            </span>
+          </div>
+          {!inFreeWindow && (
+            <p className="caption-copy mt-1 text-[var(--color-muted)]">
+              £{(RATE_PENCE / 100).toFixed(2)} per {INCREMENT_MIN} min after the
+              first {FREE_MIN} min.
+            </p>
+          )}
+        </div>
+      )}
+
+      {customerArrived ? (
+        <div className="alert alert-success" role="status">
+          You let the driver know you've arrived.
+        </div>
+      ) : (
+        <button
+          type="button"
+          onClick={() => void onCustomerArrived()}
+          className="btn-green w-full"
+        >
+          <span>I'm here</span>
+          <span className="btn-icon" aria-hidden="true">
+            <span className="btn-icon-glyph">↗</span>
+          </span>
+        </button>
+      )}
+    </div>
+  );
+}
+
 // ── Main component ────────────────────────────────────────────────────────────
 
 export default function CustomerRideDetail() {
@@ -190,6 +287,39 @@ export default function CustomerRideDetail() {
   const [incidentType, setIncidentType] = useState<
     "emergency" | "contact_admin" | null
   >(null);
+
+  // Runtime-tunable contact numbers — fetched once on mount. Admin can edit
+  // these from /admin/settings; we refetch when the user opens help.
+  const [publicSettings, setPublicSettings] = useState<PublicSettings | null>(
+    null,
+  );
+  useEffect(() => {
+    getPublicSettings()
+      .then(setPublicSettings)
+      .catch(() => {});
+  }, []);
+
+  // Local "now" ticker so the waiting-fee meter advances visibly without a
+  // server round-trip. The fee is still authoritatively computed server-side
+  // at status flip / no-show, but the customer sees the meter live.
+  const [nowTick, setNowTick] = useState(() => Date.now());
+  useEffect(() => {
+    const t = setInterval(() => setNowTick(Date.now()), 1000);
+    return () => clearInterval(t);
+  }, []);
+
+  async function handleCustomerArrived() {
+    if (!bookingId) return;
+    try {
+      await markCustomerArrived(bookingId);
+      toast.success("Driver has been notified");
+      load();
+    } catch (err) {
+      toast.error(
+        err instanceof ApiError ? err.message : "Could not notify driver",
+      );
+    }
+  }
 
   const load = useCallback(async () => {
     if (!Number.isFinite(bookingId)) return;
@@ -548,9 +678,11 @@ export default function CustomerRideDetail() {
                 )}
 
                 {isArrived && (
-                  <p className="caption-copy text-[var(--color-mid)]">
-                    Your driver is waiting at the pickup point.
-                  </p>
+                  <ArrivedPanel
+                    booking={booking}
+                    nowTick={nowTick}
+                    onCustomerArrived={handleCustomerArrived}
+                  />
                 )}
 
                 {isInProgress && (
@@ -806,7 +938,7 @@ export default function CustomerRideDetail() {
         </div>
       </div>
 
-      {/* Help modal — choose between Contact Admin and SOS */}
+      {/* Help modal — Contact Admin dials admin; SOS dials emergency services. */}
       {helpOpen && (
         <div
           className="fixed inset-0 z-[2000] flex items-end sm:items-center justify-center p-4 bg-black/60 backdrop-blur-sm"
@@ -820,26 +952,49 @@ export default function CustomerRideDetail() {
               Choose an option below.
             </p>
             <div className="space-y-2">
+              {publicSettings?.adminContactPhone ? (
+                <a
+                  href={`tel:${publicSettings.adminContactPhone}`}
+                  onClick={() => setHelpOpen(false)}
+                  className="btn-secondary w-full text-sm py-3 text-center block"
+                >
+                  <span className="inline-flex items-center gap-2">
+                    <IconPhone className="h-4 w-4" />
+                    Call admin
+                  </span>
+                </a>
+              ) : (
+                <button
+                  disabled
+                  className="btn-secondary w-full text-sm py-3 opacity-50 cursor-not-allowed"
+                >
+                  <span className="inline-flex items-center gap-2">
+                    <IconPhone className="h-4 w-4" />
+                    Admin phone unavailable
+                  </span>
+                </button>
+              )}
               <button
-                onClick={() => {
+                onClick={async () => {
+                  const number = publicSettings?.emergencyNumber || "999";
+                  const ok = await confirm({
+                    title: "Call emergency services?",
+                    message: `This will dial ${number} on your device. We will also alert our admin team.`,
+                    confirmLabel: `Call ${number}`,
+                    variant: "danger",
+                  });
+                  if (!ok) return;
                   setHelpOpen(false);
-                  setIncidentType("contact_admin");
-                }}
-                className="btn-secondary w-full text-sm py-3"
-              >
-                <span className="inline-flex items-center gap-2">
-                  <IconPhone className="h-4 w-4" />
-                  Contact admin
-                </span>
-              </button>
-              <button
-                onClick={() => {
-                  setHelpOpen(false);
-                  setIncidentType("emergency");
+                  // Notify admin in parallel so ops sees the SOS even if the
+                  // call drops or the customer can't speak.
+                  reportIncident(booking.id, "emergency", "SOS dialled").catch(
+                    () => {},
+                  );
+                  window.location.href = `tel:${number}`;
                 }}
                 className="btn-danger w-full text-sm py-3"
               >
-                SOS — Emergency
+                SOS — Call emergency services
               </button>
             </div>
             <button

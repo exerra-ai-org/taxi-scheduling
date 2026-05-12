@@ -115,6 +115,16 @@ export interface Booking {
   cancellationFeePence: number;
   paymentHoldExpiresAt?: string | Date | null;
   activePaymentIntentId?: string | null;
+  // Cash flow
+  paymentMethod?: "card" | "cash";
+  depositPence?: number;
+  balanceDuePence?: number;
+  cashCollectedAt?: string | Date | null;
+  // Arrival + waiting fee
+  driverArrivedAt?: string | Date | null;
+  customerArrivedAt?: string | Date | null;
+  waitingFeePence?: number;
+  noShowAt?: string | Date | null;
   createdAt: Date;
 }
 

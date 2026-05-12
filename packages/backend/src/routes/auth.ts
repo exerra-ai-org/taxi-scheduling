@@ -199,7 +199,14 @@ authRoutes.post("/register", registerLimiter, async (c) => {
 
   const [user] = await db
     .insert(users)
-    .values({ email, name, phone, role: "customer", passwordHash })
+    .values({
+      email,
+      name,
+      phone,
+      role: "customer",
+      passwordHash,
+      termsAcceptedAt: new Date(),
+    })
     .returning();
 
   // Eagerly create the Stripe Customer so the saved-cards page works

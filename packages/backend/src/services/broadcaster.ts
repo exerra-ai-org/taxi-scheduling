@@ -31,6 +31,12 @@ export type BroadcastEvent =
       paymentStatus: string;
       lastErrorMessage?: string | null;
     }
+  | {
+      type: "customer_arrived";
+      bookingId: number;
+      customerArrivedAt: string;
+      waitingFeePence: number;
+    }
   | { type: "ping" }
   | { type: "overflow" };
 

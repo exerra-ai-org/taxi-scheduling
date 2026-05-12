@@ -264,6 +264,51 @@ export async function sendPasswordResetEmail(
   });
 }
 
+// Send a receipt PDF to the customer + all admin users. Best-effort —
+// Resend errors are logged but never block the calling flow.
+export async function sendReceiptEmail(input: {
+  to: string[];
+  bookingId: number;
+  kind: "confirmation" | "final";
+  pdf: Buffer;
+}): Promise<void> {
+  if (!resend) {
+    console.warn(
+      `[Email] Resend not configured — receipt for booking ${input.bookingId} not sent`,
+    );
+    return;
+  }
+
+  const subject =
+    input.kind === "confirmation"
+      ? `${APP_NAME} — Booking #${input.bookingId} confirmed`
+      : `${APP_NAME} — Receipt for booking #${input.bookingId}`;
+
+  const body = `
+    ${sectionLabel(input.kind === "confirmation" ? "Booking confirmed" : "Ride complete")}
+    <h2 style="margin:4px 0 8px;font-family:${t.fontBody};font-size:24px;font-weight:700;color:${t.dark};letter-spacing:-0.03em;line-height:1.2;">
+      Receipt attached
+    </h2>
+    <p style="margin:0 0 20px;font-family:${t.fontBody};font-size:15px;font-weight:500;color:${t.muted};line-height:1.6;">
+      Your booking receipt is attached as a PDF. Keep it for your records.
+    </p>
+    ${primaryButton(`${APP_BASE_URL}/booking/${input.bookingId}`, "View booking")}
+  `;
+
+  await sendViaResend({
+    from: EMAIL_FROM,
+    to: input.to,
+    subject,
+    html: emailShell(body),
+    attachments: [
+      {
+        filename: `booking-${input.bookingId}-${input.kind}.pdf`,
+        content: input.pdf,
+      },
+    ],
+  });
+}
+
 function escapeHtml(str: string): string {
   return str
     .replace(/&/g, "&amp;")
