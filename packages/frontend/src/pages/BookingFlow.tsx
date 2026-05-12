@@ -161,14 +161,29 @@ export default function BookingFlow() {
   const handleMapClick = useCallback(
     (lat: number, lng: number) => {
       if (step !== 1 || !activeField) return;
-      // Reverse geocode then push pending pick to JourneyPanel
+      // Reverse geocode then push pending pick to JourneyPanel.
+      // zoom=18 + addressdetails=1 pulls building/house-level data and the
+      // structured address parts so the input shows a clean
+      // "12 High Street, Luton, LU1 2QA" rather than the full display_name.
       fetch(
-        `https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lng}`,
+        `https://nominatim.openstreetmap.org/reverse?format=json&zoom=18&addressdetails=1&lat=${lat}&lon=${lng}`,
       )
         .then((r) => r.json())
         .then((resp) => {
+          const a = resp?.address ?? {};
+          const line1 = [a.house_number, a.road ?? a.pedestrian]
+            .filter(Boolean)
+            .join(" ")
+            .trim();
+          const locality =
+            a.city || a.town || a.village || a.suburb || a.neighbourhood;
+          const pretty = [line1, locality, a.postcode]
+            .filter(Boolean)
+            .join(", ");
           const address =
-            resp?.display_name || `${lat.toFixed(4)}, ${lng.toFixed(4)}`;
+            pretty ||
+            resp?.display_name ||
+            `${lat.toFixed(4)}, ${lng.toFixed(4)}`;
           setPendingPick({ field: activeField, lat, lon: lng, address });
         })
         .catch(() => {

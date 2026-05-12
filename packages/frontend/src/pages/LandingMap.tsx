@@ -170,13 +170,30 @@ export default function LandingMap({ data, onNext }: Props) {
     (lat: number, lng: number) => {
       if (!activeField) return;
 
+      // zoom=18 + addressdetails=1 asks Nominatim for the finest-grained
+      // match it has at this point (building / house level when present)
+      // and returns structured address parts so we can format a clean
+      // "12 High Street, Luton, LU1 2QA" label rather than the long
+      // display_name with country.
       fetch(
-        `https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lng}`,
+        `https://nominatim.openstreetmap.org/reverse?format=json&zoom=18&addressdetails=1&lat=${lat}&lon=${lng}`,
       )
         .then((r) => r.json())
         .then((data) => {
+          const a = data.address ?? {};
+          const line1 = [a.house_number, a.road ?? a.pedestrian]
+            .filter(Boolean)
+            .join(" ")
+            .trim();
+          const locality =
+            a.city || a.town || a.village || a.suburb || a.neighbourhood;
+          const pretty = [line1, locality, a.postcode]
+            .filter(Boolean)
+            .join(", ");
           const address =
-            data.display_name || `${lat.toFixed(4)}, ${lng.toFixed(4)}`;
+            pretty ||
+            data.display_name ||
+            `${lat.toFixed(4)}, ${lng.toFixed(4)}`;
           if (activeField === "pickup") {
             setPickup(address);
             setPickupLat(lat);
