@@ -16,6 +16,7 @@ import {
   IconLogout,
   IconBell,
   IconMapPin,
+  IconEdit,
 } from "./icons";
 
 function BrandStar({ size = 16 }: { size?: number }) {
@@ -189,6 +190,7 @@ export default function Layout() {
                 <DesktopNavItem to="/admin/incidents" label="Incidents" />
                 <DesktopNavItem to="/admin/coupons" label="Coupons" />
                 <DesktopNavItem to="/admin/vehicles" label="Vehicles" />
+                <DesktopNavItem to="/admin/settings" label="Settings" />
               </>
             )}
             {user?.role === "driver" && (
@@ -298,6 +300,11 @@ export default function Layout() {
                   to="/admin/vehicles"
                   icon={<IconCar className="w-5 h-5" />}
                   label="Vehicles"
+                />
+                <NavItem
+                  to="/admin/settings"
+                  icon={<IconEdit className="w-5 h-5" />}
+                  label="Settings"
                 />
               </>
             )}
